@@ -13,6 +13,7 @@ import Sessions from "@/pages/Sessions";
 import Attendance from "@/pages/Attendance";
 import Reports from "@/pages/Reports";
 import ScanQR from "@/pages/ScanQR";
+import SessionQR from "@/pages/SessionQR";
 import UsersAdmin from "@/pages/UsersAdmin";
 import SettingsPage from "@/pages/SettingsPage";
 import ResetPassword from "@/pages/ResetPassword";
@@ -56,6 +57,7 @@ const App = () => (
                 <Route path="/courses" element={<Courses />} />
                 <Route path="/sessions" element={<Sessions />} />
                 <Route path="/scan" element={<ScanQR />} />
+                <Route path="/sessions/:sessionId/qr" element={<SessionQR />} />
                 <Route path="/attendance" element={<Attendance />} />
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/users" element={<UsersAdmin />} />
