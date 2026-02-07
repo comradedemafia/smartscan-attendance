@@ -15,6 +15,7 @@ import Reports from "@/pages/Reports";
 import ScanQR from "@/pages/ScanQR";
 import UsersAdmin from "@/pages/UsersAdmin";
 import SettingsPage from "@/pages/SettingsPage";
+import ResetPassword from "@/pages/ResetPassword";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -43,6 +44,7 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               <Route path="/auth" element={<AuthRoute />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route
                 element={
                   <ProtectedRoute>
