@@ -39,6 +39,7 @@ export default function AppLayout() {
     { to: "/scan", icon: QrCode, label: t("nav.scanQr"), roles: ["student"] },
     { to: "/attendance", icon: ClipboardList, label: t("nav.attendance"), roles: ["admin", "lecturer", "student"] },
     { to: "/reports", icon: BarChart3, label: t("nav.reports"), roles: ["admin", "lecturer"] },
+    { to: "/enrollments", icon: Users, label: t("courses.enroll"), roles: ["admin"] },
     { to: "/users", icon: Users, label: t("nav.users"), roles: ["admin"] },
     { to: "/settings", icon: Settings, label: t("nav.settings"), roles: ["admin", "lecturer", "student"] },
   ];
