@@ -15,6 +15,7 @@ import Reports from "@/pages/Reports";
 import ScanQR from "@/pages/ScanQR";
 import SessionQR from "@/pages/SessionQR";
 import UsersAdmin from "@/pages/UsersAdmin";
+import CourseEnrollments from "@/pages/CourseEnrollments";
 import SettingsPage from "@/pages/SettingsPage";
 import ResetPassword from "@/pages/ResetPassword";
 import NotFound from "@/pages/NotFound";
@@ -61,6 +62,7 @@ const App = () => (
                 <Route path="/attendance" element={<Attendance />} />
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/users" element={<UsersAdmin />} />
+                <Route path="/enrollments" element={<CourseEnrollments />} />
                 <Route path="/settings" element={<SettingsPage />} />
               </Route>
               <Route path="*" element={<NotFound />} />
