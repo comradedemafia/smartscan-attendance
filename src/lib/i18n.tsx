@@ -67,6 +67,10 @@ const translations = {
     "courses.sessions": "Sessions",
     "courses.enroll": "Enroll Students",
     "courses.empty": "No courses found",
+    "courses.enrolled": "Successfully enrolled!",
+    "courses.unenrolled": "Successfully unenrolled",
+    "courses.joinCourse": "Join Course",
+    "courses.unenroll": "Leave",
 
     // Sessions
     "sessions.title": "Sessions",
@@ -196,6 +200,10 @@ const translations = {
     "courses.sessions": "Vipindi",
     "courses.enroll": "Sajili Wanafunzi",
     "courses.empty": "Hakuna kozi zilizopatikana",
+    "courses.enrolled": "Umejisajili kikamilifu!",
+    "courses.unenrolled": "Umejitoa kwenye kozi",
+    "courses.joinCourse": "Jiunge",
+    "courses.unenroll": "Jiondoe",
 
     // Sessions
     "sessions.title": "Vipindi",
