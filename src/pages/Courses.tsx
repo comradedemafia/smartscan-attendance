@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { BookOpen, Plus, Trash2, Edit, Users } from "lucide-react";
+import { BookOpen, Plus, Trash2, Edit, Users, LogIn, LogOut } from "lucide-react";
 
 export default function Courses() {
   const { user, role } = useAuth();
@@ -24,6 +24,7 @@ export default function Courses() {
   const [description, setDescription] = useState("");
 
   const canManage = role === "lecturer" || role === "admin";
+  const isStudent = role === "student";
 
   const { data: courses = [], isLoading } = useQuery({
     queryKey: ["courses"],
@@ -34,6 +35,57 @@ export default function Courses() {
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
+    },
+  });
+
+  // Fetch student's own enrollments
+  const { data: myEnrollments = [] } = useQuery({
+    queryKey: ["my-enrollments", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("course_enrollments")
+        .select("course_id")
+        .eq("user_id", user!.id);
+      if (error) throw error;
+      return data.map((e) => e.course_id);
+    },
+    enabled: isStudent && !!user,
+  });
+
+  const enrollMutation = useMutation({
+    mutationFn: async (courseId: string) => {
+      const { error } = await supabase.from("course_enrollments").insert({
+        course_id: courseId,
+        user_id: user!.id,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
+      queryClient.invalidateQueries({ queryKey: ["my-enrollments"] });
+      toast({ title: t("common.success"), description: t("courses.enrolled") });
+    },
+    onError: (e: any) => {
+      toast({ title: t("common.error"), description: e.message, variant: "destructive" });
+    },
+  });
+
+  const unenrollMutation = useMutation({
+    mutationFn: async (courseId: string) => {
+      const { error } = await supabase
+        .from("course_enrollments")
+        .delete()
+        .eq("course_id", courseId)
+        .eq("user_id", user!.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
+      queryClient.invalidateQueries({ queryKey: ["my-enrollments"] });
+      toast({ title: t("common.success"), description: t("courses.unenrolled") });
+    },
+    onError: (e: any) => {
+      toast({ title: t("common.error"), description: e.message, variant: "destructive" });
     },
   });
 
@@ -190,9 +242,33 @@ export default function Courses() {
                 {course.description && (
                   <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{course.description}</p>
                 )}
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Users className="h-3.5 w-3.5" />
-                  <span>{course.course_enrollments?.[0]?.count ?? 0} {t("courses.students")}</span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Users className="h-3.5 w-3.5" />
+                    <span>{course.course_enrollments?.[0]?.count ?? 0} {t("courses.students")}</span>
+                  </div>
+                  {isStudent && (
+                    myEnrollments.includes(course.id) ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => unenrollMutation.mutate(course.id)}
+                        disabled={unenrollMutation.isPending}
+                      >
+                        <LogOut className="h-3.5 w-3.5 mr-1" />
+                        {t("courses.unenroll")}
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        onClick={() => enrollMutation.mutate(course.id)}
+                        disabled={enrollMutation.isPending}
+                      >
+                        <LogIn className="h-3.5 w-3.5 mr-1" />
+                        {t("courses.joinCourse")}
+                      </Button>
+                    )
+                  )}
                 </div>
               </CardContent>
             </Card>
