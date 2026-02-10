@@ -40,16 +40,29 @@ export default function SessionQR() {
   const { data: attendees = [] } = useQuery({
     queryKey: ["session-attendees", sessionId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: records, error } = await supabase
         .from("attendance_records")
-        .select("id, scanned_at, status, user_id, profiles:user_id(full_name, university_id)")
+        .select("id, scanned_at, status, user_id")
         .eq("session_id", sessionId!)
         .order("scanned_at", { ascending: true });
       if (error) throw error;
-      return data;
+      if (!records || records.length === 0) return [];
+
+      // Fetch profiles separately
+      const userIds = records.map((r) => r.user_id);
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, full_name, university_id")
+        .in("id", userIds);
+
+      const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
+      return records.map((r) => ({
+        ...r,
+        profile: profileMap.get(r.user_id) || null,
+      }));
     },
     enabled: !!sessionId,
-    refetchInterval: 3000, // Poll every 3s for new scans
+    refetchInterval: 3000,
   });
 
   // Generate / activate QR
@@ -184,8 +197,8 @@ export default function SessionQR() {
                     <span className="text-xs font-mono text-muted-foreground w-6">{i + 1}.</span>
                     <CheckCircle2 className="h-4 w-4 text-primary" />
                     <div>
-                      <p className="text-sm font-medium">{(a.profiles as any)?.full_name || "Unknown"}</p>
-                      <p className="text-xs text-muted-foreground">{(a.profiles as any)?.university_id}</p>
+                      <p className="text-sm font-medium">{a.profile?.full_name || "Unknown"}</p>
+                      <p className="text-xs text-muted-foreground">{a.profile?.university_id}</p>
                     </div>
                   </div>
                   <span className="text-xs text-muted-foreground">
