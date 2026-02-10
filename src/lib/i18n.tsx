@@ -87,6 +87,10 @@ const translations = {
     "sessions.generateQr": "Generate QR",
     "sessions.qrActive": "QR Active",
     "sessions.expired": "Expired",
+    "sessions.terminate": "Terminate Session",
+    "sessions.terminated": "Session terminated",
+    "sessions.extendTime": "Extend Time",
+    "sessions.timeExtended": "Time extended",
 
     // QR
     "qr.title": "QR Code",
@@ -220,6 +224,10 @@ const translations = {
     "sessions.generateQr": "Tengeneza QR",
     "sessions.qrActive": "QR Hai",
     "sessions.expired": "Imeisha",
+    "sessions.terminate": "Maliza Kipindi",
+    "sessions.terminated": "Kipindi kimeisha",
+    "sessions.extendTime": "Ongeza Muda",
+    "sessions.timeExtended": "Muda umeongezwa",
 
     // QR
     "qr.title": "QR Code",
