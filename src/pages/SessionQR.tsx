@@ -8,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Clock, Users, CheckCircle2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowLeft, Clock, Users, CheckCircle2, StopCircle, TimerReset } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
 export default function SessionQR() {
@@ -91,6 +92,47 @@ export default function SessionQR() {
     },
   });
 
+  // Terminate session
+  const terminateMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("sessions")
+        .update({ status: "completed", qr_expires_at: new Date().toISOString(), qr_code_secret: null })
+        .eq("id", sessionId!);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setQrValue("");
+      setTimeLeft(0);
+      queryClient.invalidateQueries({ queryKey: ["session", sessionId] });
+      toast({ title: t("common.success"), description: t("sessions.terminated") });
+    },
+    onError: (e: any) => {
+      toast({ title: t("common.error"), description: e.message, variant: "destructive" });
+    },
+  });
+
+  // Extend / modify time
+  const extendMutation = useMutation({
+    mutationFn: async (extraMinutes: number) => {
+      const currentExpiry = session?.qr_expires_at ? new Date(session.qr_expires_at).getTime() : Date.now();
+      const base = Math.max(currentExpiry, Date.now());
+      const newExpiry = new Date(base + extraMinutes * 60 * 1000).toISOString();
+      const { error } = await supabase
+        .from("sessions")
+        .update({ qr_expires_at: newExpiry })
+        .eq("id", sessionId!);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["session", sessionId] });
+      toast({ title: t("common.success"), description: t("sessions.timeExtended") });
+    },
+    onError: (e: any) => {
+      toast({ title: t("common.error"), description: e.message, variant: "destructive" });
+    },
+  });
+
   // Set QR value from existing session data
   useEffect(() => {
     if (session?.qr_code_secret && session?.qr_expires_at) {
@@ -157,6 +199,31 @@ export default function SessionQR() {
               <p className="text-sm text-muted-foreground text-center">
                 {t("qr.timeRemaining")}: {formatTime(timeLeft!)}
               </p>
+
+              {/* Action buttons */}
+              <div className="flex flex-wrap items-center gap-3 w-full justify-center">
+                <Select onValueChange={(v) => extendMutation.mutate(parseInt(v))}>
+                  <SelectTrigger className="w-[160px]">
+                    <TimerReset className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder={t("sessions.extendTime")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5">+5 {t("qr.minutes")}</SelectItem>
+                    <SelectItem value="10">+10 {t("qr.minutes")}</SelectItem>
+                    <SelectItem value="15">+15 {t("qr.minutes")}</SelectItem>
+                    <SelectItem value="30">+30 {t("qr.minutes")}</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Button
+                  variant="destructive"
+                  onClick={() => terminateMutation.mutate()}
+                  disabled={terminateMutation.isPending}
+                >
+                  <StopCircle className="h-4 w-4 mr-2" />
+                  {t("sessions.terminate")}
+                </Button>
+              </div>
             </>
           ) : isExpired ? (
             <div className="text-center space-y-4 py-8">
