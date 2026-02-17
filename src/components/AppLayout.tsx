@@ -67,7 +67,7 @@ export default function AppLayout() {
         <div className="flex items-center gap-2 px-6 py-5 border-b border-sidebar-border">
           <QrCode className="h-7 w-7 text-sidebar-primary" />
           <span className="font-bold text-lg font-['Space_Grotesk'] text-sidebar-primary-foreground">
-            QR Attendance
+            AAS
           </span>
           <button className="ml-auto lg:hidden" onClick={() => setSidebarOpen(false)}>
             <X className="h-5 w-5" />
