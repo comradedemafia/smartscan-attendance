@@ -21,6 +21,7 @@ const signupSchema = loginSchema.extend({
   universityId: z.string().min(3, "University ID is required"),
   fullName: z.string().min(2, "Full name is required"),
   role: z.enum(["student", "lecturer"]),
+  gender: z.enum(["M", "F"], { required_error: "Gender is required" }),
 });
 
 export default function Auth() {
@@ -31,6 +32,7 @@ export default function Auth() {
   const [universityId, setUniversityId] = useState("");
   const [fullName, setFullName] = useState("");
   const [role, setRole] = useState<"student" | "lecturer">("student");
+  const [gender, setGender] = useState<"M" | "F">("M");
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -88,7 +90,7 @@ export default function Auth() {
           navigate("/");
         }
       } else {
-        const parsed = signupSchema.safeParse({ email, password, universityId, fullName, role });
+        const parsed = signupSchema.safeParse({ email, password, universityId, fullName, role, gender });
         if (!parsed.success) {
           const fieldErrors: Record<string, string> = {};
           parsed.error.errors.forEach((err) => {
@@ -103,6 +105,7 @@ export default function Auth() {
           university_id: universityId,
           full_name: fullName,
           role,
+          gender,
         });
         if (error) {
           toast({ title: t("common.error"), description: error.message, variant: "destructive" });
@@ -227,6 +230,19 @@ export default function Auth() {
                         <SelectItem value="lecturer">{t("auth.lecturer")}</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="gender">{t("auth.gender")}</Label>
+                    <Select value={gender} onValueChange={(v) => setGender(v as "M" | "F")}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="M">{t("auth.male")}</SelectItem>
+                        <SelectItem value="F">{t("auth.female")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {errors.gender && <p className="text-sm text-destructive">{errors.gender}</p>}
                   </div>
                 </>
               )}

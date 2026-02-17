@@ -14,7 +14,7 @@ interface AuthContextType {
   signUp: (
     email: string,
     password: string,
-    metadata: { university_id: string; full_name: string; role: string }
+    metadata: { university_id: string; full_name: string; role: string; gender?: string }
   ) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
@@ -78,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUp = async (
     email: string,
     password: string,
-    metadata: { university_id: string; full_name: string; role: string }
+    metadata: { university_id: string; full_name: string; role: string; gender?: string }
   ) => {
     const { error } = await supabase.auth.signUp({
       email,

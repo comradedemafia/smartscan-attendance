@@ -102,7 +102,7 @@ export default function ScanQR() {
             const parsed = JSON.parse(decodedText);
             if (parsed.session_id && parsed.secret) {
               stopScanner();
-              recordMutation.mutate(parsed);
+              recordMutation.mutate({ session_id: parsed.session_id, secret: parsed.secret });
             }
           } catch {
             processedRef.current = false;

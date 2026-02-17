@@ -32,6 +32,9 @@ const translations = {
     "auth.updatePassword": "Update Password",
     "auth.backToLogin": "Back to Sign In",
     "auth.passwordMismatch": "Passwords do not match",
+    "auth.gender": "Gender",
+    "auth.male": "Male",
+    "auth.female": "Female",
 
     // Nav
     "nav.dashboard": "Dashboard",
@@ -97,6 +100,15 @@ const translations = {
     "sessions.terminated": "Session terminated",
     "sessions.extendTime": "Extend Time",
     "sessions.timeExtended": "Time extended",
+    "sessions.weeklyView": "Weekly Schedule",
+    "sessions.listView": "List View",
+    "sessions.monday": "Mon",
+    "sessions.tuesday": "Tue",
+    "sessions.wednesday": "Wed",
+    "sessions.thursday": "Thu",
+    "sessions.friday": "Fri",
+    "sessions.saturday": "Sat",
+    "sessions.sunday": "Sun",
 
     // QR
     "qr.title": "QR Code",
@@ -200,6 +212,9 @@ const translations = {
     "auth.updatePassword": "Badilisha Neno la Siri",
     "auth.backToLogin": "Rudi kwenye Kuingia",
     "auth.passwordMismatch": "Maneno ya siri hayalingani",
+    "auth.gender": "Jinsia",
+    "auth.male": "Mwanaume",
+    "auth.female": "Mwanamke",
 
     // Nav
     "nav.dashboard": "Dashibodi",
@@ -265,6 +280,15 @@ const translations = {
     "sessions.terminated": "Kipindi kimeisha",
     "sessions.extendTime": "Ongeza Muda",
     "sessions.timeExtended": "Muda umeongezwa",
+    "sessions.weeklyView": "Ratiba ya Wiki",
+    "sessions.listView": "Orodha",
+    "sessions.monday": "Jtt",
+    "sessions.tuesday": "Jnn",
+    "sessions.wednesday": "Jtn",
+    "sessions.thursday": "Alh",
+    "sessions.friday": "Ijm",
+    "sessions.saturday": "Jms",
+    "sessions.sunday": "Jpl",
 
     // QR
     "qr.title": "QR Code",
