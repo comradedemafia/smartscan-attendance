@@ -129,9 +129,9 @@ export default function Auth() {
               <QrCode className="h-10 w-10" />
               <GraduationCap className="h-10 w-10" />
             </div>
-            <h1 className="text-3xl font-bold tracking-tight font-['Space_Grotesk']">
-              QR Attendance
-            </h1>
+             <h1 className="text-3xl font-bold tracking-tight font-['Space_Grotesk']">
+               Academic Attendance System
+             </h1>
           </div>
 
           <Card className="border-border/50 shadow-lg">
@@ -180,9 +180,9 @@ export default function Auth() {
             <QrCode className="h-10 w-10" />
             <GraduationCap className="h-10 w-10" />
           </div>
-          <h1 className="text-3xl font-bold tracking-tight font-['Space_Grotesk']">
-            QR Attendance
-          </h1>
+           <h1 className="text-3xl font-bold tracking-tight font-['Space_Grotesk']">
+             Academic Attendance System
+           </h1>
           <p className="text-muted-foreground text-center">
             {isLogin ? "Sign in with your university credentials" : "Create your account"}
           </p>
