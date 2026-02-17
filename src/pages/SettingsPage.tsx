@@ -1,13 +1,23 @@
 import { useAuth } from "@/hooks/useAuth";
 import { useI18n } from "@/lib/i18n";
+import { useTheme } from "@/lib/theme";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Settings } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Sun, Moon, Monitor } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function SettingsPage() {
   const { profile, role } = useAuth();
   const { t, language, setLanguage } = useI18n();
+  const { theme, setTheme } = useTheme();
+
+  const themeOptions = [
+    { value: "light" as const, label: t("settings.light"), icon: Sun },
+    { value: "dark" as const, label: t("settings.dark"), icon: Moon },
+    { value: "system" as const, label: t("settings.system"), icon: Monitor },
+  ];
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -33,6 +43,27 @@ export default function SettingsPage() {
           <div>
             <Label className="text-muted-foreground text-xs">{t("auth.role")}</Label>
             <p className="font-medium capitalize">{role || "—"}</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">{t("settings.appearance")}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-2">
+            {themeOptions.map((opt) => (
+              <Button
+                key={opt.value}
+                variant={theme === opt.value ? "default" : "outline"}
+                className={cn("flex-1 gap-2")}
+                onClick={() => setTheme(opt.value)}
+              >
+                <opt.icon className="h-4 w-4" />
+                {opt.label}
+              </Button>
+            ))}
           </div>
         </CardContent>
       </Card>

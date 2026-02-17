@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -10,10 +11,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { BookOpen, Plus, Trash2, Edit, Users, LogIn, LogOut } from "lucide-react";
+import { BookOpen, Plus, Trash2, Edit, Users, LogIn, LogOut, UserCog } from "lucide-react";
 
 export default function Courses() {
   const { user, role } = useAuth();
+  const navigate = useNavigate();
   const { t } = useI18n();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -242,33 +244,45 @@ export default function Courses() {
                 {course.description && (
                   <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{course.description}</p>
                 )}
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
                     <Users className="h-3.5 w-3.5" />
                     <span>{course.course_enrollments?.[0]?.count ?? 0} {t("courses.students")}</span>
                   </div>
-                  {isStudent && (
-                    myEnrollments.includes(course.id) ? (
+                  <div className="flex items-center gap-1">
+                    {canManage && course.created_by === user?.id && (
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => unenrollMutation.mutate(course.id)}
-                        disabled={unenrollMutation.isPending}
+                        onClick={() => navigate(`/courses/${course.id}/students`)}
                       >
-                        <LogOut className="h-3.5 w-3.5 mr-1" />
-                        {t("courses.unenroll")}
+                        <UserCog className="h-3.5 w-3.5 mr-1" />
+                        {t("courses.manageStudents")}
                       </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        onClick={() => enrollMutation.mutate(course.id)}
-                        disabled={enrollMutation.isPending}
-                      >
-                        <LogIn className="h-3.5 w-3.5 mr-1" />
-                        {t("courses.joinCourse")}
-                      </Button>
-                    )
-                  )}
+                    )}
+                    {isStudent && (
+                      myEnrollments.includes(course.id) ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => unenrollMutation.mutate(course.id)}
+                          disabled={unenrollMutation.isPending}
+                        >
+                          <LogOut className="h-3.5 w-3.5 mr-1" />
+                          {t("courses.unenroll")}
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={() => enrollMutation.mutate(course.id)}
+                          disabled={enrollMutation.isPending}
+                        >
+                          <LogIn className="h-3.5 w-3.5 mr-1" />
+                          {t("courses.joinCourse")}
+                        </Button>
+                      )
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>

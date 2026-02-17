@@ -1,6 +1,7 @@
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useI18n } from "@/lib/i18n";
+import { useTheme } from "@/lib/theme";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -16,6 +17,8 @@ import {
   Users,
   Menu,
   X,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -23,6 +26,7 @@ import { cn } from "@/lib/utils";
 export default function AppLayout() {
   const { role, profile, signOut } = useAuth();
   const { t, language, setLanguage } = useI18n();
+  const { theme, setTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -99,6 +103,17 @@ export default function AppLayout() {
               checked={language === "sw"}
               onCheckedChange={(checked) => setLanguage(checked ? "sw" : "en")}
             />
+          </div>
+          <div className="flex items-center justify-between">
+            <Label className="text-xs text-sidebar-foreground/70">{t("settings.appearance")}</Label>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-sidebar-foreground/70 hover:text-sidebar-foreground"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            >
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
           </div>
           <div className="text-xs text-sidebar-foreground/60 truncate">
             {profile?.full_name} • {role}

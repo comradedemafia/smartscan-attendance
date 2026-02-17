@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { BarChart3, Users, CalendarCheck, Percent } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { BarChart3, Users, CalendarCheck, Percent, FileDown } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -119,8 +120,16 @@ export default function Reports() {
   };
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold tracking-tight font-['Space_Grotesk']">{t("reports.title")}</h1>
+    <div className="space-y-6 print-report">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <h1 className="text-2xl font-bold tracking-tight font-['Space_Grotesk']">{t("reports.title")}</h1>
+        {selectedCourse && reportData && (
+          <Button variant="outline" className="no-print" onClick={() => window.print()}>
+            <FileDown className="h-4 w-4 mr-2" />
+            {t("reports.exportPdf")}
+          </Button>
+        )}
+      </div>
 
       {/* Course selector */}
       <Select value={selectedCourse} onValueChange={setSelectedCourse}>

@@ -71,6 +71,12 @@ const translations = {
     "courses.unenrolled": "Successfully unenrolled",
     "courses.joinCourse": "Join Course",
     "courses.unenroll": "Leave",
+    "courses.manageStudents": "Manage Students",
+    "courses.addStudent": "Add Student",
+    "courses.removeStudent": "Remove Student",
+    "courses.searchStudent": "Search by name or ID...",
+    "courses.studentAdded": "Student added successfully",
+    "courses.studentRemoved": "Student removed",
 
     // Sessions
     "sessions.title": "Sessions",
@@ -139,12 +145,17 @@ const translations = {
     "reports.sessionsAttended": "Sessions Attended",
     "reports.percentage": "Percentage",
     "reports.noData": "No data available",
+    "reports.exportPdf": "Export PDF",
 
     // Settings
     "settings.title": "Settings",
     "settings.profile": "Profile",
     "settings.language": "Language",
     "settings.location": "Location Preferences",
+    "settings.appearance": "Appearance",
+    "settings.light": "Light",
+    "settings.dark": "Dark",
+    "settings.system": "System",
 
     // Common
     "common.save": "Save",
@@ -228,6 +239,12 @@ const translations = {
     "courses.unenrolled": "Umejitoa kwenye kozi",
     "courses.joinCourse": "Jiunge",
     "courses.unenroll": "Jiondoe",
+    "courses.manageStudents": "Simamia Wanafunzi",
+    "courses.addStudent": "Ongeza Mwanafunzi",
+    "courses.removeStudent": "Ondoa Mwanafunzi",
+    "courses.searchStudent": "Tafuta kwa jina au namba...",
+    "courses.studentAdded": "Mwanafunzi ameongezwa",
+    "courses.studentRemoved": "Mwanafunzi ameondolewa",
 
     // Sessions
     "sessions.title": "Vipindi",
@@ -296,12 +313,17 @@ const translations = {
     "reports.sessionsAttended": "Vipindi Alivyohudhuria",
     "reports.percentage": "Asilimia",
     "reports.noData": "Hakuna data",
+    "reports.exportPdf": "Hamisha PDF",
 
     // Settings
     "settings.title": "Mipangilio",
     "settings.profile": "Wasifu",
     "settings.language": "Lugha",
     "settings.location": "Mapendeleo ya Eneo",
+    "settings.appearance": "Muonekano",
+    "settings.light": "Mwangaza",
+    "settings.dark": "Giza",
+    "settings.system": "Mfumo",
 
     // Common
     "common.save": "Hifadhi",
