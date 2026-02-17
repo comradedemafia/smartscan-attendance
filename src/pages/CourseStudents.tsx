@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,8 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Trash2, Search, Users } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Search, Users, Upload } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 export default function CourseStudents() {
@@ -21,8 +22,9 @@ export default function CourseStudents() {
   const [searchQuery, setSearchQuery] = useState("");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [studentSearch, setStudentSearch] = useState("");
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Get course info
   const { data: course } = useQuery({
     queryKey: ["course", courseId],
     queryFn: async () => {
@@ -33,7 +35,6 @@ export default function CourseStudents() {
     enabled: !!courseId,
   });
 
-  // Get enrolled students
   const { data: enrollments = [], isLoading } = useQuery({
     queryKey: ["course-students", courseId],
     queryFn: async () => {
@@ -42,25 +43,23 @@ export default function CourseStudents() {
         .select("id, user_id, enrolled_at")
         .eq("course_id", courseId!);
       if (error) throw error;
-
       if (!data.length) return [];
 
       const userIds = data.map((e) => e.user_id);
       const { data: profiles } = await supabase
         .from("profiles")
-        .select("id, full_name, university_id, email")
+        .select("id, full_name, university_id, email, gender")
         .in("id", userIds);
 
       const profileMap = Object.fromEntries((profiles || []).map((p) => [p.id, p]));
       return data.map((e) => ({
         ...e,
-        profile: profileMap[e.user_id] || { full_name: "Unknown", university_id: "—", email: "" },
+        profile: profileMap[e.user_id] || { full_name: "Unknown", university_id: "—", email: "", gender: null },
       }));
     },
     enabled: !!courseId,
   });
 
-  // Search students to add
   const { data: searchResults = [] } = useQuery({
     queryKey: ["search-students", studentSearch],
     queryFn: async () => {
@@ -109,13 +108,64 @@ export default function CourseStudents() {
     },
   });
 
+  const handleCsvImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const lines = text.split("\n").filter((l) => l.trim());
+      // Skip header if present
+      const startIdx = lines[0]?.toLowerCase().includes("university_id") ? 1 : 0;
+
+      let added = 0;
+      const enrolledIds = new Set(enrollments.map((en) => en.profile.university_id));
+
+      for (let i = startIdx; i < lines.length; i++) {
+        const cols = lines[i].split(",").map((c) => c.trim());
+        if (cols.length < 2) continue;
+
+        const [universityId, fullName] = cols;
+
+        // Check if already enrolled
+        if (enrolledIds.has(universityId)) continue;
+
+        // Find existing profile by university_id
+        const { data: existing } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("university_id", universityId)
+          .maybeSingle();
+
+        if (existing) {
+          // Enroll existing student
+          const { error } = await supabase.from("course_enrollments").insert({
+            course_id: courseId!,
+            user_id: existing.id,
+          });
+          if (!error) added++;
+        }
+        // Skip students without accounts - they need to register first
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["course-students", courseId] });
+      toast({
+        title: t("common.success"),
+        description: `${t("admin.importSuccess")} (${added})`,
+      });
+    } catch (err: any) {
+      toast({ title: t("common.error"), description: err.message, variant: "destructive" });
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   const filtered = enrollments.filter((e: any) => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
-    return (
-      e.profile.full_name.toLowerCase().includes(q) ||
-      e.profile.university_id.toLowerCase().includes(q)
-    );
+    return e.profile.full_name.toLowerCase().includes(q) || e.profile.university_id.toLowerCase().includes(q);
   });
 
   const canManage = (role === "lecturer" && course?.created_by === user?.id) || role === "admin";
@@ -137,49 +187,64 @@ export default function CourseStudents() {
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            className="pl-9"
-            placeholder={t("common.search")}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+          <Input className="pl-9" placeholder={t("common.search")} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
         </div>
         {canManage && (
-          <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button><Plus className="h-4 w-4 mr-2" />{t("courses.addStudent")}</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{t("courses.addStudent")}</DialogTitle>
-              </DialogHeader>
-              <Input
-                placeholder={t("courses.searchStudent")}
-                value={studentSearch}
-                onChange={(e) => setStudentSearch(e.target.value)}
-              />
-              {searchResults.length > 0 && (
-                <div className="max-h-60 overflow-y-auto space-y-1">
-                  {searchResults.map((s: any) => (
-                    <div key={s.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted">
-                      <div>
-                        <p className="font-medium text-sm">{s.full_name}</p>
-                        <p className="text-xs text-muted-foreground">{s.university_id}</p>
+          <>
+            <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button><Plus className="h-4 w-4 mr-2" />{t("courses.addStudent")}</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>{t("courses.addStudent")}</DialogTitle>
+                </DialogHeader>
+                <Input placeholder={t("courses.searchStudent")} value={studentSearch} onChange={(e) => setStudentSearch(e.target.value)} />
+                {searchResults.length > 0 && (
+                  <div className="max-h-60 overflow-y-auto space-y-1">
+                    {searchResults.map((s: any) => (
+                      <div key={s.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted">
+                        <div>
+                          <p className="font-medium text-sm">{s.full_name}</p>
+                          <p className="text-xs text-muted-foreground">{s.university_id}</p>
+                        </div>
+                        <Button size="sm" onClick={() => addMutation.mutate(s.id)} disabled={addMutation.isPending}>
+                          <Plus className="h-3.5 w-3.5" />
+                        </Button>
                       </div>
-                      <Button size="sm" onClick={() => addMutation.mutate(s.id)} disabled={addMutation.isPending}>
-                        <Plus className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {studentSearch.length >= 2 && searchResults.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">{t("reports.noData")}</p>
-              )}
-            </DialogContent>
-          </Dialog>
+                    ))}
+                  </div>
+                )}
+                {studentSearch.length >= 2 && searchResults.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-4">{t("reports.noData")}</p>
+                )}
+              </DialogContent>
+            </Dialog>
+
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                className="hidden"
+                onChange={handleCsvImport}
+              />
+              <Button
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={importing}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                {importing ? t("admin.importingStudents") : t("admin.importCsv")}
+              </Button>
+            </div>
+          </>
         )}
       </div>
+
+      {canManage && (
+        <p className="text-xs text-muted-foreground">{t("admin.csvFormat")}</p>
+      )}
 
       <Card>
         <CardHeader>
@@ -198,27 +263,29 @@ export default function CourseStudents() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>#</TableHead>
                     <TableHead>{t("reports.studentName")}</TableHead>
                     <TableHead>{t("reports.universityId")}</TableHead>
                     <TableHead>{t("auth.email")}</TableHead>
+                    <TableHead>{t("auth.gender")}</TableHead>
                     {canManage && <TableHead className="w-16">{t("common.actions")}</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filtered.map((e: any) => (
+                  {filtered.map((e: any, i: number) => (
                     <TableRow key={e.id}>
+                      <TableCell className="text-muted-foreground">{i + 1}</TableCell>
                       <TableCell className="font-medium">{e.profile.full_name}</TableCell>
                       <TableCell>{e.profile.university_id}</TableCell>
                       <TableCell className="text-muted-foreground">{e.profile.email || "—"}</TableCell>
+                      <TableCell>
+                        <Badge variant={e.profile.gender === "M" ? "default" : e.profile.gender === "F" ? "secondary" : "outline"}>
+                          {e.profile.gender === "M" ? t("auth.male") : e.profile.gender === "F" ? t("auth.female") : "—"}
+                        </Badge>
+                      </TableCell>
                       {canManage && (
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive"
-                            onClick={() => removeMutation.mutate(e.id)}
-                            disabled={removeMutation.isPending}
-                          >
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => removeMutation.mutate(e.id)} disabled={removeMutation.isPending}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </TableCell>

@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, Plus, QrCode, LayoutGrid, List, ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar, Plus, QrCode, LayoutGrid, List, ChevronLeft, ChevronRight, Edit, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay } from "date-fns";
 
@@ -22,6 +22,7 @@ export default function Sessions() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [editingSession, setEditingSession] = useState<any>(null);
   const [title, setTitle] = useState("");
   const [courseId, setCourseId] = useState("");
   const [venueName, setVenueName] = useState("");
@@ -69,22 +70,80 @@ export default function Sessions() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sessions"] });
       toast({ title: t("common.success"), description: "Session created" });
-      setOpen(false);
-      setTitle("");
-      setCourseId("");
-      setVenueName("");
-      setDurationMinutes("30");
+      resetForm();
     },
     onError: (e: any) => {
       toast({ title: t("common.error"), description: e.message, variant: "destructive" });
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("sessions")
+        .update({
+          title,
+          course_id: courseId,
+          venue_name: venueName || null,
+          duration_minutes: parseInt(durationMinutes),
+        })
+        .eq("id", editingSession.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sessions"] });
+      toast({ title: t("common.success"), description: "Session updated" });
+      resetForm();
+    },
+    onError: (e: any) => {
+      toast({ title: t("common.error"), description: e.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("sessions").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sessions"] });
+      toast({ title: t("common.success"), description: "Session deleted" });
+    },
+    onError: (e: any) => {
+      toast({ title: t("common.error"), description: e.message, variant: "destructive" });
+    },
+  });
+
+  const resetForm = () => {
+    setOpen(false);
+    setEditingSession(null);
+    setTitle("");
+    setCourseId("");
+    setVenueName("");
+    setDurationMinutes("30");
+  };
+
+  const openEdit = (session: any) => {
+    setEditingSession(session);
+    setTitle(session.title);
+    setCourseId(session.course_id);
+    setVenueName(session.venue_name || "");
+    setDurationMinutes(String(session.duration_minutes));
+    setOpen(true);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !courseId) return;
-    createMutation.mutate();
+    if (editingSession) {
+      updateMutation.mutate();
+    } else {
+      createMutation.mutate();
+    }
   };
+
+  const canEditSession = (session: any) =>
+    role === "admin" || (role === "lecturer" && session.created_by === user?.id);
 
   const statusColor = (status: string) => {
     switch (status) {
@@ -99,13 +158,8 @@ export default function Sessions() {
   }, [currentWeekStart]);
 
   const dayNames = [
-    t("sessions.monday"),
-    t("sessions.tuesday"),
-    t("sessions.wednesday"),
-    t("sessions.thursday"),
-    t("sessions.friday"),
-    t("sessions.saturday"),
-    t("sessions.sunday"),
+    t("sessions.monday"), t("sessions.tuesday"), t("sessions.wednesday"),
+    t("sessions.thursday"), t("sessions.friday"), t("sessions.saturday"), t("sessions.sunday"),
   ];
 
   const sessionsByDay = useMemo(() => {
@@ -123,33 +177,21 @@ export default function Sessions() {
         <h1 className="text-2xl font-bold tracking-tight font-['Space_Grotesk']">{t("sessions.title")}</h1>
         <div className="flex items-center gap-2">
           <div className="flex items-center border border-border rounded-lg overflow-hidden">
-            <Button
-              variant={viewMode === "week" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("week")}
-              className="rounded-none"
-            >
-              <LayoutGrid className="h-4 w-4 mr-1" />
-              {t("sessions.weeklyView")}
+            <Button variant={viewMode === "week" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("week")} className="rounded-none">
+              <LayoutGrid className="h-4 w-4 mr-1" />{t("sessions.weeklyView")}
             </Button>
-            <Button
-              variant={viewMode === "list" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("list")}
-              className="rounded-none"
-            >
-              <List className="h-4 w-4 mr-1" />
-              {t("sessions.listView")}
+            <Button variant={viewMode === "list" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("list")} className="rounded-none">
+              <List className="h-4 w-4 mr-1" />{t("sessions.listView")}
             </Button>
           </div>
           {canManage && (
-            <Dialog open={open} onOpenChange={setOpen}>
+            <Dialog open={open} onOpenChange={(o) => { if (!o) resetForm(); setOpen(o); }}>
               <DialogTrigger asChild>
                 <Button><Plus className="h-4 w-4 mr-2" />{t("sessions.create")}</Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>{t("sessions.create")}</DialogTitle>
+                  <DialogTitle>{editingSession ? t("common.edit") : t("sessions.create")}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-2">
@@ -183,8 +225,8 @@ export default function Sessions() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <Button type="submit" className="w-full" disabled={createMutation.isPending}>
-                    {t("sessions.create")}
+                  <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending}>
+                    {editingSession ? t("common.save") : t("sessions.create")}
                   </Button>
                 </form>
               </DialogContent>
@@ -196,7 +238,6 @@ export default function Sessions() {
       {isLoading ? (
         <p className="text-muted-foreground">{t("common.loading")}</p>
       ) : viewMode === "week" ? (
-        /* ── Weekly Timetable View ── */
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <Button variant="outline" size="sm" onClick={() => setCurrentWeekStart(subWeeks(currentWeekStart, 1))}>
@@ -217,44 +258,38 @@ export default function Sessions() {
               const daySessions = sessionsByDay[key] || [];
 
               return (
-                <div
-                  key={key}
-                  className={`rounded-lg border p-2 min-h-[120px] ${
-                    isToday ? "border-primary bg-primary/5" : "border-border"
-                  }`}
-                >
+                <div key={key} className={`rounded-lg border p-2 min-h-[120px] ${isToday ? "border-primary bg-primary/5" : "border-border"}`}>
                   <div className="flex items-center justify-between mb-2">
-                    <span className={`text-xs font-semibold ${isToday ? "text-primary" : "text-muted-foreground"}`}>
-                      {dayNames[i]}
-                    </span>
-                    <span className={`text-xs ${isToday ? "text-primary font-bold" : "text-muted-foreground"}`}>
-                      {format(day, "dd")}
-                    </span>
+                    <span className={`text-xs font-semibold ${isToday ? "text-primary" : "text-muted-foreground"}`}>{dayNames[i]}</span>
+                    <span className={`text-xs ${isToday ? "text-primary font-bold" : "text-muted-foreground"}`}>{format(day, "dd")}</span>
                   </div>
-
                   <div className="space-y-1.5">
                     {daySessions.map((session: any) => (
-                      <div
-                        key={session.id}
-                        onClick={() => canManage && session.created_by === user?.id ? navigate(`/sessions/${session.id}/qr`) : null}
-                        className={`rounded-md p-1.5 text-xs ${
-                          session.status === "active"
-                            ? "bg-primary/15 text-primary border border-primary/30"
-                            : session.status === "completed"
-                            ? "bg-muted text-muted-foreground"
-                            : "bg-secondary text-secondary-foreground"
-                        } ${canManage && session.created_by === user?.id ? "cursor-pointer hover:opacity-80" : ""}`}
+                      <div key={session.id} className={`rounded-md p-1.5 text-xs relative group/s ${
+                        session.status === "active" ? "bg-primary/15 text-primary border border-primary/30"
+                        : session.status === "completed" ? "bg-muted text-muted-foreground"
+                        : "bg-secondary text-secondary-foreground"
+                      } ${canEditSession(session) ? "cursor-pointer hover:opacity-80" : ""}`}
+                        onClick={() => canEditSession(session) ? navigate(`/sessions/${session.id}/qr`) : null}
                       >
                         <p className="font-medium truncate">{session.title}</p>
                         <p className="text-[10px] opacity-75 truncate">
                           {(session.courses as any)?.code}
                           {session.venue_name && ` • ${session.venue_name}`}
                         </p>
+                        {canEditSession(session) && (
+                          <div className="absolute top-0.5 right-0.5 hidden group-hover/s:flex gap-0.5">
+                            <button className="p-0.5 rounded bg-background/80" onClick={(e) => { e.stopPropagation(); openEdit(session); }}>
+                              <Edit className="h-3 w-3" />
+                            </button>
+                            <button className="p-0.5 rounded bg-background/80 text-destructive" onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(session.id); }}>
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))}
-                    {daySessions.length === 0 && (
-                      <p className="text-[10px] text-muted-foreground/50 text-center py-2">—</p>
-                    )}
+                    {daySessions.length === 0 && <p className="text-[10px] text-muted-foreground/50 text-center py-2">—</p>}
                   </div>
                 </div>
               );
@@ -271,14 +306,26 @@ export default function Sessions() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {sessions.map((session: any) => (
-            <Card key={session.id}>
+            <Card key={session.id} className="relative group">
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-xs text-muted-foreground">{(session.courses as any)?.code}</p>
                     <CardTitle className="text-base mt-1">{session.title}</CardTitle>
                   </div>
-                  <Badge variant={statusColor(session.status) as any}>{session.status}</Badge>
+                  <div className="flex items-center gap-1">
+                    {canEditSession(session) && (
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(session)}>
+                          <Edit className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteMutation.mutate(session.id)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    )}
+                    <Badge variant={statusColor(session.status) as any}>{session.status}</Badge>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-2">
@@ -287,15 +334,9 @@ export default function Sessions() {
                   {session.venue_name && <span>📍 {session.venue_name}</span>}
                 </div>
                 <p className="text-xs text-muted-foreground">{session.duration_minutes} {t("qr.minutes")}</p>
-                {canManage && session.created_by === user?.id && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full mt-2"
-                    onClick={() => navigate(`/sessions/${session.id}/qr`)}
-                  >
-                    <QrCode className="h-4 w-4 mr-2" />
-                    {t("sessions.generateQr")}
+                {canEditSession(session) && (
+                  <Button variant="outline" size="sm" className="w-full mt-2" onClick={() => navigate(`/sessions/${session.id}/qr`)}>
+                    <QrCode className="h-4 w-4 mr-2" />{t("sessions.generateQr")}
                   </Button>
                 )}
               </CardContent>

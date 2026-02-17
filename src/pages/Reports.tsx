@@ -6,27 +6,25 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { BarChart3, Users, CalendarCheck, Percent, FileDown } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BarChart3, Users, CalendarCheck, Percent, FileDown, User } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 
 export default function Reports() {
   const { t } = useI18n();
   const { user, role } = useAuth();
   const [selectedCourse, setSelectedCourse] = useState<string>("");
+  const [selectedStudent, setSelectedStudent] = useState<string>("");
+  const [activeTab, setActiveTab] = useState("course");
 
-  // Get courses (lecturer's own or all for admin)
   const { data: courses } = useQuery({
     queryKey: ["report-courses", user?.id, role],
     enabled: !!user && (role === "lecturer" || role === "admin"),
     queryFn: async () => {
-      let q = supabase.from("courses").select("id, name, code");
+      let q = supabase.from("courses").select("id, name, code, created_by");
       if (role === "lecturer") q = q.eq("created_by", user!.id);
       const { data, error } = await q;
       if (error) throw error;
@@ -34,49 +32,35 @@ export default function Reports() {
     },
   });
 
-  // Get report data for selected course
+  // Course report data
   const { data: reportData, isLoading } = useQuery({
     queryKey: ["course-report", selectedCourse],
-    enabled: !!selectedCourse,
+    enabled: !!selectedCourse && activeTab === "course",
     queryFn: async () => {
-      // Get completed sessions
       const { data: sessions } = await supabase
-        .from("sessions")
-        .select("id, title, session_date")
-        .eq("course_id", selectedCourse)
-        .eq("status", "completed")
+        .from("sessions").select("id, title, session_date")
+        .eq("course_id", selectedCourse).eq("status", "completed")
         .order("session_date", { ascending: true });
 
       if (!sessions?.length) return { sessions: [], students: [], chartData: [] };
 
       const sessionIds = sessions.map((s) => s.id);
+      const { data: records } = await supabase.from("attendance_records")
+        .select("session_id, user_id, status, scanned_at").in("session_id", sessionIds);
 
-      // Get all attendance records
-      const { data: records } = await supabase
-        .from("attendance_records")
-        .select("session_id, user_id, status, scanned_at")
-        .in("session_id", sessionIds);
-
-      // Get enrolled students
-      const { data: enrollments } = await supabase
-        .from("course_enrollments")
-        .select("user_id")
-        .eq("course_id", selectedCourse);
+      const { data: enrollments } = await supabase.from("course_enrollments")
+        .select("user_id").eq("course_id", selectedCourse);
 
       const studentIds = [...new Set([
         ...(enrollments || []).map((e) => e.user_id),
         ...(records || []).map((r) => r.user_id),
       ])];
 
-      // Get profiles
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, full_name, university_id")
-        .in("id", studentIds);
+      const { data: profiles } = await supabase.from("profiles")
+        .select("id, full_name, university_id, gender").in("id", studentIds);
 
       const profileMap = Object.fromEntries((profiles || []).map((p) => [p.id, p]));
 
-      // Student attendance summary
       const studentAttendance = studentIds.map((uid) => {
         const attended = (records || []).filter((r) => r.user_id === uid).length;
         const profile = profileMap[uid];
@@ -84,13 +68,12 @@ export default function Reports() {
           userId: uid,
           name: profile?.full_name || "Unknown",
           universityId: profile?.university_id || "—",
-          attended,
-          total: sessions.length,
+          gender: profile?.gender || "—",
+          attended, total: sessions.length,
           percentage: sessions.length > 0 ? Math.round((attended / sessions.length) * 100) : 0,
         };
       });
 
-      // Chart data: attendance count per session
       const chartData = sessions.map((s) => ({
         name: s.title.length > 15 ? s.title.slice(0, 15) + "…" : s.title,
         attendance: (records || []).filter((r) => r.session_id === s.id).length,
@@ -98,11 +81,106 @@ export default function Reports() {
       }));
 
       return {
-        sessions,
-        students: studentAttendance.sort((a, b) => b.percentage - a.percentage),
-        chartData,
-        totalRecords: (records || []).length,
+        sessions, students: studentAttendance.sort((a, b) => b.percentage - a.percentage),
+        chartData, totalRecords: (records || []).length,
       };
+    },
+  });
+
+  // Individual student report
+  const { data: studentReport, isLoading: studentLoading } = useQuery({
+    queryKey: ["student-report", selectedStudent],
+    enabled: !!selectedStudent && activeTab === "student",
+    queryFn: async () => {
+      const { data: profile } = await supabase.from("profiles")
+        .select("id, full_name, university_id, gender, email").eq("id", selectedStudent).single();
+
+      const { data: enrollments } = await supabase.from("course_enrollments")
+        .select("course_id, courses(id, name, code)").eq("user_id", selectedStudent);
+
+      const courseResults = await Promise.all((enrollments || []).map(async (e: any) => {
+        const { data: sessions } = await supabase.from("sessions")
+          .select("id, title, session_date").eq("course_id", e.course_id).eq("status", "completed");
+        const sessionIds = (sessions || []).map((s) => s.id);
+        const { data: records } = sessionIds.length > 0
+          ? await supabase.from("attendance_records").select("session_id")
+              .eq("user_id", selectedStudent).in("session_id", sessionIds)
+          : { data: [] };
+        return {
+          courseId: e.course_id,
+          courseName: e.courses?.name || "",
+          courseCode: e.courses?.code || "",
+          totalSessions: (sessions || []).length,
+          attended: (records || []).length,
+          percentage: (sessions || []).length > 0 ? Math.round(((records || []).length / (sessions || []).length) * 100) : 0,
+        };
+      }));
+
+      return { profile, courses: courseResults };
+    },
+  });
+
+  // All students list for individual report dropdown
+  const { data: allStudents = [] } = useQuery({
+    queryKey: ["report-all-students", user?.id, role],
+    enabled: !!user && (role === "lecturer" || role === "admin") && activeTab === "student",
+    queryFn: async () => {
+      if (role === "admin") {
+        const { data } = await supabase.from("profiles").select("id, full_name, university_id").order("full_name");
+        return data || [];
+      }
+      // Lecturer: only enrolled students
+      const { data: myCourses } = await supabase.from("courses").select("id").eq("created_by", user!.id);
+      if (!myCourses?.length) return [];
+      const courseIds = myCourses.map((c) => c.id);
+      const { data: enrollments } = await supabase.from("course_enrollments")
+        .select("user_id").in("course_id", courseIds);
+      const userIds = [...new Set((enrollments || []).map((e) => e.user_id))];
+      if (!userIds.length) return [];
+      const { data: profiles } = await supabase.from("profiles")
+        .select("id, full_name, university_id").in("id", userIds).order("full_name");
+      return profiles || [];
+    },
+  });
+
+  // All courses report data for export
+  const { data: allCoursesReport } = useQuery({
+    queryKey: ["all-courses-report", user?.id, role],
+    enabled: !!user && (role === "lecturer" || role === "admin") && activeTab === "all",
+    queryFn: async () => {
+      let q = supabase.from("courses").select("id, name, code, created_by");
+      if (role === "lecturer") q = q.eq("created_by", user!.id);
+      const { data: myCourses } = await q;
+      if (!myCourses?.length) return [];
+
+      return Promise.all(myCourses.map(async (course) => {
+        const { data: sessions } = await supabase.from("sessions")
+          .select("id").eq("course_id", course.id).eq("status", "completed");
+        const sessionIds = (sessions || []).map((s) => s.id);
+        const { data: enrollments } = await supabase.from("course_enrollments")
+          .select("user_id").eq("course_id", course.id);
+        const totalStudents = (enrollments || []).length;
+
+        let avgRate = 0;
+        if (sessionIds.length > 0 && totalStudents > 0) {
+          const { data: records } = await supabase.from("attendance_records")
+            .select("id").in("session_id", sessionIds);
+          const totalPossible = sessionIds.length * totalStudents;
+          avgRate = Math.round(((records || []).length / totalPossible) * 100);
+        }
+
+        // Get lecturer name
+        const { data: lecturerProfile } = await supabase.from("profiles")
+          .select("full_name").eq("id", course.created_by).single();
+
+        return {
+          ...course,
+          lecturerName: lecturerProfile?.full_name || "—",
+          totalSessions: sessionIds.length,
+          totalStudents,
+          avgRate,
+        };
+      }));
     },
   });
 
@@ -115,139 +193,259 @@ export default function Reports() {
     );
   }
 
-  const chartConfig = {
-    attendance: { label: t("attendance.attended"), color: "hsl(var(--primary))" },
-  };
+  const chartConfig = { attendance: { label: t("attendance.attended"), color: "hsl(var(--primary))" } };
 
   return (
     <div className="space-y-6 print-report">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-bold tracking-tight font-['Space_Grotesk']">{t("reports.title")}</h1>
-        {selectedCourse && reportData && (
-          <Button variant="outline" className="no-print" onClick={() => window.print()}>
-            <FileDown className="h-4 w-4 mr-2" />
-            {t("reports.exportPdf")}
-          </Button>
-        )}
+        <Button variant="outline" className="no-print" onClick={() => window.print()}>
+          <FileDown className="h-4 w-4 mr-2" />{t("reports.exportPdf")}
+        </Button>
       </div>
 
-      {/* Course selector */}
-      <Select value={selectedCourse} onValueChange={setSelectedCourse}>
-        <SelectTrigger className="w-full max-w-xs">
-          <SelectValue placeholder={t("reports.selectCourse")} />
-        </SelectTrigger>
-        <SelectContent>
-          {courses?.map((c) => (
-            <SelectItem key={c.id} value={c.id}>
-              {c.code} — {c.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="no-print">
+        <TabsList>
+          <TabsTrigger value="course">{t("reports.byCourse")}</TabsTrigger>
+          <TabsTrigger value="student">{t("reports.individualReport")}</TabsTrigger>
+          <TabsTrigger value="all">{t("reports.exportAll")}</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
-      {isLoading && <p className="text-muted-foreground">{t("common.loading")}</p>}
-
-      {selectedCourse && reportData && !isLoading && (
+      {/* ── Course Report Tab ── */}
+      {activeTab === "course" && (
         <>
-          {/* Overview cards */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <Card>
-              <CardContent className="pt-6 text-center">
-                <CalendarCheck className="h-6 w-6 mx-auto mb-2 text-primary" />
-                <p className="text-2xl font-bold">{reportData.sessions?.length || 0}</p>
-                <p className="text-xs text-muted-foreground">{t("reports.totalSessions")}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6 text-center">
-                <Users className="h-6 w-6 mx-auto mb-2 text-primary" />
-                <p className="text-2xl font-bold">{reportData.students?.length || 0}</p>
-                <p className="text-xs text-muted-foreground">{t("courses.students")}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6 text-center">
-                <Percent className="h-6 w-6 mx-auto mb-2 text-primary" />
-                <p className="text-2xl font-bold">
-                  {(() => {
-                    const studs = reportData.students || [];
-                    if (!studs.length) return 0;
-                    const total = studs.map(s => s.percentage).reduce((a, b) => a + b, 0);
-                    return Math.round(total / studs.length);
-                  })()}
-                  %
-                </p>
-                <p className="text-xs text-muted-foreground">{t("reports.averageRate")}</p>
-              </CardContent>
-            </Card>
-          </div>
+          <Select value={selectedCourse} onValueChange={setSelectedCourse}>
+            <SelectTrigger className="w-full max-w-xs no-print">
+              <SelectValue placeholder={t("reports.selectCourse")} />
+            </SelectTrigger>
+            <SelectContent>
+              {courses?.map((c) => (
+                <SelectItem key={c.id} value={c.id}>{c.code} — {c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-          {/* Chart */}
-          {reportData.chartData && reportData.chartData.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <BarChart3 className="h-5 w-5" />
-                  {t("reports.trend")}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ChartContainer config={chartConfig} className="h-[250px] w-full">
-                  <BarChart data={reportData.chartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" fontSize={12} />
-                    <YAxis allowDecimals={false} />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar dataKey="attendance" fill="var(--color-attendance)" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ChartContainer>
-              </CardContent>
-            </Card>
-          )}
+          {isLoading && <p className="text-muted-foreground">{t("common.loading")}</p>}
 
-          {/* Student table */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">{t("reports.byStudent")}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {!reportData.students?.length ? (
-                <p className="text-muted-foreground">{t("reports.noData")}</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>{t("reports.studentName")}</TableHead>
-                        <TableHead>{t("reports.universityId")}</TableHead>
-                        <TableHead className="text-center">{t("reports.sessionsAttended")}</TableHead>
-                        <TableHead className="text-center">{t("reports.percentage")}</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {reportData.students.map((s) => (
-                        <TableRow key={s.userId}>
-                          <TableCell className="font-medium">{s.name}</TableCell>
-                          <TableCell>{s.universityId}</TableCell>
-                          <TableCell className="text-center">
-                            {s.attended}/{s.total}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Badge
-                              variant={s.percentage >= 75 ? "default" : s.percentage >= 50 ? "secondary" : "destructive"}
-                            >
-                              {s.percentage}%
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+          {selectedCourse && reportData && !isLoading && (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <Card>
+                  <CardContent className="pt-6 text-center">
+                    <CalendarCheck className="h-6 w-6 mx-auto mb-2 text-primary" />
+                    <p className="text-2xl font-bold">{reportData.sessions?.length || 0}</p>
+                    <p className="text-xs text-muted-foreground">{t("reports.totalSessions")}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6 text-center">
+                    <Users className="h-6 w-6 mx-auto mb-2 text-primary" />
+                    <p className="text-2xl font-bold">{reportData.students?.length || 0}</p>
+                    <p className="text-xs text-muted-foreground">{t("courses.students")}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6 text-center">
+                    <Percent className="h-6 w-6 mx-auto mb-2 text-primary" />
+                    <p className="text-2xl font-bold">
+                      {(() => {
+                        const studs = reportData.students || [];
+                        if (!studs.length) return 0;
+                        return Math.round(studs.reduce((a, b) => a + b.percentage, 0) / studs.length);
+                      })()}%
+                    </p>
+                    <p className="text-xs text-muted-foreground">{t("reports.averageRate")}</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {reportData.chartData && reportData.chartData.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <BarChart3 className="h-5 w-5" />{t("reports.trend")}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ChartContainer config={chartConfig} className="h-[250px] w-full">
+                      <BarChart data={reportData.chartData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" fontSize={12} />
+                        <YAxis allowDecimals={false} />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <Bar dataKey="attendance" fill="var(--color-attendance)" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ChartContainer>
+                  </CardContent>
+                </Card>
               )}
-            </CardContent>
-          </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">{t("reports.byStudent")}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {!reportData.students?.length ? (
+                    <p className="text-muted-foreground">{t("reports.noData")}</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>{t("reports.studentName")}</TableHead>
+                            <TableHead>{t("reports.universityId")}</TableHead>
+                            <TableHead>{t("reports.gender")}</TableHead>
+                            <TableHead className="text-center">{t("reports.sessionsAttended")}</TableHead>
+                            <TableHead className="text-center">{t("reports.percentage")}</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {reportData.students.map((s) => (
+                            <TableRow key={s.userId}>
+                              <TableCell className="font-medium">{s.name}</TableCell>
+                              <TableCell>{s.universityId}</TableCell>
+                              <TableCell>
+                                <Badge variant={s.gender === "M" ? "default" : s.gender === "F" ? "secondary" : "outline"}>
+                                  {s.gender === "M" ? t("auth.male") : s.gender === "F" ? t("auth.female") : "—"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-center">{s.attended}/{s.total}</TableCell>
+                              <TableCell className="text-center">
+                                <Badge variant={s.percentage >= 75 ? "default" : s.percentage >= 50 ? "secondary" : "destructive"}>
+                                  {s.percentage}%
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          )}
         </>
+      )}
+
+      {/* ── Individual Student Report Tab ── */}
+      {activeTab === "student" && (
+        <>
+          <Select value={selectedStudent} onValueChange={setSelectedStudent}>
+            <SelectTrigger className="w-full max-w-xs no-print">
+              <SelectValue placeholder={t("reports.selectStudent")} />
+            </SelectTrigger>
+            <SelectContent>
+              {allStudents.map((s) => (
+                <SelectItem key={s.id} value={s.id}>{s.full_name} ({s.university_id})</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {studentLoading && <p className="text-muted-foreground">{t("common.loading")}</p>}
+
+          {selectedStudent && studentReport && !studentLoading && (
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <User className="h-5 w-5" />{t("reports.studentReport")}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <p><strong>{t("reports.studentName")}:</strong> {studentReport.profile?.full_name}</p>
+                  <p><strong>{t("reports.universityId")}:</strong> {studentReport.profile?.university_id}</p>
+                  <p><strong>{t("auth.email")}:</strong> {studentReport.profile?.email || "—"}</p>
+                  <p><strong>{t("reports.gender")}:</strong> {studentReport.profile?.gender === "M" ? t("auth.male") : studentReport.profile?.gender === "F" ? t("auth.female") : "—"}</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">{t("reports.byCourse")}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {studentReport.courses.length === 0 ? (
+                    <p className="text-muted-foreground">{t("reports.noData")}</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>{t("courses.code")}</TableHead>
+                            <TableHead>{t("courses.name")}</TableHead>
+                            <TableHead className="text-center">{t("reports.sessionsAttended")}</TableHead>
+                            <TableHead className="text-center">{t("reports.percentage")}</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {studentReport.courses.map((c: any) => (
+                            <TableRow key={c.courseId}>
+                              <TableCell className="font-mono text-sm">{c.courseCode}</TableCell>
+                              <TableCell className="font-medium">{c.courseName}</TableCell>
+                              <TableCell className="text-center">{c.attended}/{c.totalSessions}</TableCell>
+                              <TableCell className="text-center">
+                                <Badge variant={c.percentage >= 75 ? "default" : c.percentage >= 50 ? "secondary" : "destructive"}>
+                                  {c.percentage}%
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </>
+      )}
+
+      {/* ── All Courses Report Tab ── */}
+      {activeTab === "all" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">{t("reports.exportAll")}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {!allCoursesReport?.length ? (
+              <p className="text-muted-foreground">{t("reports.noData")}</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t("courses.code")}</TableHead>
+                      <TableHead>{t("courses.name")}</TableHead>
+                      <TableHead>{t("auth.lecturer")}</TableHead>
+                      <TableHead className="text-center">{t("reports.totalSessions")}</TableHead>
+                      <TableHead className="text-center">{t("courses.students")}</TableHead>
+                      <TableHead className="text-center">{t("reports.averageRate")}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {allCoursesReport.map((c) => (
+                      <TableRow key={c.id}>
+                        <TableCell className="font-mono text-sm">{c.code}</TableCell>
+                        <TableCell className="font-medium">{c.name}</TableCell>
+                        <TableCell>{c.lecturerName}</TableCell>
+                        <TableCell className="text-center">{c.totalSessions}</TableCell>
+                        <TableCell className="text-center">{c.totalStudents}</TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant={c.avgRate >= 75 ? "default" : c.avgRate >= 50 ? "secondary" : "destructive"}>
+                            {c.avgRate}%
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
     </div>
   );

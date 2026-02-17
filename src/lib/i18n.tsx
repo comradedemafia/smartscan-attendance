@@ -158,6 +158,24 @@ const translations = {
     "reports.percentage": "Percentage",
     "reports.noData": "No data available",
     "reports.exportPdf": "Export PDF",
+    "reports.exportAll": "Export All Courses PDF",
+    "reports.individualReport": "Individual Report",
+    "reports.selectStudent": "Select a student",
+    "reports.studentReport": "Student Report",
+    "reports.gender": "Gender",
+
+    // Admin
+    "admin.totalStudents": "Total Students",
+    "admin.allGenders": "All Genders",
+    "admin.filterByCourse": "Filter by Course",
+    "admin.allCourses": "All Courses",
+    "admin.studentList": "Student List",
+    "admin.enrolledCourses": "Enrolled Courses",
+    "admin.importStudents": "Import Students",
+    "admin.importCsv": "Import CSV",
+    "admin.importSuccess": "Students imported successfully",
+    "admin.csvFormat": "CSV format: university_id, full_name, email, gender(M/F)",
+    "admin.importingStudents": "Importing...",
 
     // Settings
     "settings.title": "Settings",
@@ -338,6 +356,24 @@ const translations = {
     "reports.percentage": "Asilimia",
     "reports.noData": "Hakuna data",
     "reports.exportPdf": "Hamisha PDF",
+    "reports.exportAll": "Hamisha Kozi Zote PDF",
+    "reports.individualReport": "Ripoti ya Mtu Mmoja",
+    "reports.selectStudent": "Chagua mwanafunzi",
+    "reports.studentReport": "Ripoti ya Mwanafunzi",
+    "reports.gender": "Jinsia",
+
+    // Admin
+    "admin.totalStudents": "Wanafunzi Wote",
+    "admin.allGenders": "Jinsia Zote",
+    "admin.filterByCourse": "Chuja kwa Kozi",
+    "admin.allCourses": "Kozi Zote",
+    "admin.studentList": "Orodha ya Wanafunzi",
+    "admin.enrolledCourses": "Kozi Zilizosajiliwa",
+    "admin.importStudents": "Ingiza Wanafunzi",
+    "admin.importCsv": "Ingiza CSV",
+    "admin.importSuccess": "Wanafunzi wameingizwa",
+    "admin.csvFormat": "Muundo wa CSV: university_id, full_name, email, gender(M/F)",
+    "admin.importingStudents": "Inaingiza...",
 
     // Settings
     "settings.title": "Mipangilio",
