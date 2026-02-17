@@ -8,7 +8,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   role: AppRole | null;
-  profile: { university_id: string; full_name: string; email: string } | null;
+  profile: { university_id: string; full_name: string; email: string; avatar_url?: string | null } | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (
@@ -32,7 +32,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const [roleRes, profileRes] = await Promise.all([
         supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
-        supabase.from("profiles").select("university_id, full_name, email").eq("id", userId).maybeSingle(),
+        supabase.from("profiles").select("university_id, full_name, email, avatar_url").eq("id", userId).maybeSingle(),
       ]);
       if (roleRes.data) setRole(roleRes.data.role as AppRole);
       if (profileRes.data) setProfile(profileRes.data);
