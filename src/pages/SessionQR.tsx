@@ -83,7 +83,8 @@ export default function SessionQR() {
       return { secret, expiresAt };
     },
     onSuccess: (data) => {
-      setQrValue(JSON.stringify({ session_id: sessionId, secret: data.secret }));
+      const epoch = Math.floor(Date.now() / 10000);
+      setQrValue(JSON.stringify({ session_id: sessionId, secret: data.secret, t: epoch }));
       queryClient.invalidateQueries({ queryKey: ["session", sessionId] });
       toast({ title: t("common.success"), description: "QR Code activated!" });
     },
@@ -133,15 +134,24 @@ export default function SessionQR() {
     },
   });
 
-  // Set QR value from existing session data
+  // Generate rotating QR value every 10 seconds
   useEffect(() => {
-    if (session?.qr_code_secret && session?.qr_expires_at) {
-      const expires = new Date(session.qr_expires_at).getTime();
-      if (expires > Date.now()) {
-        setQrValue(JSON.stringify({ session_id: sessionId, secret: session.qr_code_secret }));
-      }
-    }
-  }, [session, sessionId]);
+    if (!session?.qr_code_secret || !session?.qr_expires_at) return;
+    const expires = new Date(session.qr_expires_at).getTime();
+    if (expires <= Date.now()) return;
+
+    const generateQr = () => {
+      const epoch = Math.floor(Date.now() / 10000); // changes every 10 sec
+      setQrValue(JSON.stringify({
+        session_id: sessionId,
+        secret: session.qr_code_secret,
+        t: epoch,
+      }));
+    };
+    generateQr();
+    const interval = setInterval(generateQr, 10000);
+    return () => clearInterval(interval);
+  }, [session?.qr_code_secret, session?.qr_expires_at, sessionId]);
 
   // Countdown timer
   useEffect(() => {
