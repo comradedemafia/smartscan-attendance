@@ -65,13 +65,10 @@ export default function CourseStudents() {
     queryFn: async () => {
       if (studentSearch.length < 2) return [];
       const { data, error } = await supabase
-        .from("profiles")
-        .select("id, full_name, university_id, email")
-        .or(`full_name.ilike.%${studentSearch}%,university_id.ilike.%${studentSearch}%`)
-        .limit(10);
+        .rpc("search_profiles_for_enrollment", { search_term: studentSearch });
       if (error) throw error;
       const enrolledIds = new Set(enrollments.map((e) => e.user_id));
-      return (data || []).filter((p) => !enrolledIds.has(p.id));
+      return (data || []).filter((p: any) => !enrolledIds.has(p.id));
     },
     enabled: studentSearch.length >= 2,
   });

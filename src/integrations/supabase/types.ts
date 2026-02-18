@@ -250,6 +250,14 @@ export type Database = {
         Args: { _course_id: string; _user_id: string }
         Returns: boolean
       }
+      search_profiles_for_enrollment: {
+        Args: { search_term: string }
+        Returns: {
+          full_name: string
+          id: string
+          university_id: string
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "lecturer" | "student"
