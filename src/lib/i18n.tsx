@@ -176,6 +176,8 @@ const translations = {
     "admin.importSuccess": "Students imported successfully",
     "admin.csvFormat": "CSV format: university_id, full_name, email, gender(M/F)",
     "admin.importingStudents": "Importing...",
+    "admin.manageCourses": "Manage Courses",
+    "admin.availableCourses": "Available Courses",
 
     // Settings
     "settings.title": "Settings",
@@ -388,6 +390,8 @@ const translations = {
     "admin.importSuccess": "Wanafunzi wameingizwa",
     "admin.csvFormat": "Muundo wa CSV: university_id, full_name, email, gender(M/F)",
     "admin.importingStudents": "Inaingiza...",
+    "admin.manageCourses": "Simamia Kozi",
+    "admin.availableCourses": "Kozi Zinazopatikana",
 
     // Settings
     "settings.title": "Mipangilio",
