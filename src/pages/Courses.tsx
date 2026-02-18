@@ -223,19 +223,23 @@ export default function Courses() {
                     <p className="text-xs font-mono text-muted-foreground">{course.code}</p>
                     <CardTitle className="text-base mt-1">{course.name}</CardTitle>
                   </div>
-                  {canManage && (course.created_by === user?.id || role === "admin") && (
+                  {canManage && (
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(course)}>
-                        <Edit className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive"
-                        onClick={() => deleteMutation.mutate(course.id)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      {(course.created_by === user?.id || role === "admin") && (
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(course)}>
+                          <Edit className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                      {(course.created_by === user?.id || role === "admin") && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive"
+                          onClick={() => deleteMutation.mutate(course.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -250,7 +254,7 @@ export default function Courses() {
                     <span>{course.course_enrollments?.[0]?.count ?? 0} {t("courses.students")}</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    {canManage && (course.created_by === user?.id || role === "admin") && (
+                    {canManage && (
                       <Button
                         variant="outline"
                         size="sm"
