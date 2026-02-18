@@ -168,7 +168,7 @@ export default function CourseStudents() {
     return e.profile.full_name.toLowerCase().includes(q) || e.profile.university_id.toLowerCase().includes(q);
   });
 
-  const canManage = (role === "lecturer" && course?.created_by === user?.id) || role === "admin";
+  const canManage = role === "lecturer" || role === "admin";
 
   return (
     <div className="space-y-6">
