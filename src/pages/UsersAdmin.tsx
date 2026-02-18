@@ -4,20 +4,26 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, Search, UserCheck, UserX } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Users, Search, UserCheck, UserX, BookOpen, Plus, Trash2 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 export default function UsersAdmin() {
   const { t } = useI18n();
   const { role } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [filterGender, setFilterGender] = useState<string>("all");
   const [filterCourse, setFilterCourse] = useState<string>("all");
+  const [selectedStudent, setSelectedStudent] = useState<any>(null);
+  const [enrollDialogOpen, setEnrollDialogOpen] = useState(false);
 
-  // Get all profiles
   const { data: profiles = [], isLoading } = useQuery({
     queryKey: ["admin-profiles"],
     queryFn: async () => {
@@ -31,7 +37,6 @@ export default function UsersAdmin() {
     enabled: role === "admin",
   });
 
-  // Get all roles
   const { data: roles = [] } = useQuery({
     queryKey: ["admin-roles"],
     queryFn: async () => {
@@ -42,7 +47,6 @@ export default function UsersAdmin() {
     enabled: role === "admin",
   });
 
-  // Get courses
   const { data: courses = [] } = useQuery({
     queryKey: ["admin-courses-list"],
     queryFn: async () => {
@@ -53,25 +57,54 @@ export default function UsersAdmin() {
     enabled: role === "admin",
   });
 
-  // Get all enrollments
   const { data: enrollments = [] } = useQuery({
     queryKey: ["admin-enrollments"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("course_enrollments").select("user_id, course_id");
+      const { data, error } = await supabase.from("course_enrollments").select("id, user_id, course_id");
       if (error) throw error;
       return data;
     },
     enabled: role === "admin",
   });
 
+  const enrollMutation = useMutation({
+    mutationFn: async ({ userId, courseId }: { userId: string; courseId: string }) => {
+      const { error } = await supabase.from("course_enrollments").insert({ user_id: userId, course_id: courseId });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-enrollments"] });
+      toast({ title: t("common.success"), description: t("courses.studentAdded") });
+    },
+    onError: (e: any) => {
+      toast({ title: t("common.error"), description: e.message, variant: "destructive" });
+    },
+  });
+
+  const unenrollMutation = useMutation({
+    mutationFn: async (enrollmentId: string) => {
+      const { error } = await supabase.from("course_enrollments").delete().eq("id", enrollmentId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-enrollments"] });
+      toast({ title: t("common.success"), description: t("courses.studentRemoved") });
+    },
+    onError: (e: any) => {
+      toast({ title: t("common.error"), description: e.message, variant: "destructive" });
+    },
+  });
+
   const roleMap = Object.fromEntries(roles.map((r) => [r.user_id, r.role]));
   const enrollmentsByCourse: Record<string, Set<string>> = {};
+  const enrollmentMap: Record<string, Record<string, string>> = {}; // userId -> courseId -> enrollmentId
   enrollments.forEach((e) => {
     if (!enrollmentsByCourse[e.course_id]) enrollmentsByCourse[e.course_id] = new Set();
     enrollmentsByCourse[e.course_id].add(e.user_id);
+    if (!enrollmentMap[e.user_id]) enrollmentMap[e.user_id] = {};
+    enrollmentMap[e.user_id][e.course_id] = e.id;
   });
 
-  // Only show students
   const students = profiles.filter((p) => roleMap[p.id] === "student");
 
   const filtered = students.filter((p) => {
@@ -85,9 +118,21 @@ export default function UsersAdmin() {
   const maleCount = filtered.filter((p) => p.gender === "M").length;
   const femaleCount = filtered.filter((p) => p.gender === "F").length;
 
+  const openEnrollDialog = (student: any) => {
+    setSelectedStudent(student);
+    setEnrollDialogOpen(true);
+  };
+
   if (role !== "admin") {
     return <p className="text-muted-foreground">{t("reports.noData")}</p>;
   }
+
+  const studentEnrolledCourses = selectedStudent
+    ? courses.filter((c) => enrollmentMap[selectedStudent.id]?.[c.id])
+    : [];
+  const studentNotEnrolledCourses = selectedStudent
+    ? courses.filter((c) => !enrollmentMap[selectedStudent.id]?.[c.id])
+    : [];
 
   return (
     <div className="space-y-6">
@@ -118,7 +163,7 @@ export default function UsersAdmin() {
         </Card>
         <Card>
           <CardContent className="pt-6 text-center">
-            <Users className="h-6 w-6 mx-auto mb-2 text-primary" />
+            <BookOpen className="h-6 w-6 mx-auto mb-2 text-primary" />
             <p className="text-2xl font-bold">{courses.length}</p>
             <p className="text-xs text-muted-foreground">{t("dashboard.totalCourses")}</p>
           </CardContent>
@@ -178,6 +223,7 @@ export default function UsersAdmin() {
                     <TableHead>{t("auth.email")}</TableHead>
                     <TableHead>{t("auth.gender")}</TableHead>
                     <TableHead>{t("admin.enrolledCourses")}</TableHead>
+                    <TableHead className="w-20">{t("common.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -205,6 +251,17 @@ export default function UsersAdmin() {
                             )}
                           </div>
                         </TableCell>
+                        <TableCell>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1 text-xs h-7"
+                            onClick={() => openEnrollDialog(p)}
+                          >
+                            <BookOpen className="h-3.5 w-3.5" />
+                            {t("admin.manageCourses")}
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     );
                   })}
@@ -214,6 +271,76 @@ export default function UsersAdmin() {
           )}
         </CardContent>
       </Card>
+
+      {/* Manage Enrollments Dialog */}
+      <Dialog open={enrollDialogOpen} onOpenChange={setEnrollDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <BookOpen className="h-5 w-5" />
+              {selectedStudent?.full_name} — {t("admin.enrolledCourses")}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Currently enrolled */}
+            {studentEnrolledCourses.length > 0 && (
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-2">{t("admin.enrolledCourses")}</p>
+                <div className="space-y-1">
+                  {studentEnrolledCourses.map((c) => (
+                    <div key={c.id} className="flex items-center justify-between rounded-lg border px-3 py-2">
+                      <div>
+                        <p className="text-sm font-medium">{c.name}</p>
+                        <p className="text-xs text-muted-foreground">{c.code}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => unenrollMutation.mutate(enrollmentMap[selectedStudent.id][c.id])}
+                        disabled={unenrollMutation.isPending}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Not enrolled */}
+            {studentNotEnrolledCourses.length > 0 && (
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-2">{t("admin.availableCourses")}</p>
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  {studentNotEnrolledCourses.map((c) => (
+                    <div key={c.id} className="flex items-center justify-between rounded-lg border px-3 py-2 hover:bg-muted/50">
+                      <div>
+                        <p className="text-sm font-medium">{c.name}</p>
+                        <p className="text-xs text-muted-foreground">{c.code}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 text-primary hover:bg-primary/10"
+                        onClick={() => enrollMutation.mutate({ userId: selectedStudent.id, courseId: c.id })}
+                        disabled={enrollMutation.isPending}
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {courses.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">{t("reports.noData")}</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
