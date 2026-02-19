@@ -9,6 +9,12 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { QrCode, CheckCircle2, XCircle, Camera } from "lucide-react";
 import { Html5Qrcode } from "html5-qrcode";
+import { z } from "zod";
+
+const qrPayloadSchema = z.object({
+  session_id: z.string().uuid(),
+  secret: z.string().min(1).max(200),
+});
 
 export default function ScanQR() {
   const { user } = useAuth();
@@ -23,36 +29,21 @@ export default function ScanQR() {
 
   const recordMutation = useMutation({
     mutationFn: async (parsed: { session_id: string; secret: string }) => {
-      // 1. Verify session is active and secret matches
-      const { data: session, error: sessionError } = await supabase
-        .from("sessions")
-        .select("id, qr_code_secret, qr_expires_at, status")
-        .eq("id", parsed.session_id)
-        .single();
+      const { data, error } = await supabase.functions.invoke("verify-attendance", {
+        body: parsed,
+      });
 
-      if (sessionError || !session) throw new Error("Session not found");
-      if (session.qr_code_secret !== parsed.secret) throw new Error("Invalid QR code");
-      if (session.status !== "active" || !session.qr_expires_at || new Date(session.qr_expires_at) < new Date()) {
-        throw new Error("QR_EXPIRED");
+      if (error) {
+        // Edge function network/invocation error
+        throw new Error(error.message || "Network error");
       }
 
-      // 2. Check duplicate
-      const { data: existing } = await supabase
-        .from("attendance_records")
-        .select("id")
-        .eq("session_id", parsed.session_id)
-        .eq("user_id", user!.id)
-        .maybeSingle();
+      // The edge function returns JSON with error field on failure
+      if (data?.error) {
+        throw new Error(data.error);
+      }
 
-      if (existing) throw new Error("DUPLICATE");
-
-      // 3. Record attendance
-      const { error } = await supabase.from("attendance_records").insert({
-        session_id: parsed.session_id,
-        user_id: user!.id,
-        status: "present",
-      });
-      if (error) throw error;
+      return data;
     },
     onSuccess: () => {
       setResult("success");
@@ -99,11 +90,10 @@ export default function ScanQR() {
           processedRef.current = true;
 
           try {
-            const parsed = JSON.parse(decodedText);
-            if (parsed.session_id && parsed.secret) {
-              stopScanner();
-              recordMutation.mutate({ session_id: parsed.session_id, secret: parsed.secret });
-            }
+            const raw = JSON.parse(decodedText);
+            const parsed = qrPayloadSchema.parse(raw);
+            stopScanner();
+            recordMutation.mutate({ session_id: parsed.session_id, secret: parsed.secret });
           } catch {
             processedRef.current = false;
           }
