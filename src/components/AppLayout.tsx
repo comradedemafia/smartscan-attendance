@@ -19,6 +19,8 @@ import {
   X,
   Sun,
   Moon,
+  Building2,
+  GraduationCap,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -38,7 +40,9 @@ export default function AppLayout() {
 
   const navItems = [
     { to: "/", icon: LayoutDashboard, label: t("nav.dashboard"), roles: ["admin", "lecturer", "student"] },
-    { to: "/courses", icon: BookOpen, label: t("nav.courses"), roles: ["admin", "lecturer", "student"] },
+    { to: "/my-department", icon: GraduationCap, label: t("dept.myDepartment"), roles: ["student"] },
+    { to: "/departments", icon: Building2, label: t("dept.departments"), roles: ["admin"] },
+    { to: "/courses", icon: BookOpen, label: t("nav.courses"), roles: ["admin", "lecturer"] },
     { to: "/sessions", icon: Calendar, label: t("nav.sessions"), roles: ["admin", "lecturer", "student"] },
     { to: "/scan", icon: QrCode, label: t("nav.scanQr"), roles: ["student"] },
     { to: "/attendance", icon: ClipboardList, label: t("nav.attendance"), roles: ["admin", "lecturer", "student"] },
