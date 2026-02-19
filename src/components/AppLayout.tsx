@@ -34,8 +34,9 @@ export default function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleSignOut = async () => {
-    await signOut();
     navigate("/auth");
+    // Delay signOut slightly to avoid DOM conflicts during navigation
+    setTimeout(() => signOut(), 100);
   };
 
   const navItems = [
