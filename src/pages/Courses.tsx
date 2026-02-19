@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { BookOpen, Plus, Trash2, Edit, Users, LogIn, LogOut, UserCog, Building2, ChevronDown, ChevronRight } from "lucide-react";
@@ -21,10 +22,11 @@ export default function Courses() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [editingCourse, setEditingCourse] = useState<any>(null);
-  const [code, setCode] = useState("");
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+  const [editingSubject, setEditingSubject] = useState<any>(null);
+  const [subjectCode, setSubjectCode] = useState("");
+  const [subjectName, setSubjectName] = useState("");
+  const [subjectDesc, setSubjectDesc] = useState("");
+  const [subjectCourseId, setSubjectCourseId] = useState("");
   const [expandedDept, setExpandedDept] = useState<string | null>(null);
   const [expandedCourse, setExpandedCourse] = useState<string | null>(null);
 
@@ -143,47 +145,79 @@ export default function Courses() {
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
-  const createMutation = useMutation({
+  // Lecturer: create/edit/delete SUBJECTS (not courses)
+  const createSubjectMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("courses").insert({ code, name, description: description || null, created_by: user!.id });
+      const { error } = await supabase.from("subjects").insert({
+        code: subjectCode.toUpperCase(),
+        name: subjectName,
+        description: subjectDesc || null,
+        course_id: subjectCourseId,
+        created_by: user!.id,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["courses"] });
-      toast({ title: t("common.success"), description: "Course created" });
+      queryClient.invalidateQueries({ queryKey: ["all-subjects-courses"] });
+      toast({ title: t("common.success"), description: t("subjects.subjectCreated") });
       resetForm();
     },
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
-  const updateMutation = useMutation({
+  const updateSubjectMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("courses").update({ code, name, description: description || null }).eq("id", editingCourse.id);
+      const { error } = await supabase.from("subjects").update({
+        code: subjectCode.toUpperCase(),
+        name: subjectName,
+        description: subjectDesc || null,
+      }).eq("id", editingSubject.id);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["courses"] });
-      toast({ title: t("common.success"), description: "Course updated" });
+      queryClient.invalidateQueries({ queryKey: ["all-subjects-courses"] });
+      toast({ title: t("common.success"), description: t("subjects.subjectUpdated") });
       resetForm();
     },
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
-  const deleteMutation = useMutation({
+  const deleteSubjectMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("courses").delete().eq("id", id);
+      const { error } = await supabase.from("subjects").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["courses"] });
-      toast({ title: t("common.success"), description: "Course deleted" });
+      queryClient.invalidateQueries({ queryKey: ["all-subjects-courses"] });
+      toast({ title: t("common.success"), description: t("subjects.subjectDeleted") });
     },
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
-  const resetForm = () => { setOpen(false); setEditingCourse(null); setCode(""); setName(""); setDescription(""); };
-  const openEdit = (course: any) => { setEditingCourse(course); setCode(course.code); setName(course.name); setDescription(course.description || ""); setOpen(true); };
-  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); if (!code.trim() || !name.trim()) return; editingCourse ? updateMutation.mutate() : createMutation.mutate(); };
+  const resetForm = () => {
+    setOpen(false);
+    setEditingSubject(null);
+    setSubjectCode("");
+    setSubjectName("");
+    setSubjectDesc("");
+    setSubjectCourseId("");
+  };
+
+  const openEditSubject = (subject: any) => {
+    setEditingSubject(subject);
+    setSubjectCode(subject.code);
+    setSubjectName(subject.name);
+    setSubjectDesc(subject.description || "");
+    setSubjectCourseId(subject.course_id);
+    setOpen(true);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!subjectCode.trim() || !subjectName.trim() || !subjectCourseId) return;
+    editingSubject ? updateSubjectMutation.mutate() : createSubjectMutation.mutate();
+  };
+
   const courseSubjects = (courseId: string) => allSubjects.filter((s) => s.course_id === courseId);
 
   const coursesByDept = isAdmin ? departments.map((dept) => ({
@@ -194,7 +228,7 @@ export default function Courses() {
 
   const renderSubjects = (courseId: string) => {
     const subjects = courseSubjects(courseId);
-    if (subjects.length === 0) return null;
+    if (subjects.length === 0 && !canManage) return null;
     const isExpanded = expandedCourse === courseId;
     return (
       <div className="mt-2">
@@ -210,19 +244,34 @@ export default function Courses() {
                   <span className="font-mono text-muted-foreground mr-1">{s.code}</span>
                   <span>{s.name}</span>
                 </div>
-                {isStudent && (
-                  mySubjectEnrollments.includes(s.id) ? (
-                    <Button variant="ghost" size="sm" className="h-5 text-xs px-1" onClick={() => unenrollSubjectMutation.mutate(s.id)}>
-                      <LogOut className="h-3 w-3 mr-0.5" />{t("subjects.leaveSubject")}
-                    </Button>
-                  ) : (
-                    <Button variant="ghost" size="sm" className="h-5 text-xs px-1 text-primary" onClick={() => enrollSubjectMutation.mutate(s.id)}>
-                      <LogIn className="h-3 w-3 mr-0.5" />{t("subjects.joinSubject")}
-                    </Button>
-                  )
-                )}
+                <div className="flex items-center gap-1">
+                  {canManage && (
+                    <>
+                      <Button variant="ghost" size="sm" className="h-5 text-xs px-1" onClick={() => openEditSubject(s)}>
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-5 text-xs px-1 text-destructive" onClick={() => deleteSubjectMutation.mutate(s.id)}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </>
+                  )}
+                  {isStudent && (
+                    mySubjectEnrollments.includes(s.id) ? (
+                      <Button variant="ghost" size="sm" className="h-5 text-xs px-1" onClick={() => unenrollSubjectMutation.mutate(s.id)}>
+                        <LogOut className="h-3 w-3 mr-0.5" />{t("subjects.leaveSubject")}
+                      </Button>
+                    ) : (
+                      <Button variant="ghost" size="sm" className="h-5 text-xs px-1 text-primary" onClick={() => enrollSubjectMutation.mutate(s.id)}>
+                        <LogIn className="h-3 w-3 mr-0.5" />{t("subjects.joinSubject")}
+                      </Button>
+                    )
+                  )}
+                </div>
               </div>
             ))}
+            {subjects.length === 0 && canManage && (
+              <p className="text-xs text-muted-foreground py-1">{t("subjects.noSubjects")}</p>
+            )}
           </div>
         )}
       </div>
@@ -237,17 +286,17 @@ export default function Courses() {
             <p className="text-xs font-mono text-muted-foreground">{course.code}</p>
             <CardTitle className="text-base mt-1">{course.name}</CardTitle>
           </div>
-          {showActions && (role === "lecturer" || role === "admin") && (
+          {showActions && role === "admin" && (
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               {(course.created_by === user?.id || role === "admin") && (
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(course)}>
-                  <Edit className="h-3.5 w-3.5" />
-                </Button>
-              )}
-              {(course.created_by === user?.id || role === "admin") && (
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteMutation.mutate(course.id)}>
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+                <>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Edit className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </>
               )}
             </div>
           )}
@@ -291,27 +340,38 @@ export default function Courses() {
         {canManage && (
           <Dialog open={open} onOpenChange={(o) => { if (!o) resetForm(); setOpen(o); }}>
             <DialogTrigger asChild>
-              <Button><Plus className="h-4 w-4 mr-2" />{t("courses.create")}</Button>
+              <Button><Plus className="h-4 w-4 mr-2" />{t("subjects.createSubject")}</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>{editingCourse ? t("common.edit") : t("courses.create")}</DialogTitle>
+                <DialogTitle>{editingSubject ? t("subjects.editSubject") : t("subjects.createSubject")}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label>{t("courses.code")}</Label>
-                  <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="CS101" required />
+                  <Label>{t("subjects.subjectCode")}</Label>
+                  <Input value={subjectCode} onChange={(e) => setSubjectCode(e.target.value)} placeholder="CS101-A" required />
                 </div>
                 <div className="space-y-2">
-                  <Label>{t("courses.name")}</Label>
-                  <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Introduction to CS" required />
+                  <Label>{t("subjects.subjectName")}</Label>
+                  <Input value={subjectName} onChange={(e) => setSubjectName(e.target.value)} placeholder="Programming Basics" required />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("sessions.course")}</Label>
+                  <Select value={subjectCourseId} onValueChange={setSubjectCourseId}>
+                    <SelectTrigger><SelectValue placeholder={t("reports.selectCourse")} /></SelectTrigger>
+                    <SelectContent>
+                      {courses.map((c: any) => (
+                        <SelectItem key={c.id} value={c.id}>{c.code} - {c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>{t("courses.description")}</Label>
-                  <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional description" />
+                  <Textarea value={subjectDesc} onChange={(e) => setSubjectDesc(e.target.value)} placeholder="Optional description" />
                 </div>
-                <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending}>
-                  {editingCourse ? t("common.save") : t("courses.create")}
+                <Button type="submit" className="w-full" disabled={createSubjectMutation.isPending || updateSubjectMutation.isPending}>
+                  {editingSubject ? t("common.save") : t("subjects.createSubject")}
                 </Button>
               </form>
             </DialogContent>
