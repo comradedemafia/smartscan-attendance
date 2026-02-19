@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Users, BookOpen, Plus, ChevronDown, ChevronRight, AlertCircle } from "lucide-react";
+import { Building2, Users, BookOpen, Plus, ChevronDown, ChevronRight, AlertCircle, Edit, Trash2, UserPlus } from "lucide-react";
 
 type Department = { id: string; name: string; code: string; description: string | null };
 type Lecturer = { lecturer_id: string; full_name: string; university_id: string; courses: { id: string; name: string; code: string }[] };
@@ -23,13 +23,27 @@ export default function AdminDepartments() {
   const queryClient = useQueryClient();
   const [expandedDept, setExpandedDept] = useState<string | null>(null);
   const [expandedLecturer, setExpandedLecturer] = useState<string | null>(null);
+  
+  // Department dialogs
   const [openDeptDialog, setOpenDeptDialog] = useState(false);
-  const [openAssignDialog, setOpenAssignDialog] = useState(false);
+  const [editingDept, setEditingDept] = useState<Department | null>(null);
   const [deptName, setDeptName] = useState("");
   const [deptCode, setDeptCode] = useState("");
   const [deptDesc, setDeptDesc] = useState("");
+  
+  // Assign lecturer dialog
+  const [openAssignDialog, setOpenAssignDialog] = useState(false);
   const [assignCourseId, setAssignCourseId] = useState("");
   const [assignLecturerId, setAssignLecturerId] = useState("");
+  const [assignDeptId, setAssignDeptId] = useState("");
+  
+  // Course dialog
+  const [openCourseDialog, setOpenCourseDialog] = useState(false);
+  const [editingCourse, setEditingCourse] = useState<any>(null);
+  const [courseName, setCourseName] = useState("");
+  const [courseCode, setCourseCode] = useState("");
+  const [courseDesc, setCourseDesc] = useState("");
+  const [courseDeptId, setCourseDeptId] = useState("");
 
   // Departments
   const { data: departments = [] } = useQuery<Department[]>({
@@ -45,7 +59,7 @@ export default function AdminDepartments() {
   const { data: allCourses = [] } = useQuery({
     queryKey: ["all-courses-admin"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("courses").select("id, name, code, department_id, departments(name)").order("name");
+      const { data, error } = await supabase.from("courses").select("id, name, code, department_id, description").order("name");
       if (error) throw error;
       return data;
     },
@@ -84,7 +98,7 @@ export default function AdminDepartments() {
     enabled: !!expandedDept,
   });
 
-  // Course lecturers - attendance check (did lecturer teach this session?)
+  // Session stats
   const { data: sessionStats = {} } = useQuery({
     queryKey: ["session-stats-by-course"],
     queryFn: async () => {
@@ -105,17 +119,70 @@ export default function AdminDepartments() {
     },
   });
 
-  // Create department
-  const createDeptMutation = useMutation({
+  // ─── Mutations ───
+
+  // Create/Edit department
+  const saveDeptMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("departments").insert({ name: deptName, code: deptCode.toUpperCase(), description: deptDesc || null });
+      if (editingDept) {
+        const { error } = await supabase.from("departments").update({ name: deptName, code: deptCode.toUpperCase(), description: deptDesc || null }).eq("id", editingDept.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("departments").insert({ name: deptName, code: deptCode.toUpperCase(), description: deptDesc || null });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["departments"] });
+      toast({ title: t("common.success"), description: editingDept ? t("dept.deptUpdated") : t("dept.deptCreated") });
+      resetDeptForm();
+    },
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
+  });
+
+  // Delete department
+  const deleteDeptMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("departments").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["departments"] });
-      toast({ title: t("common.success"), description: t("dept.deptCreated") });
-      setOpenDeptDialog(false);
-      setDeptName(""); setDeptCode(""); setDeptDesc("");
+      toast({ title: t("common.success"), description: t("dept.deptDeleted") });
+      if (expandedDept) setExpandedDept(null);
+    },
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
+  });
+
+  // Create/Edit course
+  const saveCourseMutation = useMutation({
+    mutationFn: async () => {
+      if (editingCourse) {
+        const { error } = await supabase.from("courses").update({ name: courseName, code: courseCode.toUpperCase(), description: courseDesc || null, department_id: courseDeptId || null }).eq("id", editingCourse.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("courses").insert({ name: courseName, code: courseCode.toUpperCase(), description: courseDesc || null, department_id: courseDeptId || null, created_by: user!.id });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["all-courses-admin"] });
+      queryClient.invalidateQueries({ queryKey: ["dept-lecturers-admin"] });
+      toast({ title: t("common.success"), description: editingCourse ? t("dept.courseUpdated") : t("dept.courseCreated") });
+      resetCourseForm();
+    },
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
+  });
+
+  // Delete course
+  const deleteCourseMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("courses").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["all-courses-admin"] });
+      toast({ title: t("common.success"), description: t("dept.courseDeleted") });
     },
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
@@ -134,7 +201,7 @@ export default function AdminDepartments() {
       queryClient.invalidateQueries({ queryKey: ["dept-lecturers-admin"] });
       toast({ title: t("common.success"), description: t("dept.lecturerAssigned") });
       setOpenAssignDialog(false);
-      setAssignCourseId(""); setAssignLecturerId("");
+      setAssignCourseId(""); setAssignLecturerId(""); setAssignDeptId("");
     },
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
@@ -153,7 +220,51 @@ export default function AdminDepartments() {
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
+  // ─── Form helpers ───
+  const resetDeptForm = () => {
+    setOpenDeptDialog(false);
+    setEditingDept(null);
+    setDeptName(""); setDeptCode(""); setDeptDesc("");
+  };
+
+  const openEditDept = (dept: Department) => {
+    setEditingDept(dept);
+    setDeptName(dept.name);
+    setDeptCode(dept.code);
+    setDeptDesc(dept.description || "");
+    setOpenDeptDialog(true);
+  };
+
+  const resetCourseForm = () => {
+    setOpenCourseDialog(false);
+    setEditingCourse(null);
+    setCourseName(""); setCourseCode(""); setCourseDesc(""); setCourseDeptId("");
+  };
+
+  const openEditCourse = (course: any) => {
+    setEditingCourse(course);
+    setCourseName(course.name);
+    setCourseCode(course.code);
+    setCourseDesc(course.description || "");
+    setCourseDeptId(course.department_id || "");
+    setOpenCourseDialog(true);
+  };
+
+  const openAddCourseForDept = (deptId: string) => {
+    resetCourseForm();
+    setCourseDeptId(deptId);
+    setOpenCourseDialog(true);
+  };
+
+  const openAssignForDept = (deptId: string) => {
+    setAssignDeptId(deptId);
+    setAssignCourseId("");
+    setAssignLecturerId("");
+    setOpenAssignDialog(true);
+  };
+
   const deptCourses = (deptId: string) => allCourses.filter((c: any) => c.department_id === deptId);
+  const assignFilteredCourses = assignDeptId ? deptCourses(assignDeptId) : allCourses;
 
   return (
     <div className="space-y-6">
@@ -163,50 +274,13 @@ export default function AdminDepartments() {
           <p className="text-muted-foreground">{t("dept.adminDesc")}</p>
         </div>
         <div className="flex gap-2">
-          {/* Assign Lecturer */}
-          <Dialog open={openAssignDialog} onOpenChange={setOpenAssignDialog}>
-            <DialogTrigger asChild>
-              <Button variant="outline"><Users className="h-4 w-4 mr-2" />{t("dept.assignLecturer")}</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader><DialogTitle>{t("dept.assignLecturer")}</DialogTitle></DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>{t("dept.course")}</Label>
-                  <Select value={assignCourseId} onValueChange={setAssignCourseId}>
-                    <SelectTrigger><SelectValue placeholder={t("reports.selectCourse")} /></SelectTrigger>
-                    <SelectContent>
-                      {allCourses.map((c: any) => (
-                        <SelectItem key={c.id} value={c.id}>{c.code} — {c.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>{t("dept.lecturer")}</Label>
-                  <Select value={assignLecturerId} onValueChange={setAssignLecturerId}>
-                    <SelectTrigger><SelectValue placeholder={t("dept.selectLecturer")} /></SelectTrigger>
-                    <SelectContent>
-                      {allLecturers.map((l: any) => (
-                        <SelectItem key={l.id} value={l.id}>{l.full_name} ({l.university_id})</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button className="w-full" onClick={() => assignMutation.mutate()} disabled={!assignCourseId || !assignLecturerId || assignMutation.isPending}>
-                  {t("dept.assign")}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-
           {/* Create Dept */}
-          <Dialog open={openDeptDialog} onOpenChange={setOpenDeptDialog}>
+          <Dialog open={openDeptDialog} onOpenChange={(o) => { if (!o) resetDeptForm(); setOpenDeptDialog(o); }}>
             <DialogTrigger asChild>
               <Button><Plus className="h-4 w-4 mr-2" />{t("dept.addDepartment")}</Button>
             </DialogTrigger>
             <DialogContent>
-              <DialogHeader><DialogTitle>{t("dept.addDepartment")}</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle>{editingDept ? t("dept.editDepartment") : t("dept.addDepartment")}</DialogTitle></DialogHeader>
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>{t("dept.deptName")}</Label>
@@ -220,14 +294,83 @@ export default function AdminDepartments() {
                   <Label>{t("courses.description")}</Label>
                   <Input value={deptDesc} onChange={(e) => setDeptDesc(e.target.value)} placeholder="Optional description" />
                 </div>
-                <Button className="w-full" onClick={() => createDeptMutation.mutate()} disabled={!deptName || !deptCode || createDeptMutation.isPending}>
-                  {t("dept.addDepartment")}
+                <Button className="w-full" onClick={() => saveDeptMutation.mutate()} disabled={!deptName || !deptCode || saveDeptMutation.isPending}>
+                  {editingDept ? t("common.save") : t("dept.addDepartment")}
                 </Button>
               </div>
             </DialogContent>
           </Dialog>
         </div>
       </div>
+
+      {/* Course Dialog */}
+      <Dialog open={openCourseDialog} onOpenChange={(o) => { if (!o) resetCourseForm(); setOpenCourseDialog(o); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{editingCourse ? t("dept.editCourse") : t("dept.addCourse")}</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>{t("courses.code")}</Label>
+              <Input value={courseCode} onChange={(e) => setCourseCode(e.target.value)} placeholder="CS101" />
+            </div>
+            <div className="space-y-2">
+              <Label>{t("courses.name")}</Label>
+              <Input value={courseName} onChange={(e) => setCourseName(e.target.value)} placeholder="Introduction to CS" />
+            </div>
+            <div className="space-y-2">
+              <Label>{t("courses.description")}</Label>
+              <Input value={courseDesc} onChange={(e) => setCourseDesc(e.target.value)} placeholder="Optional" />
+            </div>
+            <div className="space-y-2">
+              <Label>{t("auth.department")}</Label>
+              <Select value={courseDeptId} onValueChange={setCourseDeptId}>
+                <SelectTrigger><SelectValue placeholder={t("auth.selectDepartment")} /></SelectTrigger>
+                <SelectContent>
+                  {departments.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>{d.code} — {d.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button className="w-full" onClick={() => saveCourseMutation.mutate()} disabled={!courseName || !courseCode || saveCourseMutation.isPending}>
+              {editingCourse ? t("common.save") : t("dept.addCourse")}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign Lecturer Dialog */}
+      <Dialog open={openAssignDialog} onOpenChange={setOpenAssignDialog}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{t("dept.assignLecturer")}</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>{t("dept.course")}</Label>
+              <Select value={assignCourseId} onValueChange={setAssignCourseId}>
+                <SelectTrigger><SelectValue placeholder={t("reports.selectCourse")} /></SelectTrigger>
+                <SelectContent>
+                  {assignFilteredCourses.map((c: any) => (
+                    <SelectItem key={c.id} value={c.id}>{c.code} — {c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>{t("dept.lecturer")}</Label>
+              <Select value={assignLecturerId} onValueChange={setAssignLecturerId}>
+                <SelectTrigger><SelectValue placeholder={t("dept.selectLecturer")} /></SelectTrigger>
+                <SelectContent>
+                  {allLecturers.map((l: any) => (
+                    <SelectItem key={l.id} value={l.id}>{l.full_name} ({l.university_id})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button className="w-full" onClick={() => assignMutation.mutate()} disabled={!assignCourseId || !assignLecturerId || assignMutation.isPending}>
+              {t("dept.assign")}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Department list */}
       <div className="space-y-4">
@@ -236,12 +379,12 @@ export default function AdminDepartments() {
           const isExpanded = expandedDept === dept.id;
           return (
             <Card key={dept.id} className={isExpanded ? "border-primary/40" : ""}>
-              <CardHeader
-                className="cursor-pointer pb-3"
-                onClick={() => setExpandedDept(isExpanded ? null : dept.id)}
-              >
+              <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+                  <div
+                    className="flex items-center gap-3 cursor-pointer flex-1"
+                    onClick={() => setExpandedDept(isExpanded ? null : dept.id)}
+                  >
                     <Building2 className="h-5 w-5 text-primary" />
                     <div>
                       <div className="flex items-center gap-2">
@@ -251,10 +394,16 @@ export default function AdminDepartments() {
                       {dept.description && <p className="text-xs text-muted-foreground mt-0.5">{dept.description}</p>}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <div className="text-right text-xs text-muted-foreground mr-2">
                       <div>{courses.length} {t("dept.courses")}</div>
                     </div>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); openEditDept(dept); }}>
+                      <Edit className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={(e) => { e.stopPropagation(); deleteDeptMutation.mutate(dept.id); }}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                     {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                   </div>
                 </div>
@@ -263,23 +412,48 @@ export default function AdminDepartments() {
               {isExpanded && (
                 <CardContent className="pt-0">
                   {/* Courses in this department */}
-                  {courses.length > 0 && (
-                    <div className="mb-4">
-                      <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-1">
                         <BookOpen className="h-3.5 w-3.5" />{t("dept.coursesInDept")}
                       </h3>
-                      <div className="flex flex-wrap gap-2">
+                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => openAddCourseForDept(dept.id)}>
+                        <Plus className="h-3 w-3 mr-1" />{t("dept.addCourse")}
+                      </Button>
+                    </div>
+                    {courses.length === 0 ? (
+                      <p className="text-xs text-muted-foreground py-2">{t("dept.noCourses")}</p>
+                    ) : (
+                      <div className="space-y-1">
                         {courses.map((c: any) => (
-                          <Badge key={c.id} variant="outline" className="text-xs">{c.code} — {c.name}</Badge>
+                          <div key={c.id} className="flex items-center justify-between rounded-md border px-3 py-2">
+                            <div>
+                              <span className="font-mono text-xs text-muted-foreground mr-2">{c.code}</span>
+                              <span className="text-sm">{c.name}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditCourse(c)}>
+                                <Edit className="h-3 w-3" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => deleteCourseMutation.mutate(c.id)}>
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
                         ))}
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
                   {/* Lecturers */}
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1">
-                    <Users className="h-3.5 w-3.5" />{t("dept.lecturers")}
-                  </h3>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                      <Users className="h-3.5 w-3.5" />{t("dept.lecturers")}
+                    </h3>
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => openAssignForDept(dept.id)}>
+                      <UserPlus className="h-3 w-3 mr-1" />{t("dept.assignLecturer")}
+                    </Button>
+                  </div>
                   {deptLecturers.length === 0 ? (
                     <p className="text-xs text-muted-foreground py-2">{t("dept.noLecturers")}</p>
                   ) : (
