@@ -304,6 +304,7 @@ const translations = {
     "subjects.manageSubjects": "Manage Subjects",
     "subjects.subjectStudents": "Subject Students",
     "subjects.enrollStudent": "Enroll Student in Subject",
+    "subjects.createSubject": "Create Subject",
   },
   sw: {
     // Auth
@@ -606,6 +607,7 @@ const translations = {
     "subjects.manageSubjects": "Simamia Masomo",
     "subjects.subjectStudents": "Wanafunzi wa Somo",
     "subjects.enrollStudent": "Sajili Mwanafunzi kwenye Somo",
+    "subjects.createSubject": "Unda Somo",
   },
 } as const;
 

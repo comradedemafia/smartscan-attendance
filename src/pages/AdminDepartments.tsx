@@ -369,6 +369,10 @@ export default function AdminDepartments() {
 
   const deptCourses = (deptId: string) => allCourses.filter((c: any) => c.department_id === deptId);
   const assignFilteredCourses = assignDeptId ? deptCourses(assignDeptId) : allCourses;
+  // Filter lecturers: only show lecturers whose department matches the assign department
+  const assignFilteredLecturers = assignDeptId
+    ? allLecturers.filter((l: any) => l.department_id === assignDeptId)
+    : allLecturers;
 
   return (
     <div className="space-y-6">
@@ -435,7 +439,7 @@ export default function AdminDepartments() {
               <Label>{t("dept.lecturer")}</Label>
               <Select value={assignLecturerId} onValueChange={setAssignLecturerId}>
                 <SelectTrigger><SelectValue placeholder={t("dept.selectLecturer")} /></SelectTrigger>
-                <SelectContent>{allLecturers.map((l: any) => (<SelectItem key={l.id} value={l.id}>{l.full_name} ({l.university_id})</SelectItem>))}</SelectContent>
+                <SelectContent>{assignFilteredLecturers.map((l: any) => (<SelectItem key={l.id} value={l.id}>{l.full_name} ({l.university_id})</SelectItem>))}</SelectContent>
               </Select>
             </div>
             <Button className="w-full" onClick={() => assignMutation.mutate()} disabled={!assignCourseId || !assignLecturerId || assignMutation.isPending}>

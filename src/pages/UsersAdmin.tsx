@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Users, Search, UserCheck, UserX, BookOpen, Plus, Trash2 } from "lucide-react";
+import { Users, Search, UserCheck, UserX, BookOpen, Plus, Trash2, Building2, ChevronDown, ChevronRight } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -21,17 +21,20 @@ export default function UsersAdmin() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [filterGender, setFilterGender] = useState<string>("all");
+  const [filterDept, setFilterDept] = useState<string>("all");
   const [filterCourse, setFilterCourse] = useState<string>("all");
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [enrollDialogOpen, setEnrollDialogOpen] = useState(false);
   const [deleteStudentId, setDeleteStudentId] = useState<string | null>(null);
+  const [expandedDept, setExpandedDept] = useState<string | null>(null);
+  const [expandedCourse, setExpandedCourse] = useState<string | null>(null);
 
   const { data: profiles = [], isLoading } = useQuery({
     queryKey: ["admin-profiles"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, full_name, university_id, email, gender")
+        .select("id, full_name, university_id, email, gender, department_id")
         .order("full_name");
       if (error) throw error;
       return data;
@@ -49,10 +52,20 @@ export default function UsersAdmin() {
     enabled: role === "admin",
   });
 
+  const { data: departments = [] } = useQuery({
+    queryKey: ["admin-departments-users"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("departments").select("id, name, code").order("name");
+      if (error) throw error;
+      return data;
+    },
+    enabled: role === "admin",
+  });
+
   const { data: courses = [] } = useQuery({
     queryKey: ["admin-courses-list"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("courses").select("id, name, code");
+      const { data, error } = await supabase.from("courses").select("id, name, code, department_id");
       if (error) throw error;
       return data;
     },
@@ -97,16 +110,12 @@ export default function UsersAdmin() {
     },
   });
 
-  // Delete student: remove enrollments, attendance, role, profile
   const deleteStudentMutation = useMutation({
     mutationFn: async (studentId: string) => {
-      // Delete attendance records
       await supabase.from("attendance_records").delete().eq("user_id", studentId);
-      // Delete enrollments
+      await supabase.from("subject_enrollments").delete().eq("user_id", studentId);
       await supabase.from("course_enrollments").delete().eq("user_id", studentId);
-      // Delete role
       await supabase.from("user_roles").delete().eq("user_id", studentId);
-      // Delete profile
       const { error } = await supabase.from("profiles").delete().eq("id", studentId);
       if (error) throw error;
     },
@@ -134,12 +143,16 @@ export default function UsersAdmin() {
 
   const students = profiles.filter((p) => roleMap[p.id] === "student");
 
+  // Filter courses by selected department
+  const filteredCourseOptions = filterDept === "all" ? courses : courses.filter((c: any) => c.department_id === filterDept);
+
   const filtered = students.filter((p) => {
     const q = search.toLowerCase();
     const matchSearch = !search || p.full_name.toLowerCase().includes(q) || p.university_id.toLowerCase().includes(q);
     const matchGender = filterGender === "all" || p.gender === filterGender;
+    const matchDept = filterDept === "all" || (p as any).department_id === filterDept;
     const matchCourse = filterCourse === "all" || enrollmentsByCourse[filterCourse]?.has(p.id);
-    return matchSearch && matchGender && matchCourse;
+    return matchSearch && matchGender && matchDept && matchCourse;
   });
 
   const maleCount = filtered.filter((p) => p.gender === "M").length;
@@ -160,6 +173,20 @@ export default function UsersAdmin() {
   const studentNotEnrolledCourses = selectedStudent
     ? courses.filter((c) => !enrollmentMap[selectedStudent.id]?.[c.id])
     : [];
+
+  // Group students by department → course for grouped view
+  const deptGroupedView = departments.map((dept) => {
+    const deptCourses = courses.filter((c: any) => c.department_id === dept.id);
+    const deptStudents = students.filter((s: any) => s.department_id === dept.id);
+    return {
+      ...dept,
+      courses: deptCourses.map((c) => ({
+        ...c,
+        students: deptStudents.filter((s) => enrollmentsByCourse[c.id]?.has(s.id)),
+      })),
+      totalStudents: deptStudents.length,
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -213,20 +240,134 @@ export default function UsersAdmin() {
             <SelectItem value="F">{t("auth.female")}</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={filterDept} onValueChange={(v) => { setFilterDept(v); setFilterCourse("all"); }}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder={t("auth.department")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t("admin.allDepartments")}</SelectItem>
+            {departments.map((d) => (
+              <SelectItem key={d.id} value={d.id}>{d.code} — {d.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select value={filterCourse} onValueChange={setFilterCourse}>
           <SelectTrigger className="w-[200px]">
             <SelectValue placeholder={t("admin.filterByCourse")} />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{t("admin.allCourses")}</SelectItem>
-            {courses.map((c) => (
+            {filteredCourseOptions.map((c: any) => (
               <SelectItem key={c.id} value={c.id}>{c.code} — {c.name}</SelectItem>
             ))}
           </SelectContent>
         </Select>
       </div>
 
-      {/* Table */}
+      {/* Department → Course → Students grouped view */}
+      <div className="space-y-3">
+        {deptGroupedView.map((dept) => {
+          const isDeptExpanded = expandedDept === dept.id;
+          return (
+            <Card key={dept.id} className={isDeptExpanded ? "border-primary/40" : ""}>
+              <CardHeader className="pb-2 cursor-pointer" onClick={() => setExpandedDept(isDeptExpanded ? null : dept.id)}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="h-5 w-5 text-primary" />
+                    <CardTitle className="text-base">{dept.name}</CardTitle>
+                    <Badge variant="secondary">{dept.code}</Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">{dept.totalStudents} {t("admin.totalStudents")}</Badge>
+                    <Badge variant="outline">{dept.courses.length} {t("dept.courses")}</Badge>
+                    {isDeptExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  </div>
+                </div>
+              </CardHeader>
+              {isDeptExpanded && (
+                <CardContent className="pt-0 space-y-2">
+                  {dept.courses.map((course: any) => {
+                    const isCourseExpanded = expandedCourse === course.id;
+                    return (
+                      <div key={course.id} className="border rounded-lg">
+                        <div className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50" onClick={() => setExpandedCourse(isCourseExpanded ? null : course.id)}>
+                          <div className="flex items-center gap-2">
+                            <BookOpen className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-mono text-xs text-muted-foreground">{course.code}</span>
+                            <span className="text-sm font-medium">{course.name}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs">{course.students.length} {t("courses.students")}</Badge>
+                            {isCourseExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                          </div>
+                        </div>
+                        {isCourseExpanded && (
+                          <div className="px-3 pb-3">
+                            {course.students.length === 0 ? (
+                              <p className="text-xs text-muted-foreground text-center py-2">{t("reports.noData")}</p>
+                            ) : (
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead className="w-10">#</TableHead>
+                                    <TableHead>{t("reports.studentName")}</TableHead>
+                                    <TableHead>{t("reports.universityId")}</TableHead>
+                                    <TableHead>{t("auth.gender")}</TableHead>
+                                    <TableHead className="w-20">{t("common.actions")}</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {course.students.map((s: any, i: number) => (
+                                    <TableRow key={s.id}>
+                                      <TableCell className="text-muted-foreground text-xs">{i + 1}</TableCell>
+                                      <TableCell className="text-sm font-medium">{s.full_name}</TableCell>
+                                      <TableCell className="text-sm">{s.university_id}</TableCell>
+                                      <TableCell>
+                                        <Badge variant={s.gender === "M" ? "default" : "secondary"} className="text-xs">
+                                          {s.gender === "M" ? t("auth.male") : t("auth.female")}
+                                        </Badge>
+                                      </TableCell>
+                                      <TableCell>
+                                        <div className="flex items-center gap-1">
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-7 text-xs gap-1"
+                                            onClick={(e) => { e.stopPropagation(); openEnrollDialog(s); }}
+                                          >
+                                            <BookOpen className="h-3 w-3" />
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                            onClick={(e) => { e.stopPropagation(); setDeleteStudentId(s.id); }}
+                                          >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                          </Button>
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {dept.courses.length === 0 && (
+                    <p className="text-xs text-muted-foreground text-center py-2">{t("dept.noCourses")}</p>
+                  )}
+                </CardContent>
+              )}
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* Full student table */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
