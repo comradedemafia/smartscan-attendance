@@ -2,7 +2,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useI18n } from "@/lib/i18n";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Calendar, Users, TrendingUp, Clock } from "lucide-react";
+import { BookOpen, Calendar, Users, TrendingUp, Clock, Building2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -12,11 +12,23 @@ export default function Dashboard() {
   const { role, profile, user } = useAuth();
   const { t } = useI18n();
 
+  // Fetch user's department
+  const { data: userDepartment } = useQuery({
+    queryKey: ["user-department", profile?.university_id],
+    queryFn: async () => {
+      if (!user) return null;
+      const { data: prof } = await supabase.from("profiles").select("department_id").eq("id", user.id).single();
+      if (!prof?.department_id) return null;
+      const { data: dept } = await supabase.from("departments").select("name, code").eq("id", prof.department_id).single();
+      return dept;
+    },
+    enabled: !!user && role !== "admin",
+  });
+
   const { data: courses = [] } = useQuery({
     queryKey: ["dashboard-courses", user?.id, role],
     queryFn: async () => {
       if (role === "lecturer") {
-        // Lecturer sees only assigned courses
         const { data, error } = await supabase
           .from("course_lecturers")
           .select("course_id, courses(id, code, name, description, created_by)")
@@ -30,7 +42,6 @@ export default function Dashboard() {
     },
     enabled: !!user,
   });
-
 
   const { data: sessions = [] } = useQuery({
     queryKey: ["dashboard-sessions", user?.id],
@@ -48,14 +59,10 @@ export default function Dashboard() {
   const { data: enrollmentCounts = {} } = useQuery({
     queryKey: ["dashboard-enrollments", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("course_enrollments")
-        .select("course_id");
+      const { data, error } = await supabase.from("course_enrollments").select("course_id");
       if (error) throw error;
       const counts: Record<string, number> = {};
-      data.forEach((e) => {
-        counts[e.course_id] = (counts[e.course_id] || 0) + 1;
-      });
+      data.forEach((e) => { counts[e.course_id] = (counts[e.course_id] || 0) + 1; });
       return counts;
     },
     enabled: !!user,
@@ -83,7 +90,15 @@ export default function Dashboard() {
         <h1 className="text-2xl font-bold tracking-tight font-['Space_Grotesk']">
           {t("dashboard.welcome")}, {profile?.full_name || "User"}
         </h1>
-        <p className="text-muted-foreground capitalize">{role} {t("nav.dashboard")}</p>
+        <div className="flex items-center gap-2 mt-1">
+          <p className="text-muted-foreground capitalize">{role} {t("nav.dashboard")}</p>
+          {role !== "admin" && userDepartment && (
+            <Badge variant="outline" className="flex items-center gap-1">
+              <Building2 className="h-3 w-3" />
+              {userDepartment.name} ({userDepartment.code})
+            </Badge>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
