@@ -29,8 +29,17 @@ export default function Courses() {
   const isStudent = role === "student";
 
   const { data: courses = [], isLoading } = useQuery({
-    queryKey: ["courses"],
+    queryKey: ["courses", user?.id, role],
     queryFn: async () => {
+      if (role === "lecturer") {
+        // Lecturer sees only courses assigned to them
+        const { data, error } = await supabase
+          .from("course_lecturers")
+          .select("course_id, courses(*, course_enrollments(count))")
+          .eq("lecturer_id", user!.id);
+        if (error) throw error;
+        return (data || []).map((r: any) => r.courses).filter(Boolean);
+      }
       const { data, error } = await supabase
         .from("courses")
         .select("*, course_enrollments(count)")
@@ -38,7 +47,9 @@ export default function Courses() {
       if (error) throw error;
       return data;
     },
+    enabled: !!user,
   });
+
 
   // Fetch student's own enrollments
   const { data: myEnrollments = [] } = useQuery({

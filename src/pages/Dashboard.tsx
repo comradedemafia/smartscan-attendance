@@ -13,14 +13,24 @@ export default function Dashboard() {
   const { t } = useI18n();
 
   const { data: courses = [] } = useQuery({
-    queryKey: ["dashboard-courses", user?.id],
+    queryKey: ["dashboard-courses", user?.id, role],
     queryFn: async () => {
+      if (role === "lecturer") {
+        // Lecturer sees only assigned courses
+        const { data, error } = await supabase
+          .from("course_lecturers")
+          .select("course_id, courses(id, code, name, description, created_by)")
+          .eq("lecturer_id", user!.id);
+        if (error) throw error;
+        return (data || []).map((r: any) => r.courses).filter(Boolean);
+      }
       const { data, error } = await supabase.from("courses").select("*");
       if (error) throw error;
       return data;
     },
     enabled: !!user,
   });
+
 
   const { data: sessions = [] } = useQuery({
     queryKey: ["dashboard-sessions", user?.id],

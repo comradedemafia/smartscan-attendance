@@ -35,13 +35,24 @@ export default function Sessions() {
   const canManage = role === "lecturer" || role === "admin";
 
   const { data: courses = [] } = useQuery({
-    queryKey: ["courses"],
+    queryKey: ["courses-for-sessions", user?.id, role],
     queryFn: async () => {
+      if (role === "lecturer") {
+        // Only show courses assigned to this lecturer
+        const { data, error } = await supabase
+          .from("course_lecturers")
+          .select("course_id, courses(id, code, name)")
+          .eq("lecturer_id", user!.id);
+        if (error) throw error;
+        return (data || []).map((r: any) => r.courses).filter(Boolean);
+      }
       const { data, error } = await supabase.from("courses").select("id, code, name").order("name");
       if (error) throw error;
       return data;
     },
+    enabled: !!user,
   });
+
 
   const { data: sessions = [], isLoading } = useQuery({
     queryKey: ["sessions"],
