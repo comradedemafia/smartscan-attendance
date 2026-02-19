@@ -284,6 +284,26 @@ const translations = {
     "dept.lecturerUpdated": "Lecturer updated successfully",
     "dept.lecturerDeleted": "Lecturer deleted successfully",
     "dept.confirmDeleteLecturer": "Are you sure you want to delete this lecturer? All their data will be removed.",
+
+    // Subjects
+    "subjects.title": "Subjects",
+    "subjects.addSubject": "Add Subject",
+    "subjects.editSubject": "Edit Subject",
+    "subjects.subjectCode": "Subject Code",
+    "subjects.subjectName": "Subject Name",
+    "subjects.subjectCreated": "Subject created successfully",
+    "subjects.subjectUpdated": "Subject updated successfully",
+    "subjects.subjectDeleted": "Subject deleted successfully",
+    "subjects.noSubjects": "No subjects in this course",
+    "subjects.selectSubject": "Select subject",
+    "subjects.subject": "Subject",
+    "subjects.enrolled": "Enrolled in subject!",
+    "subjects.unenrolled": "Left subject",
+    "subjects.joinSubject": "Join Subject",
+    "subjects.leaveSubject": "Leave",
+    "subjects.manageSubjects": "Manage Subjects",
+    "subjects.subjectStudents": "Subject Students",
+    "subjects.enrollStudent": "Enroll Student in Subject",
   },
   sw: {
     // Auth
@@ -566,6 +586,26 @@ const translations = {
     "dept.lecturerUpdated": "Mhadhiri amebadilishwa",
     "dept.lecturerDeleted": "Mhadhiri amefutwa",
     "dept.confirmDeleteLecturer": "Una uhakika unataka kumfuta mhadhiri huyu? Data zake zote zitaondolewa.",
+
+    // Subjects
+    "subjects.title": "Masomo",
+    "subjects.addSubject": "Ongeza Somo",
+    "subjects.editSubject": "Hariri Somo",
+    "subjects.subjectCode": "Msimbo wa Somo",
+    "subjects.subjectName": "Jina la Somo",
+    "subjects.subjectCreated": "Somo limeundwa",
+    "subjects.subjectUpdated": "Somo limebadilishwa",
+    "subjects.subjectDeleted": "Somo limefutwa",
+    "subjects.noSubjects": "Hakuna masomo katika kozi hii",
+    "subjects.selectSubject": "Chagua somo",
+    "subjects.subject": "Somo",
+    "subjects.enrolled": "Umejisajili kwenye somo!",
+    "subjects.unenrolled": "Umejiondoa kwenye somo",
+    "subjects.joinSubject": "Jiunge na Somo",
+    "subjects.leaveSubject": "Jiondoe",
+    "subjects.manageSubjects": "Simamia Masomo",
+    "subjects.subjectStudents": "Wanafunzi wa Somo",
+    "subjects.enrollStudent": "Sajili Mwanafunzi kwenye Somo",
   },
 } as const;
 

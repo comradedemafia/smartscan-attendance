@@ -26,12 +26,12 @@ export default function Courses() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [expandedDept, setExpandedDept] = useState<string | null>(null);
+  const [expandedCourse, setExpandedCourse] = useState<string | null>(null);
 
   const canManage = role === "lecturer";
   const isStudent = role === "student";
   const isAdmin = role === "admin";
 
-  // For lecturer: only assigned courses
   const { data: courses = [], isLoading } = useQuery({
     queryKey: ["courses", user?.id, role],
     queryFn: async () => {
@@ -43,7 +43,6 @@ export default function Courses() {
         if (error) throw error;
         return (data || []).map((r: any) => r.courses).filter(Boolean);
       }
-      // Admin & Student: all courses
       const { data, error } = await supabase
         .from("courses")
         .select("*, course_enrollments(count), departments(name, code)")
@@ -54,7 +53,26 @@ export default function Courses() {
     enabled: !!user,
   });
 
-  // For admin: departments
+  const { data: allSubjects = [] } = useQuery({
+    queryKey: ["all-subjects-courses"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("subjects").select("id, code, name, course_id, description").order("name");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  const { data: mySubjectEnrollments = [] } = useQuery({
+    queryKey: ["my-subject-enrollments", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("subject_enrollments").select("subject_id").eq("user_id", user!.id);
+      if (error) throw error;
+      return data.map((e) => e.subject_id);
+    },
+    enabled: isStudent && !!user,
+  });
+
   const { data: departments = [] } = useQuery({
     queryKey: ["departments-for-courses"],
     queryFn: async () => {
@@ -65,14 +83,10 @@ export default function Courses() {
     enabled: isAdmin,
   });
 
-  // Student enrollments
   const { data: myEnrollments = [] } = useQuery({
     queryKey: ["my-enrollments", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("course_enrollments")
-        .select("course_id")
-        .eq("user_id", user!.id);
+      const { data, error } = await supabase.from("course_enrollments").select("course_id").eq("user_id", user!.id);
       if (error) throw error;
       return data.map((e) => e.course_id);
     },
@@ -105,7 +119,30 @@ export default function Courses() {
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
-  // Lecturer CRUD
+  const enrollSubjectMutation = useMutation({
+    mutationFn: async (subjectId: string) => {
+      const { error } = await supabase.from("subject_enrollments").insert({ subject_id: subjectId, user_id: user!.id });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-subject-enrollments"] });
+      toast({ title: t("common.success"), description: t("subjects.enrolled") });
+    },
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
+  });
+
+  const unenrollSubjectMutation = useMutation({
+    mutationFn: async (subjectId: string) => {
+      const { error } = await supabase.from("subject_enrollments").delete().eq("subject_id", subjectId).eq("user_id", user!.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-subject-enrollments"] });
+      toast({ title: t("common.success"), description: t("subjects.unenrolled") });
+    },
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
+  });
+
   const createMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from("courses").insert({ code, name, description: description || null, created_by: user!.id });
@@ -147,13 +184,50 @@ export default function Courses() {
   const resetForm = () => { setOpen(false); setEditingCourse(null); setCode(""); setName(""); setDescription(""); };
   const openEdit = (course: any) => { setEditingCourse(course); setCode(course.code); setName(course.name); setDescription(course.description || ""); setOpen(true); };
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); if (!code.trim() || !name.trim()) return; editingCourse ? updateMutation.mutate() : createMutation.mutate(); };
+  const courseSubjects = (courseId: string) => allSubjects.filter((s) => s.course_id === courseId);
 
-  // Admin: group courses by department
   const coursesByDept = isAdmin ? departments.map((dept) => ({
     ...dept,
     courses: courses.filter((c: any) => c.department_id === dept.id),
   })) : [];
   const unassignedCourses = isAdmin ? courses.filter((c: any) => !c.department_id) : [];
+
+  const renderSubjects = (courseId: string) => {
+    const subjects = courseSubjects(courseId);
+    if (subjects.length === 0) return null;
+    const isExpanded = expandedCourse === courseId;
+    return (
+      <div className="mt-2">
+        <Button variant="ghost" size="sm" className="h-6 text-xs gap-1 p-0 px-1" onClick={() => setExpandedCourse(isExpanded ? null : courseId)}>
+          {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+          {subjects.length} {t("subjects.title")}
+        </Button>
+        {isExpanded && (
+          <div className="mt-1 space-y-1">
+            {subjects.map((s) => (
+              <div key={s.id} className="flex items-center justify-between bg-muted/50 rounded px-2 py-1 text-xs">
+                <div>
+                  <span className="font-mono text-muted-foreground mr-1">{s.code}</span>
+                  <span>{s.name}</span>
+                </div>
+                {isStudent && (
+                  mySubjectEnrollments.includes(s.id) ? (
+                    <Button variant="ghost" size="sm" className="h-5 text-xs px-1" onClick={() => unenrollSubjectMutation.mutate(s.id)}>
+                      <LogOut className="h-3 w-3 mr-0.5" />{t("subjects.leaveSubject")}
+                    </Button>
+                  ) : (
+                    <Button variant="ghost" size="sm" className="h-5 text-xs px-1 text-primary" onClick={() => enrollSubjectMutation.mutate(s.id)}>
+                      <LogIn className="h-3 w-3 mr-0.5" />{t("subjects.joinSubject")}
+                    </Button>
+                  )
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const renderCourseCard = (course: any, showActions: boolean) => (
     <Card key={course.id} className="relative group">
@@ -205,6 +279,7 @@ export default function Courses() {
             )}
           </div>
         </div>
+        {renderSubjects(course.id)}
       </CardContent>
     </Card>
   );
@@ -247,16 +322,12 @@ export default function Courses() {
       {isLoading ? (
         <p className="text-muted-foreground">{t("common.loading")}</p>
       ) : isAdmin ? (
-        /* Admin: grouped by department */
         <div className="space-y-4">
           {coursesByDept.map((dept) => {
             const isExpanded = expandedDept === dept.id;
             return (
               <Card key={dept.id}>
-                <CardHeader
-                  className="cursor-pointer pb-3"
-                  onClick={() => setExpandedDept(isExpanded ? null : dept.id)}
-                >
+                <CardHeader className="cursor-pointer pb-3" onClick={() => setExpandedDept(isExpanded ? null : dept.id)}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Building2 className="h-5 w-5 text-primary" />

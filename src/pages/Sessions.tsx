@@ -25,6 +25,7 @@ export default function Sessions() {
   const [editingSession, setEditingSession] = useState<any>(null);
   const [title, setTitle] = useState("");
   const [courseId, setCourseId] = useState("");
+  const [subjectId, setSubjectId] = useState("");
   const [venueName, setVenueName] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("30");
   const [viewMode, setViewMode] = useState<"list" | "week">("week");
@@ -65,12 +66,24 @@ export default function Sessions() {
     enabled: !!user,
   });
 
+  // Subjects for selected course
+  const { data: subjects = [] } = useQuery({
+    queryKey: ["subjects-for-sessions", courseId],
+    queryFn: async () => {
+      if (!courseId) return [];
+      const { data, error } = await supabase.from("subjects").select("id, code, name").eq("course_id", courseId).order("name");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!courseId,
+  });
+
   const { data: sessions = [], isLoading } = useQuery({
     queryKey: ["sessions"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("sessions")
-        .select("*, courses(code, name, department_id)")
+        .select("*, courses(code, name, department_id), subjects(code, name)")
         .order("session_date", { ascending: false });
       if (error) throw error;
       return data;
@@ -98,7 +111,7 @@ export default function Sessions() {
   const createMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from("sessions").insert({
-        title, course_id: courseId, venue_name: venueName || null,
+        title, course_id: courseId, subject_id: subjectId || null, venue_name: venueName || null,
         duration_minutes: parseInt(durationMinutes), created_by: user!.id, status: "scheduled",
       });
       if (error) throw error;
@@ -114,7 +127,7 @@ export default function Sessions() {
   const updateMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from("sessions").update({
-        title, course_id: courseId, venue_name: venueName || null, duration_minutes: parseInt(durationMinutes),
+        title, course_id: courseId, subject_id: subjectId || null, venue_name: venueName || null, duration_minutes: parseInt(durationMinutes),
       }).eq("id", editingSession.id);
       if (error) throw error;
     },
@@ -138,8 +151,8 @@ export default function Sessions() {
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
-  const resetForm = () => { setOpen(false); setEditingSession(null); setTitle(""); setCourseId(""); setVenueName(""); setDurationMinutes("30"); };
-  const openEdit = (session: any) => { setEditingSession(session); setTitle(session.title); setCourseId(session.course_id); setVenueName(session.venue_name || ""); setDurationMinutes(String(session.duration_minutes)); setOpen(true); };
+  const resetForm = () => { setOpen(false); setEditingSession(null); setTitle(""); setCourseId(""); setSubjectId(""); setVenueName(""); setDurationMinutes("30"); };
+  const openEdit = (session: any) => { setEditingSession(session); setTitle(session.title); setCourseId(session.course_id); setSubjectId(session.subject_id || ""); setVenueName(session.venue_name || ""); setDurationMinutes(String(session.duration_minutes)); setOpen(true); };
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); if (!title.trim() || !courseId) return; editingSession ? updateMutation.mutate() : createMutation.mutate(); };
   const canEditSession = (session: any) => role === "admin" || (role === "lecturer" && session.created_by === user?.id);
   const statusColor = (status: string) => { switch (status) { case "active": return "default"; case "completed": return "secondary"; default: return "outline"; } };
@@ -211,7 +224,7 @@ export default function Sessions() {
                   </div>
                   <div className="space-y-2">
                     <Label>{t("sessions.course")}</Label>
-                    <Select value={courseId} onValueChange={setCourseId}>
+                    <Select value={courseId} onValueChange={(v) => { setCourseId(v); setSubjectId(""); }}>
                       <SelectTrigger><SelectValue placeholder="Select course" /></SelectTrigger>
                       <SelectContent>
                         {courses.map((c: any) => (
@@ -220,6 +233,20 @@ export default function Sessions() {
                       </SelectContent>
                     </Select>
                   </div>
+                  {courseId && subjects.length > 0 && (
+                    <div className="space-y-2">
+                      <Label>{t("subjects.subject")}</Label>
+                      <Select value={subjectId} onValueChange={setSubjectId}>
+                        <SelectTrigger><SelectValue placeholder={t("subjects.selectSubject")} /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">— {t("subjects.selectSubject")} —</SelectItem>
+                          {subjects.map((s: any) => (
+                            <SelectItem key={s.id} value={s.id}>{s.code} - {s.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <Label>{t("sessions.venue")}</Label>
                     <Input value={venueName} onChange={(e) => setVenueName(e.target.value)} placeholder="Room 101" />

@@ -65,6 +65,14 @@ export default function AdminDepartments() {
   // Delete lecturer
   const [deleteLecturerId, setDeleteLecturerId] = useState<string | null>(null);
 
+  // Subject dialog
+  const [openSubjectDialog, setOpenSubjectDialog] = useState(false);
+  const [editingSubject, setEditingSubject] = useState<any>(null);
+  const [subjectName, setSubjectName] = useState("");
+  const [subjectCode, setSubjectCode] = useState("");
+  const [subjectDesc, setSubjectDesc] = useState("");
+  const [subjectCourseId, setSubjectCourseId] = useState("");
+
   // Departments
   const { data: departments = [] } = useQuery<Department[]>({
     queryKey: ["departments"],
@@ -116,6 +124,16 @@ export default function AdminDepartments() {
       return Array.from(map.values());
     },
     enabled: !!expandedDept,
+  });
+
+  // All subjects
+  const { data: allSubjects = [] } = useQuery({
+    queryKey: ["all-subjects-admin"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("subjects").select("id, name, code, course_id, description").order("name");
+      if (error) throw error;
+      return data;
+    },
   });
 
   // Session stats
@@ -297,6 +315,37 @@ export default function AdminDepartments() {
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
+  // Save subject
+  const saveSubjectMutation = useMutation({
+    mutationFn: async () => {
+      if (editingSubject) {
+        const { error } = await supabase.from("subjects").update({ name: subjectName, code: subjectCode.toUpperCase(), description: subjectDesc || null }).eq("id", editingSubject.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("subjects").insert({ name: subjectName, code: subjectCode.toUpperCase(), description: subjectDesc || null, course_id: subjectCourseId, created_by: user!.id });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["all-subjects-admin"] });
+      toast({ title: t("common.success"), description: editingSubject ? t("subjects.subjectUpdated") : t("subjects.subjectCreated") });
+      resetSubjectForm();
+    },
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
+  });
+
+  const deleteSubjectMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("subjects").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["all-subjects-admin"] });
+      toast({ title: t("common.success"), description: t("subjects.subjectDeleted") });
+    },
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
+  });
+
   // ─── Form helpers ───
   const resetDeptForm = () => { setOpenDeptDialog(false); setEditingDept(null); setDeptName(""); setDeptCode(""); setDeptDesc(""); };
   const openEditDept = (dept: Department) => { setEditingDept(dept); setDeptName(dept.name); setDeptCode(dept.code); setDeptDesc(dept.description || ""); setOpenDeptDialog(true); };
@@ -305,6 +354,10 @@ export default function AdminDepartments() {
   const openAddCourseForDept = (deptId: string) => { resetCourseForm(); setCourseDeptId(deptId); setOpenCourseDialog(true); };
   const openAssignForDept = (deptId: string) => { setAssignDeptId(deptId); setAssignCourseId(""); setAssignLecturerId(""); setOpenAssignDialog(true); };
   const openRegisterForDept = (deptId: string) => { setRegDeptId(deptId); setRegName(""); setRegEmail(""); setRegUniId(""); setRegGender("M"); setRegPhone(""); setOpenRegisterDialog(true); };
+  const resetSubjectForm = () => { setOpenSubjectDialog(false); setEditingSubject(null); setSubjectName(""); setSubjectCode(""); setSubjectDesc(""); setSubjectCourseId(""); };
+  const openAddSubjectForCourse = (courseId: string) => { resetSubjectForm(); setSubjectCourseId(courseId); setOpenSubjectDialog(true); };
+  const openEditSubject = (subject: any) => { setEditingSubject(subject); setSubjectName(subject.name); setSubjectCode(subject.code); setSubjectDesc(subject.description || ""); setSubjectCourseId(subject.course_id); setOpenSubjectDialog(true); };
+  const courseSubjects = (courseId: string) => allSubjects.filter((s: any) => s.course_id === courseId);
   const openEditLecturer = (l: any) => {
     const prof = allLecturers.find((p: any) => p.id === l.lecturer_id) || l;
     setEditLecturerId(l.lecturer_id);
@@ -387,6 +440,21 @@ export default function AdminDepartments() {
             </div>
             <Button className="w-full" onClick={() => assignMutation.mutate()} disabled={!assignCourseId || !assignLecturerId || assignMutation.isPending}>
               {t("dept.assign")}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Subject Dialog */}
+      <Dialog open={openSubjectDialog} onOpenChange={(o) => { if (!o) resetSubjectForm(); setOpenSubjectDialog(o); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{editingSubject ? t("subjects.editSubject") : t("subjects.addSubject")}</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2"><Label>{t("subjects.subjectCode")}</Label><Input value={subjectCode} onChange={(e) => setSubjectCode(e.target.value)} placeholder="CS101-A" /></div>
+            <div className="space-y-2"><Label>{t("subjects.subjectName")}</Label><Input value={subjectName} onChange={(e) => setSubjectName(e.target.value)} placeholder="Programming Basics" /></div>
+            <div className="space-y-2"><Label>{t("courses.description")}</Label><Input value={subjectDesc} onChange={(e) => setSubjectDesc(e.target.value)} placeholder="Optional" /></div>
+            <Button className="w-full" onClick={() => saveSubjectMutation.mutate()} disabled={!subjectName || !subjectCode || !subjectCourseId || saveSubjectMutation.isPending}>
+              {editingSubject ? t("common.save") : t("subjects.addSubject")}
             </Button>
           </div>
         </DialogContent>
@@ -507,19 +575,43 @@ export default function AdminDepartments() {
                     {courses.length === 0 ? (
                       <p className="text-xs text-muted-foreground py-2">{t("dept.noCourses")}</p>
                     ) : (
-                      <div className="space-y-1">
-                        {courses.map((c: any) => (
-                          <div key={c.id} className="flex items-center justify-between rounded-md border px-3 py-2">
-                            <div>
-                              <span className="font-mono text-xs text-muted-foreground mr-2">{c.code}</span>
-                              <span className="text-sm">{c.name}</span>
+                      <div className="space-y-2">
+                        {courses.map((c: any) => {
+                          const subjects = courseSubjects(c.id);
+                          return (
+                            <div key={c.id} className="border rounded-md">
+                              <div className="flex items-center justify-between px-3 py-2">
+                                <div>
+                                  <span className="font-mono text-xs text-muted-foreground mr-2">{c.code}</span>
+                                  <span className="text-sm">{c.name}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => openAddSubjectForCourse(c.id)}>
+                                    <Plus className="h-3 w-3 mr-1" />{t("subjects.addSubject")}
+                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditCourse(c)}><Edit className="h-3 w-3" /></Button>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => deleteCourseMutation.mutate(c.id)}><Trash2 className="h-3 w-3" /></Button>
+                                </div>
+                              </div>
+                              {subjects.length > 0 && (
+                                <div className="px-3 pb-2 space-y-1">
+                                  {subjects.map((s: any) => (
+                                    <div key={s.id} className="flex items-center justify-between bg-muted/50 rounded px-2 py-1 text-xs">
+                                      <div>
+                                        <span className="font-mono text-muted-foreground mr-2">{s.code}</span>
+                                        <span>{s.name}</span>
+                                      </div>
+                                      <div className="flex items-center gap-1">
+                                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => openEditSubject(s)}><Edit className="h-2.5 w-2.5" /></Button>
+                                        <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive" onClick={() => deleteSubjectMutation.mutate(s.id)}><Trash2 className="h-2.5 w-2.5" /></Button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
-                            <div className="flex items-center gap-1">
-                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditCourse(c)}><Edit className="h-3 w-3" /></Button>
-                              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => deleteCourseMutation.mutate(c.id)}><Trash2 className="h-3 w-3" /></Button>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
