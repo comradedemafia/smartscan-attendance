@@ -255,7 +255,7 @@ export default function AdminDepartments() {
     mutationFn: async () => {
       const { error } = await supabase.auth.signUp({
         email: regEmail,
-        password: "Temp@" + Date.now(),
+        password: Array.from(crypto.getRandomValues(new Uint8Array(24)), b => 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%&*'[b % 67]).join(''),
         options: {
           data: {
             university_id: regUniId,
