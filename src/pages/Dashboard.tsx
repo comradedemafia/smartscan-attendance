@@ -17,7 +17,7 @@ export default function Dashboard() {
     queryKey: ["user-department", profile?.university_id],
     queryFn: async () => {
       if (!user) return null;
-      const { data: prof } = await supabase.from("profiles").select("department_id").eq("id", user.id).single();
+      const { data: prof } = await supabase.from("profiles").select("department_id").eq("id", user.id).maybeSingle();
       if (!prof?.department_id) return null;
       const { data: dept } = await supabase.from("departments").select("name, code").eq("id", prof.department_id).single();
       return dept;
