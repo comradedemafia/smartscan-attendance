@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,7 +22,13 @@ const signupSchema = loginSchema.extend({
   fullName: z.string().min(2, "Full name is required"),
   role: z.enum(["student", "lecturer"]),
   gender: z.enum(["M", "F"], { required_error: "Gender is required" }),
+  departmentId: z.string().min(1, "Department is required"),
+  phone: z.string().regex(/^\+255\d{9}$/, "Phone must be in format +255XXXXXXXXX"),
+  academicYear: z.string().min(4, "Academic year is required"),
+  studyYear: z.coerce.number().min(1).max(6).optional(),
 });
+
+type Department = { id: string; name: string; code: string };
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
@@ -33,6 +39,11 @@ export default function Auth() {
   const [fullName, setFullName] = useState("");
   const [role, setRole] = useState<"student" | "lecturer">("student");
   const [gender, setGender] = useState<"M" | "F">("M");
+  const [departmentId, setDepartmentId] = useState("");
+  const [phone, setPhone] = useState("+255");
+  const [academicYear, setAcademicYear] = useState("2024/2025");
+  const [studyYear, setStudyYear] = useState("1");
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -40,6 +51,12 @@ export default function Auth() {
   const { t } = useI18n();
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    supabase.from("departments").select("id, name, code").order("name").then(({ data }) => {
+      if (data) setDepartments(data);
+    });
+  }, []);
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,7 +99,6 @@ export default function Auth() {
           setSubmitting(false);
           return;
         }
-
         const { error } = await signIn(email, password);
         if (error) {
           toast({ title: t("common.error"), description: error.message, variant: "destructive" });
@@ -90,7 +106,11 @@ export default function Auth() {
           navigate("/");
         }
       } else {
-        const parsed = signupSchema.safeParse({ email, password, universityId, fullName, role, gender });
+        const parsed = signupSchema.safeParse({
+          email, password, universityId, fullName, role, gender,
+          departmentId, phone, academicYear,
+          studyYear: role === "student" ? studyYear : undefined,
+        });
         if (!parsed.success) {
           const fieldErrors: Record<string, string> = {};
           parsed.error.errors.forEach((err) => {
@@ -106,6 +126,10 @@ export default function Auth() {
           full_name: fullName,
           role,
           gender,
+          department_id: departmentId,
+          phone,
+          academic_year: academicYear,
+          study_year: role === "student" ? parseInt(studyYear) : undefined,
         });
         if (error) {
           toast({ title: t("common.error"), description: error.message, variant: "destructive" });
@@ -119,7 +143,8 @@ export default function Auth() {
     }
   };
 
-  // Forgot password form
+  const academicYears = ["2022/2023", "2023/2024", "2024/2025", "2025/2026", "2026/2027"];
+
   if (isForgotPassword) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -129,11 +154,8 @@ export default function Auth() {
               <QrCode className="h-10 w-10" />
               <GraduationCap className="h-10 w-10" />
             </div>
-             <h1 className="text-3xl font-bold tracking-tight font-['Space_Grotesk']">
-               Academic Attendance System
-             </h1>
+            <h1 className="text-3xl font-bold tracking-tight font-['Space_Grotesk']">Academic Attendance System</h1>
           </div>
-
           <Card className="border-border/50 shadow-lg">
             <CardHeader className="pb-4">
               <CardTitle>{t("auth.resetPassword")}</CardTitle>
@@ -143,13 +165,7 @@ export default function Auth() {
               <form onSubmit={handleForgotPassword} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">{t("auth.email")}</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@university.ac.tz"
-                  />
+                  <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@university.ac.tz" />
                   {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
                 </div>
                 <Button type="submit" className="w-full" disabled={submitting}>
@@ -157,11 +173,7 @@ export default function Auth() {
                 </Button>
               </form>
               <div className="mt-4 text-center">
-                <button
-                  type="button"
-                  onClick={() => { setIsForgotPassword(false); setErrors({}); }}
-                  className="text-sm text-primary hover:underline font-medium"
-                >
+                <button type="button" onClick={() => { setIsForgotPassword(false); setErrors({}); }} className="text-sm text-primary hover:underline font-medium">
                   {t("auth.backToLogin")}
                 </button>
               </div>
@@ -180,9 +192,7 @@ export default function Auth() {
             <QrCode className="h-10 w-10" />
             <GraduationCap className="h-10 w-10" />
           </div>
-           <h1 className="text-3xl font-bold tracking-tight font-['Space_Grotesk']">
-             Academic Attendance System
-           </h1>
+          <h1 className="text-3xl font-bold tracking-tight font-['Space_Grotesk']">Academic Attendance System</h1>
           <p className="text-muted-foreground text-center">
             {isLogin ? "Sign in with your university credentials" : "Create your account"}
           </p>
@@ -201,42 +211,32 @@ export default function Auth() {
                 <>
                   <div className="space-y-2">
                     <Label htmlFor="fullName">{t("auth.fullName")}</Label>
-                    <Input
-                      id="fullName"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      placeholder="John Doe"
-                    />
+                    <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="John Doe" />
                     {errors.fullName && <p className="text-sm text-destructive">{errors.fullName}</p>}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="universityId">{t("auth.universityId")}</Label>
-                    <Input
-                      id="universityId"
-                      value={universityId}
-                      onChange={(e) => setUniversityId(e.target.value)}
-                      placeholder="STD-2024-001"
-                    />
+                    <Input id="universityId" value={universityId} onChange={(e) => setUniversityId(e.target.value)} placeholder="STD-2024-001" />
                     {errors.universityId && <p className="text-sm text-destructive">{errors.universityId}</p>}
                   </div>
+
+                  {/* Role */}
                   <div className="space-y-2">
-                    <Label htmlFor="role">{t("auth.role")}</Label>
+                    <Label>{t("auth.role")}</Label>
                     <Select value={role} onValueChange={(v) => setRole(v as "student" | "lecturer")}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="student">{t("auth.student")}</SelectItem>
                         <SelectItem value="lecturer">{t("auth.lecturer")}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {/* Gender */}
                   <div className="space-y-2">
-                    <Label htmlFor="gender">{t("auth.gender")}</Label>
+                    <Label>{t("auth.gender")}</Label>
                     <Select value={gender} onValueChange={(v) => setGender(v as "M" | "F")}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="M">{t("auth.male")}</SelectItem>
                         <SelectItem value="F">{t("auth.female")}</SelectItem>
@@ -244,40 +244,79 @@ export default function Auth() {
                     </Select>
                     {errors.gender && <p className="text-sm text-destructive">{errors.gender}</p>}
                   </div>
+
+                  {/* Department */}
+                  <div className="space-y-2">
+                    <Label>{t("auth.department")}</Label>
+                    <Select value={departmentId} onValueChange={setDepartmentId}>
+                      <SelectTrigger><SelectValue placeholder={t("auth.selectDepartment")} /></SelectTrigger>
+                      <SelectContent>
+                        {departments.map((d) => (
+                          <SelectItem key={d.id} value={d.id}>{d.name} ({d.code})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {errors.departmentId && <p className="text-sm text-destructive">{errors.departmentId}</p>}
+                  </div>
+
+                  {/* Academic Year */}
+                  <div className="space-y-2">
+                    <Label>{t("auth.academicYear")}</Label>
+                    <Select value={academicYear} onValueChange={setAcademicYear}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {academicYears.map((y) => (
+                          <SelectItem key={y} value={y}>{y}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {errors.academicYear && <p className="text-sm text-destructive">{errors.academicYear}</p>}
+                  </div>
+
+                  {/* Study Year - students only */}
+                  {role === "student" && (
+                    <div className="space-y-2">
+                      <Label>{t("auth.studyYear")}</Label>
+                      <Select value={studyYear} onValueChange={setStudyYear}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {[1, 2, 3, 4, 5, 6].map((y) => (
+                            <SelectItem key={y} value={String(y)}>{t("auth.year")} {y}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {/* Phone */}
+                  <div className="space-y-2">
+                    <Label>{t("auth.phone")}</Label>
+                    <Input
+                      id="phone"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="+255712345678"
+                    />
+                    {errors.phone && <p className="text-sm text-destructive">{errors.phone}</p>}
+                  </div>
                 </>
               )}
 
               <div className="space-y-2">
                 <Label htmlFor="email">{t("auth.email")}</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@university.ac.tz"
-                />
+                <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@university.ac.tz" />
                 {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="password">{t("auth.password")}</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                />
+                <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
                 {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
               </div>
 
               {isLogin && (
                 <div className="text-right">
-                  <button
-                    type="button"
-                    onClick={() => { setIsForgotPassword(true); setErrors({}); }}
-                    className="text-sm text-muted-foreground hover:text-primary hover:underline"
-                  >
+                  <button type="button" onClick={() => { setIsForgotPassword(true); setErrors({}); }} className="text-sm text-muted-foreground hover:text-primary hover:underline">
                     {t("auth.forgotPassword")}
                   </button>
                 </div>
@@ -285,12 +324,8 @@ export default function Auth() {
 
               <Button type="submit" className="w-full" disabled={submitting}>
                 {submitting
-                  ? isLogin
-                    ? t("auth.signingIn")
-                    : t("auth.signingUp")
-                  : isLogin
-                  ? t("auth.login")
-                  : t("auth.register")}
+                  ? isLogin ? t("auth.signingIn") : t("auth.signingUp")
+                  : isLogin ? t("auth.login") : t("auth.register")}
               </Button>
             </form>
 
@@ -298,11 +333,7 @@ export default function Auth() {
               <span className="text-muted-foreground">
                 {isLogin ? t("auth.noAccount") : t("auth.hasAccount")}
               </span>{" "}
-              <button
-                type="button"
-                onClick={() => { setIsLogin(!isLogin); setErrors({}); }}
-                className="text-primary hover:underline font-medium"
-              >
+              <button type="button" onClick={() => { setIsLogin(!isLogin); setErrors({}); }} className="text-primary hover:underline font-medium">
                 {isLogin ? t("auth.register") : t("auth.login")}
               </button>
             </div>

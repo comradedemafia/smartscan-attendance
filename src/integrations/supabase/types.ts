@@ -81,11 +81,51 @@ export type Database = {
           },
         ]
       }
+      course_lecturers: {
+        Row: {
+          assigned_at: string
+          assigned_by: string
+          course_id: string
+          id: string
+          lecturer_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by: string
+          course_id: string
+          id?: string
+          lecturer_id: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string
+          course_id?: string
+          id?: string
+          lecturer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_lecturers_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_lecturers_lecturer_id_fkey"
+            columns: ["lecturer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       courses: {
         Row: {
           code: string
           created_at: string
           created_by: string
+          department_id: string | null
           description: string | null
           id: string
           name: string
@@ -95,6 +135,7 @@ export type Database = {
           code: string
           created_at?: string
           created_by: string
+          department_id?: string | null
           description?: string | null
           id?: string
           name: string
@@ -104,6 +145,42 @@ export type Database = {
           code?: string
           created_at?: string
           created_by?: string
+          department_id?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "courses_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      departments: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
           description?: string | null
           id?: string
           name?: string
@@ -113,36 +190,56 @@ export type Database = {
       }
       profiles: {
         Row: {
+          academic_year: string | null
           avatar_url: string | null
           created_at: string
+          department_id: string | null
           email: string | null
           full_name: string
           gender: string | null
           id: string
+          phone: string | null
+          study_year: number | null
           university_id: string
           updated_at: string
         }
         Insert: {
+          academic_year?: string | null
           avatar_url?: string | null
           created_at?: string
+          department_id?: string | null
           email?: string | null
           full_name: string
           gender?: string | null
           id: string
+          phone?: string | null
+          study_year?: number | null
           university_id: string
           updated_at?: string
         }
         Update: {
+          academic_year?: string | null
           avatar_url?: string | null
           created_at?: string
+          department_id?: string | null
           email?: string | null
           full_name?: string
           gender?: string | null
           id?: string
+          phone?: string | null
+          study_year?: number | null
           university_id?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sessions: {
         Row: {
@@ -235,6 +332,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_department_lecturers: {
+        Args: { _department_id: string }
+        Returns: {
+          course_code: string
+          course_id: string
+          course_name: string
+          full_name: string
+          lecturer_id: string
+          university_id: string
+        }[]
+      }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]

@@ -21,6 +21,8 @@ import CourseEnrollments from "@/pages/CourseEnrollments";
 import SettingsPage from "@/pages/SettingsPage";
 import ResetPassword from "@/pages/ResetPassword";
 import NotFound from "@/pages/NotFound";
+import StudentDepartment from "@/pages/StudentDepartment";
+import AdminDepartments from "@/pages/AdminDepartments";
 
 const queryClient = new QueryClient();
 
@@ -68,6 +70,8 @@ const App = () => (
                   <Route path="/users" element={<UsersAdmin />} />
                   <Route path="/enrollments" element={<CourseEnrollments />} />
                   <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="/my-department" element={<StudentDepartment />} />
+                  <Route path="/departments" element={<AdminDepartments />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>
@@ -80,3 +84,4 @@ const App = () => (
 );
 
 export default App;
+
