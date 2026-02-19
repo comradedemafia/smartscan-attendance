@@ -31,7 +31,7 @@ const signupSchema = loginSchema.extend({
 type Department = { id: string; name: string; code: string };
 
 export default function Auth() {
-  const [isLogin, setIsLogin] = useState(true);
+  const [isLogin, setIsLogin] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
