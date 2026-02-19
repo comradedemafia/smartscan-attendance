@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, Users, CalendarCheck, Percent, FileDown, User } from "lucide-react";
+import { BarChart3, Users, CalendarCheck, Percent, FileDown, User, Building2, BookOpen } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -18,17 +18,106 @@ export default function Reports() {
   const { user, role } = useAuth();
   const [selectedCourse, setSelectedCourse] = useState<string>("");
   const [selectedStudent, setSelectedStudent] = useState<string>("");
-  const [activeTab, setActiveTab] = useState("course");
+  const [selectedDepartment, setSelectedDepartment] = useState<string>("");
+  const [activeTab, setActiveTab] = useState(role === "admin" ? "department" : "course");
+
+  // Departments (admin only)
+  const { data: departments = [] } = useQuery({
+    queryKey: ["report-departments"],
+    enabled: !!user && role === "admin",
+    queryFn: async () => {
+      const { data, error } = await supabase.from("departments").select("id, name, code").order("name");
+      if (error) throw error;
+      return data || [];
+    },
+  });
 
   const { data: courses } = useQuery({
     queryKey: ["report-courses", user?.id, role],
     enabled: !!user && (role === "lecturer" || role === "admin"),
     queryFn: async () => {
-      let q = supabase.from("courses").select("id, name, code, created_by");
+      let q = supabase.from("courses").select("id, name, code, created_by, department_id");
       if (role === "lecturer") q = q.eq("created_by", user!.id);
       const { data, error } = await q;
       if (error) throw error;
       return data || [];
+    },
+  });
+
+  // Department report
+  const { data: deptReport, isLoading: deptLoading } = useQuery({
+    queryKey: ["dept-report", selectedDepartment],
+    enabled: !!selectedDepartment && activeTab === "department" && role === "admin",
+    queryFn: async () => {
+      // Get courses in this department
+      const { data: deptCourses } = await supabase.from("courses")
+        .select("id, name, code, department_id").eq("department_id", selectedDepartment);
+      if (!deptCourses?.length) return { courses: [], lecturers: [], students: 0, totalSessions: 0, avgRate: 0 };
+
+      const courseIds = deptCourses.map(c => c.id);
+
+      // Get lecturers via course_lecturers
+      const { data: clData } = await supabase.from("course_lecturers")
+        .select("lecturer_id, course_id, profiles(full_name, university_id)")
+        .in("course_id", courseIds);
+
+      const lecturerMap = new Map<string, { name: string; uid: string; courses: string[] }>();
+      (clData || []).forEach((cl: any) => {
+        if (!lecturerMap.has(cl.lecturer_id)) {
+          lecturerMap.set(cl.lecturer_id, { name: cl.profiles?.full_name || "", uid: cl.profiles?.university_id || "", courses: [] });
+        }
+        const course = deptCourses.find(c => c.id === cl.course_id);
+        if (course) lecturerMap.get(cl.lecturer_id)!.courses.push(course.code);
+      });
+
+      // Get enrollments
+      const { data: enrollments } = await supabase.from("course_enrollments")
+        .select("user_id").in("course_id", courseIds);
+      const uniqueStudents = new Set((enrollments || []).map(e => e.user_id));
+
+      // Get sessions and attendance
+      const { data: sessions } = await supabase.from("sessions")
+        .select("id").in("course_id", courseIds).eq("status", "completed");
+      const sessionIds = (sessions || []).map(s => s.id);
+      let totalRecords = 0;
+      if (sessionIds.length > 0) {
+        const { data: records } = await supabase.from("attendance_records")
+          .select("id").in("session_id", sessionIds);
+        totalRecords = (records || []).length;
+      }
+      const totalPossible = sessionIds.length * uniqueStudents.size;
+      const avgRate = totalPossible > 0 ? Math.round((totalRecords / totalPossible) * 100) : 0;
+
+      // Course stats
+      const courseStats = await Promise.all(deptCourses.map(async (course) => {
+        const { data: cSessions } = await supabase.from("sessions")
+          .select("id").eq("course_id", course.id).eq("status", "completed");
+        const cSessionIds = (cSessions || []).map(s => s.id);
+        const { data: cEnrollments } = await supabase.from("course_enrollments")
+          .select("user_id").eq("course_id", course.id);
+        const cStudents = (cEnrollments || []).length;
+        let cRecords = 0;
+        if (cSessionIds.length > 0) {
+          const { data: recs } = await supabase.from("attendance_records")
+            .select("id").in("session_id", cSessionIds);
+          cRecords = (recs || []).length;
+        }
+        const cPossible = cSessionIds.length * cStudents;
+        return {
+          ...course,
+          totalSessions: cSessionIds.length,
+          totalStudents: cStudents,
+          avgRate: cPossible > 0 ? Math.round((cRecords / cPossible) * 100) : 0,
+        };
+      }));
+
+      return {
+        courses: courseStats,
+        lecturers: Array.from(lecturerMap.values()),
+        students: uniqueStudents.size,
+        totalSessions: sessionIds.length,
+        avgRate,
+      };
     },
   });
 
@@ -65,10 +154,8 @@ export default function Reports() {
         const attended = (records || []).filter((r) => r.user_id === uid).length;
         const profile = profileMap[uid];
         return {
-          userId: uid,
-          name: profile?.full_name || "Unknown",
-          universityId: profile?.university_id || "—",
-          gender: profile?.gender || "—",
+          userId: uid, name: profile?.full_name || "Unknown",
+          universityId: profile?.university_id || "—", gender: profile?.gender || "—",
           attended, total: sessions.length,
           percentage: sessions.length > 0 ? Math.round((attended / sessions.length) * 100) : 0,
         };
@@ -107,11 +194,8 @@ export default function Reports() {
               .eq("user_id", selectedStudent).in("session_id", sessionIds)
           : { data: [] };
         return {
-          courseId: e.course_id,
-          courseName: e.courses?.name || "",
-          courseCode: e.courses?.code || "",
-          totalSessions: (sessions || []).length,
-          attended: (records || []).length,
+          courseId: e.course_id, courseName: e.courses?.name || "", courseCode: e.courses?.code || "",
+          totalSessions: (sessions || []).length, attended: (records || []).length,
           percentage: (sessions || []).length > 0 ? Math.round(((records || []).length / (sessions || []).length) * 100) : 0,
         };
       }));
@@ -129,7 +213,6 @@ export default function Reports() {
         const { data } = await supabase.from("profiles").select("id, full_name, university_id").order("full_name");
         return data || [];
       }
-      // Lecturer: only enrolled students
       const { data: myCourses } = await supabase.from("courses").select("id").eq("created_by", user!.id);
       if (!myCourses?.length) return [];
       const courseIds = myCourses.map((c) => c.id);
@@ -143,7 +226,7 @@ export default function Reports() {
     },
   });
 
-  // All courses report data for export
+  // All courses report data
   const { data: allCoursesReport } = useQuery({
     queryKey: ["all-courses-report", user?.id, role],
     enabled: !!user && (role === "lecturer" || role === "admin") && activeTab === "all",
@@ -169,17 +252,10 @@ export default function Reports() {
           avgRate = Math.round(((records || []).length / totalPossible) * 100);
         }
 
-        // Get lecturer name
         const { data: lecturerProfile } = await supabase.from("profiles")
           .select("full_name").eq("id", course.created_by).single();
 
-        return {
-          ...course,
-          lecturerName: lecturerProfile?.full_name || "—",
-          totalSessions: sessionIds.length,
-          totalStudents,
-          avgRate,
-        };
+        return { ...course, lecturerName: lecturerProfile?.full_name || "—", totalSessions: sessionIds.length, totalStudents, avgRate };
       }));
     },
   });
@@ -206,11 +282,143 @@ export default function Reports() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="no-print">
         <TabsList>
+          {role === "admin" && <TabsTrigger value="department">{t("reports.byDepartment")}</TabsTrigger>}
           <TabsTrigger value="course">{t("reports.byCourse")}</TabsTrigger>
           <TabsTrigger value="student">{t("reports.individualReport")}</TabsTrigger>
           <TabsTrigger value="all">{t("reports.exportAll")}</TabsTrigger>
         </TabsList>
       </Tabs>
+
+      {/* ── Department Report Tab (Admin only) ── */}
+      {activeTab === "department" && role === "admin" && (
+        <>
+          <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+            <SelectTrigger className="w-full max-w-xs no-print">
+              <SelectValue placeholder={t("reports.selectDepartment")} />
+            </SelectTrigger>
+            <SelectContent>
+              {departments.map((d) => (
+                <SelectItem key={d.id} value={d.id}>{d.code} — {d.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {deptLoading && <p className="text-muted-foreground">{t("common.loading")}</p>}
+
+          {selectedDepartment && deptReport && !deptLoading && (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Card>
+                  <CardContent className="pt-6 text-center">
+                    <BookOpen className="h-6 w-6 mx-auto mb-2 text-primary" />
+                    <p className="text-2xl font-bold">{deptReport.courses.length}</p>
+                    <p className="text-xs text-muted-foreground">{t("reports.deptCourses")}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6 text-center">
+                    <Users className="h-6 w-6 mx-auto mb-2 text-primary" />
+                    <p className="text-2xl font-bold">{deptReport.lecturers.length}</p>
+                    <p className="text-xs text-muted-foreground">{t("reports.deptLecturers")}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6 text-center">
+                    <Users className="h-6 w-6 mx-auto mb-2 text-primary" />
+                    <p className="text-2xl font-bold">{deptReport.students}</p>
+                    <p className="text-xs text-muted-foreground">{t("reports.deptStudents")}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6 text-center">
+                    <Percent className="h-6 w-6 mx-auto mb-2 text-primary" />
+                    <p className="text-2xl font-bold">{deptReport.avgRate}%</p>
+                    <p className="text-xs text-muted-foreground">{t("reports.averageRate")}</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Lecturers in department */}
+              {deptReport.lecturers.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">{t("reports.deptLecturers")}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>{t("reports.studentName")}</TableHead>
+                            <TableHead>{t("reports.universityId")}</TableHead>
+                            <TableHead>{t("dept.courses")}</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {deptReport.lecturers.map((l, i) => (
+                            <TableRow key={i}>
+                              <TableCell className="font-medium">{l.name}</TableCell>
+                              <TableCell>{l.uid}</TableCell>
+                              <TableCell>
+                                <div className="flex flex-wrap gap-1">
+                                  {l.courses.map((c, j) => (
+                                    <Badge key={j} variant="outline" className="text-xs">{c}</Badge>
+                                  ))}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Courses in department */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">{t("reports.deptCourses")}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {deptReport.courses.length === 0 ? (
+                    <p className="text-muted-foreground">{t("reports.noData")}</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>{t("courses.code")}</TableHead>
+                            <TableHead>{t("courses.name")}</TableHead>
+                            <TableHead className="text-center">{t("reports.totalSessions")}</TableHead>
+                            <TableHead className="text-center">{t("courses.students")}</TableHead>
+                            <TableHead className="text-center">{t("reports.averageRate")}</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {deptReport.courses.map((c: any) => (
+                            <TableRow key={c.id}>
+                              <TableCell className="font-mono text-sm">{c.code}</TableCell>
+                              <TableCell className="font-medium">{c.name}</TableCell>
+                              <TableCell className="text-center">{c.totalSessions}</TableCell>
+                              <TableCell className="text-center">{c.totalStudents}</TableCell>
+                              <TableCell className="text-center">
+                                <Badge variant={c.avgRate >= 75 ? "default" : c.avgRate >= 50 ? "secondary" : "destructive"}>
+                                  {c.avgRate}%
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </>
+      )}
 
       {/* ── Course Report Tab ── */}
       {activeTab === "course" && (

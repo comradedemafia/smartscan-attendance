@@ -59,6 +59,7 @@ const translations = {
     "dashboard.viewReports": "View Reports",
     "dashboard.manageCourses": "Manage Courses",
     "dashboard.noSessions": "No upcoming sessions",
+    "dashboard.department": "Department",
 
     // Courses
     "courses.title": "Courses",
@@ -145,6 +146,7 @@ const translations = {
     "reports.byCourse": "By Course",
     "reports.byStudent": "By Student",
     "reports.bySession": "By Session",
+    "reports.byDepartment": "By Department",
     "reports.trend": "Attendance Trend",
     "reports.overview": "Overview",
     "reports.totalSessions": "Total Sessions",
@@ -152,6 +154,7 @@ const translations = {
     "reports.averageRate": "Average Attendance Rate",
     "reports.courseReport": "Course Report",
     "reports.selectCourse": "Select a course",
+    "reports.selectDepartment": "Select a department",
     "reports.studentName": "Student Name",
     "reports.universityId": "University ID",
     "reports.sessionsAttended": "Sessions Attended",
@@ -163,6 +166,9 @@ const translations = {
     "reports.selectStudent": "Select a student",
     "reports.studentReport": "Student Report",
     "reports.gender": "Gender",
+    "reports.deptCourses": "Department Courses",
+    "reports.deptLecturers": "Department Lecturers",
+    "reports.deptStudents": "Department Students",
 
     // Admin
     "admin.totalStudents": "Total Students",
@@ -182,6 +188,9 @@ const translations = {
     "admin.lecturerStatus": "Lecturer Status",
     "admin.registeredLecturers": "Assigned Lecturers",
     "admin.unregisteredLecturers": "Unassigned Lecturers",
+    "admin.deleteStudent": "Delete Student",
+    "admin.studentDeleted": "Student deleted successfully",
+    "admin.confirmDeleteStudent": "Are you sure you want to delete this student? All their data will be removed.",
 
     // Settings
     "settings.title": "Settings",
@@ -268,6 +277,13 @@ const translations = {
     "dept.coursesBy": "Courses by",
     "dept.selectLecturerToSee": "Select a lecturer to see their courses",
     "dept.clickLecturer": "Click a lecturer on the left to see the courses they teach.",
+    "dept.registerLecturer": "Register New Lecturer",
+    "dept.lecturerRegistered": "Lecturer registered successfully",
+    "dept.editLecturer": "Edit Lecturer",
+    "dept.deleteLecturer": "Delete Lecturer",
+    "dept.lecturerUpdated": "Lecturer updated successfully",
+    "dept.lecturerDeleted": "Lecturer deleted successfully",
+    "dept.confirmDeleteLecturer": "Are you sure you want to delete this lecturer? All their data will be removed.",
   },
   sw: {
     // Auth
@@ -325,6 +341,7 @@ const translations = {
     "dashboard.viewReports": "Angalia Ripoti",
     "dashboard.manageCourses": "Simamia Kozi",
     "dashboard.noSessions": "Hakuna vipindi vijavyo",
+    "dashboard.department": "Idara",
 
     // Courses
     "courses.title": "Kozi",
@@ -411,6 +428,7 @@ const translations = {
     "reports.byCourse": "Kwa Kozi",
     "reports.byStudent": "Kwa Mwanafunzi",
     "reports.bySession": "Kwa Kipindi",
+    "reports.byDepartment": "Kwa Idara",
     "reports.trend": "Mwenendo wa Mahudhurio",
     "reports.overview": "Muhtasari",
     "reports.totalSessions": "Vipindi Vyote",
@@ -418,6 +436,7 @@ const translations = {
     "reports.averageRate": "Kiwango cha Wastani",
     "reports.courseReport": "Ripoti ya Kozi",
     "reports.selectCourse": "Chagua kozi",
+    "reports.selectDepartment": "Chagua idara",
     "reports.studentName": "Jina la Mwanafunzi",
     "reports.universityId": "Namba ya Chuo",
     "reports.sessionsAttended": "Vipindi Alivyohudhuria",
@@ -429,6 +448,9 @@ const translations = {
     "reports.selectStudent": "Chagua mwanafunzi",
     "reports.studentReport": "Ripoti ya Mwanafunzi",
     "reports.gender": "Jinsia",
+    "reports.deptCourses": "Kozi za Idara",
+    "reports.deptLecturers": "Wahadhiri wa Idara",
+    "reports.deptStudents": "Wanafunzi wa Idara",
 
     // Admin
     "admin.totalStudents": "Wanafunzi Wote",
@@ -448,6 +470,9 @@ const translations = {
     "admin.lecturerStatus": "Hali ya Wahadhiri",
     "admin.registeredLecturers": "Wahadhiri Waliowekwa",
     "admin.unregisteredLecturers": "Wahadhiri Wasiowekwa",
+    "admin.deleteStudent": "Futa Mwanafunzi",
+    "admin.studentDeleted": "Mwanafunzi amefutwa",
+    "admin.confirmDeleteStudent": "Una uhakika unataka kumfuta mwanafunzi huyu? Data zake zote zitaondolewa.",
 
     // Settings
     "settings.title": "Mipangilio",
@@ -534,6 +559,13 @@ const translations = {
     "dept.coursesBy": "Kozi za",
     "dept.selectLecturerToSee": "Chagua mhadhiri kuona kozi anazofundisha",
     "dept.clickLecturer": "Bonyeza mhadhiri upande wa kushoto kuona kozi anazofundisha.",
+    "dept.registerLecturer": "Sajili Mhadhiri Mpya",
+    "dept.lecturerRegistered": "Mhadhiri amesajiliwa",
+    "dept.editLecturer": "Hariri Mhadhiri",
+    "dept.deleteLecturer": "Futa Mhadhiri",
+    "dept.lecturerUpdated": "Mhadhiri amebadilishwa",
+    "dept.lecturerDeleted": "Mhadhiri amefutwa",
+    "dept.confirmDeleteLecturer": "Una uhakika unataka kumfuta mhadhiri huyu? Data zake zote zitaondolewa.",
   },
 } as const;
 

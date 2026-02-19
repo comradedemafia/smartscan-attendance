@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Users, Search, UserCheck, UserX, BookOpen, Plus, Trash2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,6 +24,7 @@ export default function UsersAdmin() {
   const [filterCourse, setFilterCourse] = useState<string>("all");
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [enrollDialogOpen, setEnrollDialogOpen] = useState(false);
+  const [deleteStudentId, setDeleteStudentId] = useState<string | null>(null);
 
   const { data: profiles = [], isLoading } = useQuery({
     queryKey: ["admin-profiles"],
@@ -95,9 +97,34 @@ export default function UsersAdmin() {
     },
   });
 
+  // Delete student: remove enrollments, attendance, role, profile
+  const deleteStudentMutation = useMutation({
+    mutationFn: async (studentId: string) => {
+      // Delete attendance records
+      await supabase.from("attendance_records").delete().eq("user_id", studentId);
+      // Delete enrollments
+      await supabase.from("course_enrollments").delete().eq("user_id", studentId);
+      // Delete role
+      await supabase.from("user_roles").delete().eq("user_id", studentId);
+      // Delete profile
+      const { error } = await supabase.from("profiles").delete().eq("id", studentId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-profiles"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-roles"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-enrollments"] });
+      toast({ title: t("common.success"), description: t("admin.studentDeleted") });
+      setDeleteStudentId(null);
+    },
+    onError: (e: any) => {
+      toast({ title: t("common.error"), description: e.message, variant: "destructive" });
+    },
+  });
+
   const roleMap = Object.fromEntries(roles.map((r) => [r.user_id, r.role]));
   const enrollmentsByCourse: Record<string, Set<string>> = {};
-  const enrollmentMap: Record<string, Record<string, string>> = {}; // userId -> courseId -> enrollmentId
+  const enrollmentMap: Record<string, Record<string, string>> = {};
   enrollments.forEach((e) => {
     if (!enrollmentsByCourse[e.course_id]) enrollmentsByCourse[e.course_id] = new Set();
     enrollmentsByCourse[e.course_id].add(e.user_id);
@@ -223,7 +250,7 @@ export default function UsersAdmin() {
                     <TableHead>{t("auth.email")}</TableHead>
                     <TableHead>{t("auth.gender")}</TableHead>
                     <TableHead>{t("admin.enrolledCourses")}</TableHead>
-                    <TableHead className="w-20">{t("common.actions")}</TableHead>
+                    <TableHead className="w-28">{t("common.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -252,15 +279,25 @@ export default function UsersAdmin() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="gap-1 text-xs h-7"
-                            onClick={() => openEnrollDialog(p)}
-                          >
-                            <BookOpen className="h-3.5 w-3.5" />
-                            {t("admin.manageCourses")}
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-1 text-xs h-7"
+                              onClick={() => openEnrollDialog(p)}
+                            >
+                              <BookOpen className="h-3.5 w-3.5" />
+                              {t("admin.manageCourses")}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => setDeleteStudentId(p.id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
@@ -283,7 +320,6 @@ export default function UsersAdmin() {
           </DialogHeader>
 
           <div className="space-y-4">
-            {/* Currently enrolled */}
             {studentEnrolledCourses.length > 0 && (
               <div>
                 <p className="text-sm font-medium text-muted-foreground mb-2">{t("admin.enrolledCourses")}</p>
@@ -309,7 +345,6 @@ export default function UsersAdmin() {
               </div>
             )}
 
-            {/* Not enrolled */}
             {studentNotEnrolledCourses.length > 0 && (
               <div>
                 <p className="text-sm font-medium text-muted-foreground mb-2">{t("admin.availableCourses")}</p>
@@ -341,6 +376,25 @@ export default function UsersAdmin() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Student Confirmation */}
+      <AlertDialog open={!!deleteStudentId} onOpenChange={(o) => { if (!o) setDeleteStudentId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("admin.deleteStudent")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("admin.confirmDeleteStudent")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteStudentId && deleteStudentMutation.mutate(deleteStudentId)}
+            >
+              {t("common.delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
