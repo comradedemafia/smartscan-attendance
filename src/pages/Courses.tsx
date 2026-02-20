@@ -54,7 +54,7 @@ export default function Courses() {
       if (role === "lecturer") {
         const { data, error } = await supabase
           .from("course_lecturers")
-          .select("course_id, courses(*, course_enrollments(count))")
+          .select("course_id, courses(*, course_enrollments(count), departments(name, code))")
           .eq("lecturer_id", user!.id);
         if (error) throw error;
         return (data || []).map((r: any) => r.courses).filter(Boolean);
