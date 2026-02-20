@@ -36,6 +36,15 @@ export default function Dashboard() {
         if (error) throw error;
         return (data || []).map((r: any) => r.courses).filter(Boolean);
       }
+      if (role === "student") {
+        // Students only see their enrolled courses
+        const { data: enrollments, error: enrollError } = await supabase
+          .from("course_enrollments")
+          .select("course_id, courses(id, code, name, description)")
+          .eq("user_id", user!.id);
+        if (enrollError) throw enrollError;
+        return (enrollments || []).map((r: any) => r.courses).filter(Boolean);
+      }
       const { data, error } = await supabase.from("courses").select("*");
       if (error) throw error;
       return data;
