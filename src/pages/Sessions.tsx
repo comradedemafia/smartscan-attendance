@@ -116,8 +116,25 @@ export default function Sessions() {
       });
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: async (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["sessions"] });
+      // Notify enrolled students
+      try {
+        const { data: newSessions } = await supabase
+          .from("sessions")
+          .select("id")
+          .eq("created_by", user!.id)
+          .order("created_at", { ascending: false })
+          .limit(1);
+        if (newSessions?.[0]) {
+          await supabase.rpc("notify_enrolled_students", {
+            _session_id: newSessions[0].id,
+            _title: "📅 New Session",
+            _message: `New session "${title}" has been scheduled`,
+            _type: "session",
+          });
+        }
+      } catch {}
       toast({ title: t("common.success"), description: "Session created" });
       resetForm();
     },

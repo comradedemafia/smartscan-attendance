@@ -188,6 +188,47 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          message: string
+          session_id: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message: string
+          session_id?: string | null
+          title: string
+          type?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          session_id?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           academic_year: string | null
@@ -441,6 +482,15 @@ export type Database = {
       is_enrolled_in_subject: {
         Args: { _subject_id: string; _user_id: string }
         Returns: boolean
+      }
+      notify_enrolled_students: {
+        Args: {
+          _message: string
+          _session_id: string
+          _title: string
+          _type?: string
+        }
+        Returns: undefined
       }
       search_profiles_for_enrollment: {
         Args: { search_term: string }
