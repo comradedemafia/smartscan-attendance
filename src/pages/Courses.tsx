@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { BookOpen, Plus, Trash2, Edit, Users, LogIn, LogOut, UserCog, Building2, ChevronDown, ChevronRight } from "lucide-react";
@@ -32,6 +31,22 @@ export default function Courses() {
   const isAdmin = role === "admin";
   const isLecturer = role === "lecturer";
   const isStudent = role === "student";
+  const canCreate = isAdmin || isLecturer;
+
+  // Fetch lecturer's own department
+  const { data: lecturerProfile } = useQuery({
+    queryKey: ["lecturer-profile-dept", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("department_id")
+        .eq("id", user!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: isLecturer && !!user,
+  });
 
   const { data: courses = [], isLoading } = useQuery({
     queryKey: ["courses", user?.id, role],
@@ -61,7 +76,7 @@ export default function Courses() {
       if (error) throw error;
       return data;
     },
-    enabled: isAdmin,
+    enabled: canCreate,
   });
 
   const { data: myEnrollments = [] } = useQuery({
@@ -100,17 +115,25 @@ export default function Courses() {
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
-  // Admin: create/edit course
   const createCourseMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("courses").insert({
+      const deptId = isLecturer ? (lecturerProfile?.department_id || courseDeptId || null) : (courseDeptId || null);
+      const { data: newCourse, error } = await supabase.from("courses").insert({
         code: courseCode.toUpperCase(),
         name: courseName,
         description: courseDesc || null,
-        department_id: courseDeptId || null,
+        department_id: deptId,
         created_by: user!.id,
-      });
+      }).select("id").single();
       if (error) throw error;
+      // If lecturer creates course, auto-assign themselves
+      if (isLecturer && newCourse) {
+        await supabase.from("course_lecturers").insert({
+          course_id: newCourse.id,
+          lecturer_id: user!.id,
+          assigned_by: user!.id,
+        });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["courses"] });
@@ -234,7 +257,7 @@ export default function Courses() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight font-['Space_Grotesk']">{t("courses.title")}</h1>
-        {isAdmin && (
+        {canCreate && (
           <Dialog open={open} onOpenChange={(o) => { if (!o) resetForm(); setOpen(o); }}>
             <DialogTrigger asChild>
               <Button><Plus className="h-4 w-4 mr-2" />{t("courses.create")}</Button>
@@ -254,14 +277,16 @@ export default function Courses() {
                 </div>
                 <div className="space-y-2">
                   <Label>{t("auth.department")}</Label>
-                  <Select value={courseDeptId} onValueChange={setCourseDeptId}>
-                    <SelectTrigger><SelectValue placeholder={t("auth.selectDepartment")} /></SelectTrigger>
-                    <SelectContent>
-                      {departments.map((d) => (
-                        <SelectItem key={d.id} value={d.id}>{d.code} — {d.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <select
+                    value={courseDeptId}
+                    onChange={(e) => setCourseDeptId(e.target.value)}
+                    className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  >
+                    <option value="">{t("auth.selectDepartment")}</option>
+                    {departments.map((d) => (
+                      <option key={d.id} value={d.id}>{d.code} — {d.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="space-y-2">
                   <Label>{t("courses.description")}</Label>

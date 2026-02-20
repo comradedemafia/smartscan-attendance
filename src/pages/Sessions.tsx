@@ -7,11 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, Plus, QrCode, LayoutGrid, List, ChevronLeft, ChevronRight, Edit, Trash2, Building2, ChevronDown, Users } from "lucide-react";
+import { Calendar, Plus, QrCode, LayoutGrid, List, ChevronLeft, ChevronRight, Edit, Trash2, Building2, ChevronDown, Users, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay } from "date-fns";
 
@@ -21,6 +22,8 @@ export default function Sessions() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+
+  // Session dialog state
   const [open, setOpen] = useState(false);
   const [editingSession, setEditingSession] = useState<any>(null);
   const [title, setTitle] = useState("");
@@ -28,6 +31,14 @@ export default function Sessions() {
   const [subjectId, setSubjectId] = useState("");
   const [venueName, setVenueName] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("30");
+
+  // Subject dialog state
+  const [subjectOpen, setSubjectOpen] = useState(false);
+  const [subjectCode, setSubjectCode] = useState("");
+  const [subjectName, setSubjectName] = useState("");
+  const [subjectDesc, setSubjectDesc] = useState("");
+  const [subjectCourseId, setSubjectCourseId] = useState("");
+
   const [viewMode, setViewMode] = useState<"list" | "week">("week");
   const [currentWeekStart, setCurrentWeekStart] = useState(() =>
     startOfWeek(new Date(), { weekStartsOn: 1 })
@@ -66,7 +77,7 @@ export default function Sessions() {
     enabled: !!user,
   });
 
-  // Subjects for selected course
+  // Subjects for selected course (session form)
   const { data: subjects = [] } = useQuery({
     queryKey: ["subjects-for-sessions", courseId],
     queryFn: async () => {
@@ -108,6 +119,7 @@ export default function Sessions() {
     return sessions.filter((s: any) => s.courses?.department_id === selectedDeptId);
   }, [sessions, selectedDeptId, isAdmin]);
 
+  // ===== SESSION MUTATIONS =====
   const createMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from("sessions").insert({
@@ -116,16 +128,12 @@ export default function Sessions() {
       });
       if (error) throw error;
     },
-    onSuccess: async (_, variables) => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ["sessions"] });
-      // Notify enrolled students
       try {
         const { data: newSessions } = await supabase
-          .from("sessions")
-          .select("id")
-          .eq("created_by", user!.id)
-          .order("created_at", { ascending: false })
-          .limit(1);
+          .from("sessions").select("id").eq("created_by", user!.id)
+          .order("created_at", { ascending: false }).limit(1);
         if (newSessions?.[0]) {
           await supabase.rpc("notify_enrolled_students", {
             _session_id: newSessions[0].id,
@@ -136,7 +144,7 @@ export default function Sessions() {
         }
       } catch {}
       toast({ title: t("common.success"), description: "Session created" });
-      resetForm();
+      resetSessionForm();
     },
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
@@ -151,7 +159,7 @@ export default function Sessions() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sessions"] });
       toast({ title: t("common.success"), description: "Session updated" });
-      resetForm();
+      resetSessionForm();
     },
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
@@ -168,9 +176,32 @@ export default function Sessions() {
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
-  const resetForm = () => { setOpen(false); setEditingSession(null); setTitle(""); setCourseId(""); setSubjectId(""); setVenueName(""); setDurationMinutes("30"); };
+  // ===== SUBJECT MUTATION =====
+  const createSubjectMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("subjects").insert({
+        code: subjectCode.toUpperCase(),
+        name: subjectName,
+        description: subjectDesc || null,
+        course_id: subjectCourseId,
+        created_by: user!.id,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["all-subjects"] });
+      queryClient.invalidateQueries({ queryKey: ["subjects-for-sessions"] });
+      toast({ title: t("common.success"), description: t("subjects.subjectCreated") });
+      resetSubjectForm();
+    },
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
+  });
+
+  const resetSessionForm = () => { setOpen(false); setEditingSession(null); setTitle(""); setCourseId(""); setSubjectId(""); setVenueName(""); setDurationMinutes("30"); };
+  const resetSubjectForm = () => { setSubjectOpen(false); setSubjectCode(""); setSubjectName(""); setSubjectDesc(""); setSubjectCourseId(""); };
   const openEdit = (session: any) => { setEditingSession(session); setTitle(session.title); setCourseId(session.course_id); setSubjectId(session.subject_id || ""); setVenueName(session.venue_name || ""); setDurationMinutes(String(session.duration_minutes)); setOpen(true); };
-  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); if (!title.trim() || !courseId) return; editingSession ? updateMutation.mutate() : createMutation.mutate(); };
+  const handleSessionSubmit = (e: React.FormEvent) => { e.preventDefault(); if (!title.trim() || !courseId) return; editingSession ? updateMutation.mutate() : createMutation.mutate(); };
+  const handleSubjectSubmit = (e: React.FormEvent) => { e.preventDefault(); if (!subjectCode.trim() || !subjectName.trim() || !subjectCourseId) return; createSubjectMutation.mutate(); };
   const canEditSession = (session: any) => role === "admin" || (role === "lecturer" && session.created_by === user?.id);
   const statusColor = (status: string) => { switch (status) { case "active": return "default"; case "completed": return "secondary"; default: return "outline"; } };
 
@@ -186,7 +217,6 @@ export default function Sessions() {
     return map;
   }, [filteredSessions, weekDays]);
 
-  // Admin: group sessions by lecturer for weekly view
   const sessionsByLecturer = useMemo(() => {
     if (!isAdmin) return null;
     const map = new Map<string, { name: string; sessions: typeof filteredSessions }>();
@@ -226,70 +256,116 @@ export default function Sessions() {
             </Button>
           </div>
           {canManage && (
-            <Dialog open={open} onOpenChange={(o) => { if (!o) resetForm(); setOpen(o); }}>
-              <DialogTrigger asChild>
-                <Button><Plus className="h-4 w-4 mr-2" />{t("sessions.create")}</Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>{editingSession ? t("common.edit") : t("sessions.create")}</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Title</Label>
-                    <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Week 1 Lecture" required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>{t("sessions.course")}</Label>
-                    <select
-                      value={courseId}
-                      onChange={(e) => { setCourseId(e.target.value); setSubjectId(""); }}
-                      className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                      required
-                    >
-                      <option value="">Select course</option>
-                      {courses.map((c: any) => (
-                        <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  {courseId && subjects.length > 0 && (
+            <>
+              {/* Create Subject Dialog */}
+              <Dialog open={subjectOpen} onOpenChange={(o) => { if (!o) resetSubjectForm(); setSubjectOpen(o); }}>
+                <DialogTrigger asChild>
+                  <Button variant="outline"><FileText className="h-4 w-4 mr-2" />{t("subjects.createSubject")}</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>{t("subjects.createSubject")}</DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={handleSubjectSubmit} className="space-y-4">
                     <div className="space-y-2">
-                      <Label>{t("subjects.subject")}</Label>
-                    <select
-                      value={subjectId}
-                      onChange={(e) => setSubjectId(e.target.value)}
-                      className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                    >
-                      <option value="">— {t("subjects.selectSubject")} —</option>
-                      {subjects.map((s: any) => (
-                        <option key={s.id} value={s.id}>{s.code} - {s.name}</option>
-                      ))}
-                    </select>
+                      <Label>{t("subjects.subjectCode")}</Label>
+                      <Input value={subjectCode} onChange={(e) => setSubjectCode(e.target.value)} placeholder="CS101-A" required />
                     </div>
-                  )}
-                  <div className="space-y-2">
-                    <Label>{t("sessions.venue")}</Label>
-                    <Input value={venueName} onChange={(e) => setVenueName(e.target.value)} placeholder="Room 101" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>{t("sessions.duration")}</Label>
-                    <Select value={durationMinutes} onValueChange={setDurationMinutes}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="15">15 {t("qr.minutes")}</SelectItem>
-                        <SelectItem value="30">30 {t("qr.minutes")}</SelectItem>
-                        <SelectItem value="45">45 {t("qr.minutes")}</SelectItem>
-                        <SelectItem value="60">60 {t("qr.minutes")}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending}>
-                    {editingSession ? t("common.save") : t("sessions.create")}
-                  </Button>
-                </form>
-              </DialogContent>
-            </Dialog>
+                    <div className="space-y-2">
+                      <Label>{t("subjects.subjectName")}</Label>
+                      <Input value={subjectName} onChange={(e) => setSubjectName(e.target.value)} placeholder="Programming Basics" required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t("sessions.course")}</Label>
+                      <select
+                        value={subjectCourseId}
+                        onChange={(e) => setSubjectCourseId(e.target.value)}
+                        className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                        required
+                      >
+                        <option value="">{t("reports.selectCourse")}</option>
+                        {courses.map((c: any) => (
+                          <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t("courses.description")}</Label>
+                      <Textarea value={subjectDesc} onChange={(e) => setSubjectDesc(e.target.value)} placeholder="Optional description" />
+                    </div>
+                    <Button type="submit" className="w-full" disabled={createSubjectMutation.isPending}>
+                      {t("subjects.createSubject")}
+                    </Button>
+                  </form>
+                </DialogContent>
+              </Dialog>
+
+              {/* Create Session Dialog */}
+              <Dialog open={open} onOpenChange={(o) => { if (!o) resetSessionForm(); setOpen(o); }}>
+                <DialogTrigger asChild>
+                  <Button><Plus className="h-4 w-4 mr-2" />{t("sessions.create")}</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>{editingSession ? t("common.edit") : t("sessions.create")}</DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={handleSessionSubmit} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Title</Label>
+                      <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Week 1 Lecture" required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t("sessions.course")}</Label>
+                      <select
+                        value={courseId}
+                        onChange={(e) => { setCourseId(e.target.value); setSubjectId(""); }}
+                        className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                        required
+                      >
+                        <option value="">Select course</option>
+                        {courses.map((c: any) => (
+                          <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {courseId && subjects.length > 0 && (
+                      <div className="space-y-2">
+                        <Label>{t("subjects.subject")}</Label>
+                        <select
+                          value={subjectId}
+                          onChange={(e) => setSubjectId(e.target.value)}
+                          className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                        >
+                          <option value="">— {t("subjects.selectSubject")} —</option>
+                          {subjects.map((s: any) => (
+                            <option key={s.id} value={s.id}>{s.code} - {s.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      <Label>{t("sessions.venue")}</Label>
+                      <Input value={venueName} onChange={(e) => setVenueName(e.target.value)} placeholder="Room 101" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t("sessions.duration")}</Label>
+                      <Select value={durationMinutes} onValueChange={setDurationMinutes}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="15">15 {t("qr.minutes")}</SelectItem>
+                          <SelectItem value="30">30 {t("qr.minutes")}</SelectItem>
+                          <SelectItem value="45">45 {t("qr.minutes")}</SelectItem>
+                          <SelectItem value="60">60 {t("qr.minutes")}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending}>
+                      {editingSession ? t("common.save") : t("sessions.create")}
+                    </Button>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </>
           )}
         </div>
       </div>
@@ -310,7 +386,6 @@ export default function Sessions() {
             </Button>
           </div>
 
-          {/* Admin: show sessions grouped by lecturer */}
           {isAdmin && sessionsByLecturer && sessionsByLecturer.length > 0 ? (
             <div className="space-y-4">
               {sessionsByLecturer.map((lecturer) => {
@@ -359,7 +434,6 @@ export default function Sessions() {
               })}
             </div>
           ) : (
-            /* Non-admin or no grouped data: original weekly grid */
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-2">
               {weekDays.map((day, i) => {
                 const key = format(day, "yyyy-MM-dd");
