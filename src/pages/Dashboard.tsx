@@ -1,28 +1,63 @@
+import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useI18n } from "@/lib/i18n";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Calendar, Users, TrendingUp, Clock, Building2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { BookOpen, Calendar, Users, TrendingUp, Clock, Building2, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Dashboard() {
   const { role, profile, user } = useAuth();
   const { t } = useI18n();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const isLecturer = role === "lecturer";
+
+  // Create course state
+  const [open, setOpen] = useState(false);
+  const [courseCode, setCourseCode] = useState("");
+  const [courseName, setCourseName] = useState("");
+  const [courseDesc, setCourseDesc] = useState("");
+  const [courseDeptId, setCourseDeptId] = useState("");
 
   // Fetch user's department
-  const { data: userDepartment } = useQuery({
-    queryKey: ["user-department", profile?.university_id],
+  const { data: userProfile } = useQuery({
+    queryKey: ["user-profile-dept", user?.id],
     queryFn: async () => {
-      if (!user) return null;
-      const { data: prof } = await supabase.from("profiles").select("department_id").eq("id", user.id).maybeSingle();
-      if (!prof?.department_id) return null;
-      const { data: dept } = await supabase.from("departments").select("name, code").eq("id", prof.department_id).single();
-      return dept;
+      const { data } = await supabase.from("profiles").select("department_id").eq("id", user!.id).maybeSingle();
+      return data;
     },
-    enabled: !!user && role !== "admin",
+    enabled: !!user,
+  });
+
+  const { data: userDepartment } = useQuery({
+    queryKey: ["user-department", userProfile?.department_id],
+    queryFn: async () => {
+      if (!userProfile?.department_id) return null;
+      const { data } = await supabase.from("departments").select("name, code").eq("id", userProfile.department_id).single();
+      return data;
+    },
+    enabled: !!userProfile?.department_id && role !== "admin",
+  });
+
+  const { data: departments = [] } = useQuery({
+    queryKey: ["departments-for-dashboard"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("departments").select("id, name, code").order("name");
+      if (error) throw error;
+      return data;
+    },
+    enabled: isLecturer,
   });
 
   const { data: courses = [] } = useQuery({
@@ -31,19 +66,18 @@ export default function Dashboard() {
       if (role === "lecturer") {
         const { data, error } = await supabase
           .from("course_lecturers")
-          .select("course_id, courses(id, code, name, description, created_by)")
+          .select("course_id, courses(id, code, name, description, created_by, department_id, departments(name, code))")
           .eq("lecturer_id", user!.id);
         if (error) throw error;
         return (data || []).map((r: any) => r.courses).filter(Boolean);
       }
       if (role === "student") {
-        // Students only see their enrolled courses
-        const { data: enrollments, error: enrollError } = await supabase
+        const { data, error } = await supabase
           .from("course_enrollments")
           .select("course_id, courses(id, code, name, description)")
           .eq("user_id", user!.id);
-        if (enrollError) throw enrollError;
-        return (enrollments || []).map((r: any) => r.courses).filter(Boolean);
+        if (error) throw error;
+        return (data || []).map((r: any) => r.courses).filter(Boolean);
       }
       const { data, error } = await supabase.from("courses").select("*");
       if (error) throw error;
@@ -75,6 +109,39 @@ export default function Dashboard() {
       return counts;
     },
     enabled: !!user,
+  });
+
+  // Create course mutation for lecturer
+  const createCourseMutation = useMutation({
+    mutationFn: async () => {
+      const deptId = courseDeptId || userProfile?.department_id || null;
+      const { data: newCourse, error } = await supabase.from("courses").insert({
+        code: courseCode.toUpperCase(),
+        name: courseName,
+        description: courseDesc || null,
+        department_id: deptId,
+        created_by: user!.id,
+      }).select("id").single();
+      if (error) throw error;
+      if (newCourse) {
+        await supabase.from("course_lecturers").insert({
+          course_id: newCourse.id,
+          lecturer_id: user!.id,
+          assigned_by: user!.id,
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["dashboard-courses"] });
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
+      toast({ title: t("common.success"), description: t("dept.courseCreated") });
+      setOpen(false);
+      setCourseCode("");
+      setCourseName("");
+      setCourseDesc("");
+      setCourseDeptId("");
+    },
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
   const activeSessions = sessions.filter((s) => s.status === "active").length;
@@ -124,13 +191,57 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Courses */}
+      {/* Courses with Create button for lecturer */}
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold">{t("nav.courses")}</h2>
-          <Link to="/courses" className="text-sm text-primary hover:underline">
-            {t("common.actions")} →
-          </Link>
+          <div className="flex items-center gap-2">
+            {isLecturer && (
+              <Dialog open={open} onOpenChange={setOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm"><Plus className="h-4 w-4 mr-1" />{t("courses.create")}</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>{t("courses.create")}</DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={(e) => { e.preventDefault(); if (courseCode.trim() && courseName.trim()) createCourseMutation.mutate(); }} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>{t("courses.code")}</Label>
+                      <Input value={courseCode} onChange={(e) => setCourseCode(e.target.value)} placeholder="CS101" required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t("courses.name")}</Label>
+                      <Input value={courseName} onChange={(e) => setCourseName(e.target.value)} placeholder="Introduction to CS" required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t("auth.department")}</Label>
+                      <select
+                        value={courseDeptId}
+                        onChange={(e) => setCourseDeptId(e.target.value)}
+                        className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      >
+                        <option value="">{userProfile?.department_id ? "My Department (default)" : t("auth.selectDepartment")}</option>
+                        {departments.map((d) => (
+                          <option key={d.id} value={d.id}>{d.code} — {d.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t("courses.description")}</Label>
+                      <Textarea value={courseDesc} onChange={(e) => setCourseDesc(e.target.value)} placeholder="Optional description" />
+                    </div>
+                    <Button type="submit" className="w-full" disabled={createCourseMutation.isPending}>
+                      {t("courses.create")}
+                    </Button>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            )}
+            <Link to="/courses" className="text-sm text-primary hover:underline">
+              {t("common.actions")} →
+            </Link>
+          </div>
         </div>
         {courses.length === 0 ? (
           <Card>
@@ -140,7 +251,7 @@ export default function Dashboard() {
           </Card>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {courses.map((course) => (
+            {courses.map((course: any) => (
               <Card key={course.id} className="hover:shadow-md transition-shadow">
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
@@ -148,6 +259,12 @@ export default function Dashboard() {
                     <BookOpen className="h-4 w-4 text-muted-foreground" />
                   </div>
                   <CardTitle className="text-base mt-1">{course.name}</CardTitle>
+                  {course.departments && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Building2 className="h-3 w-3" />
+                      {course.departments.name}
+                    </p>
+                  )}
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {course.description && (
