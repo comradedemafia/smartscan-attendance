@@ -197,14 +197,17 @@ export default function Subjects() {
                 </div>
                 <div className="space-y-2">
                   <Label>{t("sessions.course")}</Label>
-                  <Select value={subjectCourseId} onValueChange={setSubjectCourseId}>
-                    <SelectTrigger><SelectValue placeholder={t("reports.selectCourse")} /></SelectTrigger>
-                    <SelectContent>
-                      {courses.map((c: any) => (
-                        <SelectItem key={c.id} value={c.id}>{c.code} - {c.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <select
+                    value={subjectCourseId}
+                    onChange={(e) => setSubjectCourseId(e.target.value)}
+                    className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                    required
+                  >
+                    <option value="">{t("reports.selectCourse")}</option>
+                    {courses.map((c: any) => (
+                      <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="space-y-2">
                   <Label>{t("courses.description")}</Label>
