@@ -59,6 +59,20 @@ export default function Courses() {
         if (error) throw error;
         return (data || []).map((r: any) => r.courses).filter(Boolean);
       }
+      if (role === "student") {
+        // Students only see courses from their department
+        const { data: prof } = await supabase.from("profiles").select("department_id").eq("id", user!.id).maybeSingle();
+        if (prof?.department_id) {
+          const { data, error } = await supabase
+            .from("courses")
+            .select("*, course_enrollments(count), departments(name, code)")
+            .eq("department_id", prof.department_id)
+            .order("created_at", { ascending: false });
+          if (error) throw error;
+          return data;
+        }
+        return [];
+      }
       const { data, error } = await supabase
         .from("courses")
         .select("*, course_enrollments(count), departments(name, code)")
