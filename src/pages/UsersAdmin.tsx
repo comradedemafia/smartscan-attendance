@@ -113,7 +113,6 @@ export default function UsersAdmin() {
   const deleteStudentMutation = useMutation({
     mutationFn: async (studentId: string) => {
       await supabase.from("attendance_records").delete().eq("user_id", studentId);
-      await supabase.from("subject_enrollments").delete().eq("user_id", studentId);
       await supabase.from("course_enrollments").delete().eq("user_id", studentId);
       await supabase.from("user_roles").delete().eq("user_id", studentId);
       const { error } = await supabase.from("profiles").delete().eq("id", studentId);

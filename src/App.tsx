@@ -10,7 +10,7 @@ import AppLayout from "@/components/AppLayout";
 import Auth from "@/pages/Auth";
 import Dashboard from "@/pages/Dashboard";
 import Courses from "@/pages/Courses";
-import Subjects from "@/pages/Subjects";
+
 import CourseStudents from "@/pages/CourseStudents";
 import Sessions from "@/pages/Sessions";
 import Attendance from "@/pages/Attendance";
@@ -62,7 +62,7 @@ const App = () => (
                 >
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/courses" element={<Courses />} />
-                  <Route path="/subjects" element={<Subjects />} />
+                  
                   <Route path="/courses/:courseId/students" element={<CourseStudents />} />
                   <Route path="/sessions" element={<Sessions />} />
                   <Route path="/scan" element={<ScanQR />} />

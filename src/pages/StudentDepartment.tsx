@@ -90,29 +90,6 @@ export default function StudentDepartment() {
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
-  const enrollSubjectMutation = useMutation({
-    mutationFn: async (subjectId: string) => {
-      const { error } = await supabase.from("subject_enrollments").insert({ subject_id: subjectId, user_id: user!.id });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["my-subject-enrollments"] });
-      toast({ title: t("common.success"), description: t("subjects.enrolled") });
-    },
-    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
-  });
-
-  const unenrollSubjectMutation = useMutation({
-    mutationFn: async (subjectId: string) => {
-      const { error } = await supabase.from("subject_enrollments").delete().eq("subject_id", subjectId).eq("user_id", user!.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["my-subject-enrollments"] });
-      toast({ title: t("common.success"), description: t("subjects.unenrolled") });
-    },
-    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
-  });
 
   const dept = studentProfile?.departments as any;
 

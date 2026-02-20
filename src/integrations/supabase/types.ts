@@ -298,7 +298,6 @@ export type Database = {
           session_date: string
           start_time: string
           status: string
-          subject_id: string | null
           title: string
           updated_at: string
           venue_name: string | null
@@ -318,7 +317,6 @@ export type Database = {
           session_date?: string
           start_time?: string
           status?: string
-          subject_id?: string | null
           title: string
           updated_at?: string
           venue_name?: string | null
@@ -338,7 +336,6 @@ export type Database = {
           session_date?: string
           start_time?: string
           status?: string
-          subject_id?: string | null
           title?: string
           updated_at?: string
           venue_name?: string | null
@@ -346,83 +343,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "sessions_course_id_fkey"
-            columns: ["course_id"]
-            isOneToOne: false
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sessions_subject_id_fkey"
-            columns: ["subject_id"]
-            isOneToOne: false
-            referencedRelation: "subjects"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      subject_enrollments: {
-        Row: {
-          enrolled_at: string
-          id: string
-          subject_id: string
-          user_id: string
-        }
-        Insert: {
-          enrolled_at?: string
-          id?: string
-          subject_id: string
-          user_id: string
-        }
-        Update: {
-          enrolled_at?: string
-          id?: string
-          subject_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "subject_enrollments_subject_id_fkey"
-            columns: ["subject_id"]
-            isOneToOne: false
-            referencedRelation: "subjects"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      subjects: {
-        Row: {
-          code: string
-          course_id: string
-          created_at: string
-          created_by: string
-          description: string | null
-          id: string
-          name: string
-          updated_at: string
-        }
-        Insert: {
-          code: string
-          course_id: string
-          created_at?: string
-          created_by: string
-          description?: string | null
-          id?: string
-          name: string
-          updated_at?: string
-        }
-        Update: {
-          code?: string
-          course_id?: string
-          created_at?: string
-          created_by?: string
-          description?: string | null
-          id?: string
-          name?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "subjects_course_id_fkey"
             columns: ["course_id"]
             isOneToOne: false
             referencedRelation: "courses"
@@ -477,10 +397,6 @@ export type Database = {
       }
       is_enrolled_in_course: {
         Args: { _course_id: string; _user_id: string }
-        Returns: boolean
-      }
-      is_enrolled_in_subject: {
-        Args: { _subject_id: string; _user_id: string }
         Returns: boolean
       }
       notify_enrolled_students: {
