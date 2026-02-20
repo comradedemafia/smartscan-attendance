@@ -82,10 +82,19 @@ export default function SessionQR() {
       if (error) throw error;
       return { secret, expiresAt };
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       const epoch = Math.floor(Date.now() / 10000);
       setQrValue(JSON.stringify({ session_id: sessionId, secret: data.secret, t: epoch }));
       queryClient.invalidateQueries({ queryKey: ["session", sessionId] });
+      // Notify students
+      try {
+        await supabase.rpc("notify_enrolled_students", {
+          _session_id: sessionId!,
+          _title: "🟢 QR Code Active",
+          _message: `QR Code is now active for "${session?.title}". Scan now!`,
+          _type: "qr",
+        });
+      } catch {}
       toast({ title: t("common.success"), description: "QR Code activated!" });
     },
     onError: (e: any) => {

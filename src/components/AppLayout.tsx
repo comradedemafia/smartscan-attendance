@@ -1,3 +1,4 @@
+import NotificationBell from "@/components/NotificationBell";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useI18n } from "@/lib/i18n";
@@ -142,6 +143,7 @@ export default function AppLayout() {
             <Menu className="h-6 w-6" />
           </button>
           <div className="flex-1" />
+          {role === "student" && <NotificationBell />}
         </header>
         <main className="flex-1 overflow-y-auto p-4 lg:p-6">
           <Outlet />

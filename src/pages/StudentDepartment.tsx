@@ -16,7 +16,7 @@ export default function StudentDepartment() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [expandedLecturer, setExpandedLecturer] = useState<string | null>(null);
+  const [selectedLecturer, setSelectedLecturer] = useState<string | null>(null);
 
   const { data: studentProfile } = useQuery({
     queryKey: ["student-profile", user?.id],
@@ -34,7 +34,6 @@ export default function StudentDepartment() {
 
   const departmentId = (studentProfile?.departments as any)?.id;
 
-  // Get lecturers & courses in this department
   const { data: deptLecturers = [] } = useQuery({
     queryKey: ["dept-lecturers", departmentId],
     queryFn: async () => {
@@ -55,7 +54,6 @@ export default function StudentDepartment() {
     enabled: !!departmentId,
   });
 
-  // Get all subjects for this department's courses
   const { data: deptSubjects = [] } = useQuery({
     queryKey: ["dept-subjects", departmentId],
     queryFn: async () => {
@@ -71,7 +69,6 @@ export default function StudentDepartment() {
     enabled: deptLecturers.length > 0,
   });
 
-  // Get student's enrollments
   const { data: myEnrollments = [] } = useQuery({
     queryKey: ["my-enrollments", user?.id],
     queryFn: async () => {
@@ -156,9 +153,10 @@ export default function StudentDepartment() {
     );
   }
 
-  // Get subjects taught by a lecturer (created_by matches)
   const lecturerSubjects = (lecturerId: string, courseId: string) =>
     deptSubjects.filter((s: any) => s.course_id === courseId && s.created_by === lecturerId);
+
+  const selectedLecturerData = deptLecturers.find((l) => l.lecturer_id === selectedLecturer);
 
   return (
     <div className="space-y-6">
@@ -167,6 +165,7 @@ export default function StudentDepartment() {
         <p className="text-muted-foreground">{profile?.full_name}</p>
       </div>
 
+      {/* Department Info Card */}
       <Card className="bg-primary/5 border-primary/20">
         <CardHeader>
           <div className="flex items-start justify-between flex-wrap gap-2">
@@ -193,7 +192,7 @@ export default function StudentDepartment() {
         </CardHeader>
       </Card>
 
-      {/* Lecturers with their courses and subjects */}
+      {/* Lecturers Section - Two Column Layout */}
       <div>
         <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
           <Users className="h-5 w-5 text-primary" />
@@ -206,94 +205,117 @@ export default function StudentDepartment() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-3">
-            {deptLecturers.map((lecturer) => {
-              const isExpanded = expandedLecturer === lecturer.lecturer_id;
-              return (
-                <Card key={lecturer.lecturer_id} className={isExpanded ? "border-primary/40" : ""}>
-                  <CardHeader
-                    className="pb-2 cursor-pointer"
-                    onClick={() => setExpandedLecturer(isExpanded ? null : lecturer.lecturer_id)}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Left: Lecturer list */}
+            <div className="space-y-2">
+              {deptLecturers.map((lecturer) => {
+                const isSelected = selectedLecturer === lecturer.lecturer_id;
+                return (
+                  <Card
+                    key={lecturer.lecturer_id}
+                    className={`cursor-pointer transition-all hover:shadow-md ${isSelected ? "border-primary bg-primary/5 ring-1 ring-primary/30" : ""}`}
+                    onClick={() => setSelectedLecturer(isSelected ? null : lecturer.lecturer_id)}
                   >
-                    <div className="flex items-center justify-between">
+                    <CardContent className="p-3 flex items-center justify-between">
                       <div>
-                        <CardTitle className="text-sm">{lecturer.full_name}</CardTitle>
-                        <p className="text-xs text-muted-foreground">{lecturer.university_id} • {dept.name}</p>
+                        <p className="text-sm font-medium">{lecturer.full_name}</p>
+                        <p className="text-xs text-muted-foreground">{lecturer.university_id}</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant="secondary" className="text-xs">
                           {lecturer.courses.length} {t("dept.courses")}
                         </Badge>
-                        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        {isSelected ? <ChevronDown className="h-4 w-4 text-primary" /> : <ChevronRight className="h-4 w-4" />}
                       </div>
-                    </div>
-                  </CardHeader>
-                  {isExpanded && (
-                    <CardContent className="pt-0 space-y-3">
-                      {lecturer.courses.map((course) => {
-                        const isEnrolled = myEnrollments.includes(course.id);
-                        const subjects = lecturerSubjects(lecturer.lecturer_id, course.id);
-                        return (
-                          <div key={course.id} className="border rounded-lg p-3 space-y-2">
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="flex items-center gap-2">
-                                <BookOpen className="h-4 w-4 text-primary" />
-                                <Badge variant="outline" className="text-xs font-mono">{course.code}</Badge>
-                                <span className="text-sm font-medium">{course.name}</span>
-                                {isEnrolled && <Badge className="text-xs">{t("dept.enrolled")}</Badge>}
-                              </div>
-                              <div className="flex items-center gap-1 shrink-0">
-                                {isEnrolled ? (
-                                  <>
-                                    <Button size="sm" variant="outline" onClick={() => navigate("/sessions")} className="text-xs">
-                                      <Calendar className="h-3.5 w-3.5 mr-1" />{t("dept.sessions")}
-                                    </Button>
-                                    <Button size="sm" variant="ghost" className="text-xs text-destructive" onClick={() => unenrollMutation.mutate(course.id)} disabled={unenrollMutation.isPending}>
-                                      <LogOut className="h-3.5 w-3.5" />
-                                    </Button>
-                                  </>
-                                ) : (
-                                  <Button size="sm" onClick={() => enrollMutation.mutate(course.id)} disabled={enrollMutation.isPending} className="text-xs">
-                                    <LogIn className="h-3.5 w-3.5 mr-1" />{t("courses.joinCourse")}
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
-                            {/* Subjects under this course by this lecturer */}
-                            {subjects.length > 0 && (
-                              <div className="ml-6 space-y-1">
-                                {subjects.map((s: any) => {
-                                  const isSubEnrolled = mySubjectEnrollments.includes(s.id);
-                                  return (
-                                    <div key={s.id} className="flex items-center justify-between bg-muted/50 rounded px-3 py-1.5 text-xs">
-                                      <div className="flex items-center gap-2">
-                                        <FileText className="h-3 w-3 text-muted-foreground" />
-                                        <span className="font-mono text-muted-foreground">{s.code}</span>
-                                        <span>{s.name}</span>
-                                        {isSubEnrolled && <Badge variant="secondary" className="text-[10px] h-4">{t("dept.enrolled")}</Badge>}
-                                      </div>
-                                      {isSubEnrolled ? (
-                                        <Button variant="ghost" size="sm" className="h-5 text-xs px-1" onClick={() => unenrollSubjectMutation.mutate(s.id)}>
-                                          <LogOut className="h-3 w-3 mr-0.5" />{t("subjects.leaveSubject")}
-                                        </Button>
-                                      ) : (
-                                        <Button variant="ghost" size="sm" className="h-5 text-xs px-1 text-primary" onClick={() => enrollSubjectMutation.mutate(s.id)}>
-                                          <LogIn className="h-3 w-3 mr-0.5" />{t("subjects.joinSubject")}
-                                        </Button>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
                     </CardContent>
-                  )}
+                  </Card>
+                );
+              })}
+            </div>
+
+            {/* Right: Selected lecturer's courses & subjects */}
+            <div className="lg:col-span-2">
+              {selectedLecturerData ? (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <GraduationCap className="h-5 w-5 text-primary" />
+                      {t("dept.coursesBy")} {selectedLecturerData.full_name}
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground">{selectedLecturerData.university_id} • {dept.name}</p>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {selectedLecturerData.courses.map((course) => {
+                      const isEnrolled = myEnrollments.includes(course.id);
+                      const subjects = lecturerSubjects(selectedLecturerData.lecturer_id, course.id);
+                      return (
+                        <div key={course.id} className="border rounded-lg p-3 space-y-2">
+                          <div className="flex items-center justify-between gap-3 flex-wrap">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <BookOpen className="h-4 w-4 text-primary" />
+                              <Badge variant="outline" className="text-xs font-mono">{course.code}</Badge>
+                              <span className="text-sm font-medium">{course.name}</span>
+                              {isEnrolled && <Badge className="text-xs">{t("dept.enrolled")}</Badge>}
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {isEnrolled ? (
+                                <>
+                                  <Button size="sm" variant="outline" onClick={() => navigate("/sessions")} className="text-xs">
+                                    <Calendar className="h-3.5 w-3.5 mr-1" />{t("dept.sessions")}
+                                  </Button>
+                                  <Button size="sm" variant="ghost" className="text-xs text-destructive" onClick={() => unenrollMutation.mutate(course.id)} disabled={unenrollMutation.isPending}>
+                                    <LogOut className="h-3.5 w-3.5" />
+                                  </Button>
+                                </>
+                              ) : (
+                                <Button size="sm" onClick={() => enrollMutation.mutate(course.id)} disabled={enrollMutation.isPending} className="text-xs">
+                                  <LogIn className="h-3.5 w-3.5 mr-1" />{t("courses.joinCourse")}
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                          {/* Subjects */}
+                          {subjects.length > 0 && (
+                            <div className="ml-6 space-y-1">
+                              {subjects.map((s: any) => {
+                                const isSubEnrolled = mySubjectEnrollments.includes(s.id);
+                                return (
+                                  <div key={s.id} className="flex items-center justify-between bg-muted/50 rounded px-3 py-1.5 text-xs">
+                                    <div className="flex items-center gap-2">
+                                      <FileText className="h-3 w-3 text-muted-foreground" />
+                                      <span className="font-mono text-muted-foreground">{s.code}</span>
+                                      <span>{s.name}</span>
+                                      {isSubEnrolled && <Badge variant="secondary" className="text-[10px] h-4">{t("dept.enrolled")}</Badge>}
+                                    </div>
+                                    {isSubEnrolled ? (
+                                      <Button variant="ghost" size="sm" className="h-5 text-xs px-1" onClick={() => unenrollSubjectMutation.mutate(s.id)}>
+                                        <LogOut className="h-3 w-3 mr-0.5" />{t("subjects.leaveSubject")}
+                                      </Button>
+                                    ) : (
+                                      <Button variant="ghost" size="sm" className="h-5 text-xs px-1 text-primary" onClick={() => enrollSubjectMutation.mutate(s.id)}>
+                                        <LogIn className="h-3 w-3 mr-0.5" />{t("subjects.joinSubject")}
+                                      </Button>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </CardContent>
                 </Card>
-              );
-            })}
+              ) : (
+                <Card>
+                  <CardContent className="py-12 text-center">
+                    <Users className="h-10 w-10 mx-auto text-muted-foreground/30 mb-3" />
+                    <p className="text-sm text-muted-foreground">{t("dept.selectLecturerToSee")}</p>
+                    <p className="text-xs text-muted-foreground/60 mt-1">{t("dept.clickLecturer")}</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           </div>
         )}
       </div>
