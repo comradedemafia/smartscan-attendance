@@ -28,7 +28,7 @@ export default function Sessions() {
   const [editingSession, setEditingSession] = useState<any>(null);
   const [title, setTitle] = useState("");
   const [courseId, setCourseId] = useState("");
-  const [subjectId, setSubjectId] = useState("");
+  
   const [venueName, setVenueName] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("30");
 
@@ -77,7 +77,7 @@ export default function Sessions() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("sessions")
-        .select("*, courses(code, name, department_id), subjects(code, name)")
+        .select("*, courses(code, name, department_id)")
         .order("session_date", { ascending: false });
       if (error) throw error;
       return data;
@@ -106,7 +106,7 @@ export default function Sessions() {
   const createMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from("sessions").insert({
-        title, course_id: courseId, subject_id: subjectId || null, venue_name: venueName || null,
+        title, course_id: courseId, venue_name: venueName || null,
         duration_minutes: parseInt(durationMinutes), created_by: user!.id, status: "scheduled",
       });
       if (error) throw error;
@@ -135,7 +135,7 @@ export default function Sessions() {
   const updateMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from("sessions").update({
-        title, course_id: courseId, subject_id: subjectId || null, venue_name: venueName || null, duration_minutes: parseInt(durationMinutes),
+        title, course_id: courseId, venue_name: venueName || null, duration_minutes: parseInt(durationMinutes),
       }).eq("id", editingSession.id);
       if (error) throw error;
     },
@@ -160,8 +160,8 @@ export default function Sessions() {
   });
 
 
-  const resetSessionForm = () => { setOpen(false); setEditingSession(null); setTitle(""); setCourseId(""); setSubjectId(""); setVenueName(""); setDurationMinutes("30"); };
-  const openEdit = (session: any) => { setEditingSession(session); setTitle(session.title); setCourseId(session.course_id); setSubjectId(session.subject_id || ""); setVenueName(session.venue_name || ""); setDurationMinutes(String(session.duration_minutes)); setOpen(true); };
+  const resetSessionForm = () => { setOpen(false); setEditingSession(null); setTitle(""); setCourseId(""); setVenueName(""); setDurationMinutes("30"); };
+  const openEdit = (session: any) => { setEditingSession(session); setTitle(session.title); setCourseId(session.course_id); setVenueName(session.venue_name || ""); setDurationMinutes(String(session.duration_minutes)); setOpen(true); };
   const handleSessionSubmit = (e: React.FormEvent) => { e.preventDefault(); if (!title.trim() || !courseId) return; editingSession ? updateMutation.mutate() : createMutation.mutate(); };
   const canEditSession = (session: any) => role === "admin" || (role === "lecturer" && session.created_by === user?.id);
   const statusColor = (status: string) => { switch (status) { case "active": return "default"; case "completed": return "secondary"; default: return "outline"; } };
@@ -236,7 +236,7 @@ export default function Sessions() {
                       <Label>{t("sessions.course")}</Label>
                       <select
                         value={courseId}
-                        onChange={(e) => { setCourseId(e.target.value); setSubjectId(""); }}
+                        onChange={(e) => setCourseId(e.target.value)}
                         className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                         required
                       >
@@ -322,7 +322,7 @@ export default function Sessions() {
                                 {daySessions.map((session: any) => (
                                   <div key={session.id} className={`rounded-md p-1.5 text-xs ${session.status === "active" ? "bg-primary/15 text-primary border border-primary/30" : session.status === "completed" ? "bg-muted text-muted-foreground" : "bg-secondary text-secondary-foreground"}`}>
                                     <p className="font-medium truncate">{session.title}</p>
-                                    <p className="text-[10px] opacity-75 truncate">{(session.courses as any)?.code}{(session as any).subjects && ` • ${(session as any).subjects.code}`}{session.venue_name && ` • ${session.venue_name}`}</p>
+                                    <p className="text-[10px] opacity-75 truncate">{(session.courses as any)?.code}{session.venue_name && ` • ${session.venue_name}`}</p>
                                   </div>
                                 ))}
                                 {daySessions.length === 0 && <p className="text-[10px] text-muted-foreground/50 text-center py-1">—</p>}
@@ -360,7 +360,6 @@ export default function Sessions() {
                         <p className="font-medium truncate">{session.title}</p>
                           <p className="text-[10px] opacity-75 truncate">
                             {(session.courses as any)?.code}
-                            {(session as any).subjects && ` • ${(session as any).subjects.code}`}
                             {session.venue_name && ` • ${session.venue_name}`}
                           </p>
                           {canEditSession(session) && (
@@ -399,7 +398,6 @@ export default function Sessions() {
                   <div>
                     <p className="text-xs text-muted-foreground">
                       {(session.courses as any)?.code}
-                      {(session as any).subjects && ` • ${(session as any).subjects.code} - ${(session as any).subjects.name}`}
                     </p>
                     <CardTitle className="text-base mt-1">{session.title}</CardTitle>
                     {isAdmin && lecturerProfiles[session.created_by] && (

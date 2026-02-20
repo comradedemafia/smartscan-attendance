@@ -40,7 +40,7 @@ export default function Attendance() {
       if (!records?.length) return [];
 
       const sessionIds = [...new Set(records.map((r) => r.session_id))];
-      const { data: sessions } = await supabase.from("sessions").select("id, title, session_date, course_id, subject_id").in("id", sessionIds);
+      const { data: sessions } = await supabase.from("sessions").select("id, title, session_date, course_id").in("id", sessionIds);
       const courseIds = [...new Set((sessions || []).map((s) => s.course_id))];
       const { data: courses } = await supabase.from("courses").select("id, name, code").in("id", courseIds);
 
@@ -73,16 +73,6 @@ export default function Attendance() {
     enabled: (isAdmin || role === "lecturer") && !!user,
   });
 
-  // Subjects
-  const { data: allSubjects = [] } = useQuery({
-    queryKey: ["attendance-subjects"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("subjects").select("id, name, code, course_id").order("name");
-      if (error) throw error;
-      return data;
-    },
-    enabled: isAdmin || role === "lecturer",
-  });
 
   // Sessions
   const { data: allSessions = [] } = useQuery({
@@ -90,7 +80,7 @@ export default function Attendance() {
     queryFn: async () => {
       const courseIds = allCourses.map((c) => c.id);
       if (!courseIds.length) return [];
-      const { data, error } = await supabase.from("sessions").select("id, title, session_date, course_id, subject_id, status, created_by").in("course_id", courseIds).order("session_date", { ascending: false });
+      const { data, error } = await supabase.from("sessions").select("id, title, session_date, course_id, status, created_by").in("course_id", courseIds).order("session_date", { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -123,18 +113,6 @@ export default function Attendance() {
     enabled: allCourses.length > 0,
   });
 
-  // Subject enrollments
-  const { data: subjectEnrollments = [] } = useQuery({
-    queryKey: ["attendance-subject-enrollments"],
-    queryFn: async () => {
-      const subjectIds = allSubjects.map((s) => s.id);
-      if (!subjectIds.length) return [];
-      const { data, error } = await supabase.from("subject_enrollments").select("subject_id, user_id").in("subject_id", subjectIds);
-      if (error) throw error;
-      return data;
-    },
-    enabled: allSubjects.length > 0,
-  });
 
   // Student profiles
   const { data: studentProfiles = {} } = useQuery({
@@ -179,43 +157,21 @@ export default function Attendance() {
     ? allCourses.filter((c) => c.department_id === selectedDeptId)
     : allCourses;
 
-  // Build attendance summary per course → subject → session
+  // Build attendance summary per course → session
   const buildAttendanceSummary = (courseId: string) => {
-    const subjects = allSubjects.filter((s) => s.course_id === courseId);
-    const courseSessions = allSessions.filter((s) => s.course_id === courseId);
-    const enrolledStudents = courseEnrollments.filter((e) => e.course_id === courseId).map((e) => e.user_id);
+    const courseSessions = allSessions.filter((s: any) => s.course_id === courseId);
+    const enrolledStudents = courseEnrollments.filter((e: any) => e.course_id === courseId).map((e: any) => e.user_id);
 
-    // Records indexed by session_id -> Set of user_ids
     const recordsBySession = new Map<string, Set<string>>();
-    allRecords.forEach((r) => {
+    allRecords.forEach((r: any) => {
       if (!recordsBySession.has(r.session_id)) recordsBySession.set(r.session_id, new Set());
       recordsBySession.get(r.session_id)!.add(r.user_id);
     });
 
-    if (subjects.length > 0) {
-      return subjects.map((subject) => {
-        const subSessions = courseSessions.filter((s) => s.subject_id === subject.id);
-        const subEnrolled = subjectEnrollments.filter((e) => e.subject_id === subject.id).map((e) => e.user_id);
-        const effectiveStudents = subEnrolled.length > 0 ? subEnrolled : enrolledStudents;
-
-        return {
-          subject,
-          sessions: subSessions,
-          students: effectiveStudents.map((userId) => {
-            const presentCount = subSessions.filter((s) => recordsBySession.get(s.id)?.has(userId)).length;
-            const absentCount = subSessions.length - presentCount;
-            return { userId, presentCount, absentCount, totalSessions: subSessions.length };
-          }),
-        };
-      });
-    }
-
-    // No subjects - show course-level
     return [{
-      subject: null,
       sessions: courseSessions,
-      students: enrolledStudents.map((userId) => {
-        const presentCount = courseSessions.filter((s) => recordsBySession.get(s.id)?.has(userId)).length;
+      students: enrolledStudents.map((userId: string) => {
+        const presentCount = courseSessions.filter((s: any) => recordsBySession.get(s.id)?.has(userId)).length;
         const absentCount = courseSessions.length - presentCount;
         return { userId, presentCount, absentCount, totalSessions: courseSessions.length };
       }),
@@ -301,23 +257,12 @@ export default function Attendance() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {summaries.map((summary, idx) => (
-                      <div key={summary.subject?.id || idx} className="space-y-2">
-                        {summary.subject && (
-                          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground border-b pb-1">
-                            <span className="font-mono">{summary.subject.code}</span>
-                            <span>{summary.subject.name}</span>
-                            <Badge variant="secondary" className="text-[10px]">
-                              {summary.sessions.length} {t("attendance.totalSessions")}
-                            </Badge>
-                          </div>
-                        )}
-                        {!summary.subject && (
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground border-b pb-1">
-                            <Badge variant="secondary" className="text-[10px]">
-                              {summary.sessions.length} {t("attendance.totalSessions")}
-                            </Badge>
-                          </div>
-                        )}
+                      <div key={idx} className="space-y-2">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground border-b pb-1">
+                          <Badge variant="secondary" className="text-[10px]">
+                            {summary.sessions.length} {t("attendance.totalSessions")}
+                          </Badge>
+                        </div>
 
                         {summary.students.length === 0 ? (
                           <p className="text-xs text-muted-foreground py-1">{t("reports.noData")}</p>
