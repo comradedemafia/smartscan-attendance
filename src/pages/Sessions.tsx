@@ -323,7 +323,7 @@ export default function Sessions() {
                                 {daySessions.map((session: any) => (
                                   <div key={session.id} className={`rounded-md p-1.5 text-xs ${session.status === "active" ? "bg-primary/15 text-primary border border-primary/30" : session.status === "completed" ? "bg-muted text-muted-foreground" : "bg-secondary text-secondary-foreground"}`}>
                                     <p className="font-medium truncate">{session.title}</p>
-                                    <p className="text-[10px] opacity-75 truncate">{(session.courses as any)?.code}{session.venue_name && ` • ${session.venue_name}`}</p>
+                                    <p className="text-[10px] opacity-75 truncate">{(session.courses as any)?.code}{(session as any).subjects && ` • ${(session as any).subjects.code}`}{session.venue_name && ` • ${session.venue_name}`}</p>
                                   </div>
                                 ))}
                                 {daySessions.length === 0 && <p className="text-[10px] text-muted-foreground/50 text-center py-1">—</p>}
@@ -359,9 +359,10 @@ export default function Sessions() {
                         } ${canEditSession(session) ? "cursor-pointer hover:opacity-80" : ""}`}
                           onClick={() => canEditSession(session) ? navigate(`/sessions/${session.id}/qr`) : null}
                         >
-                          <p className="font-medium truncate">{session.title}</p>
+                        <p className="font-medium truncate">{session.title}</p>
                           <p className="text-[10px] opacity-75 truncate">
                             {(session.courses as any)?.code}
+                            {(session as any).subjects && ` • ${(session as any).subjects.code}`}
                             {session.venue_name && ` • ${session.venue_name}`}
                           </p>
                           {canEditSession(session) && (
@@ -398,7 +399,10 @@ export default function Sessions() {
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-xs text-muted-foreground">{(session.courses as any)?.code}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {(session.courses as any)?.code}
+                      {(session as any).subjects && ` • ${(session as any).subjects.code} - ${(session as any).subjects.name}`}
+                    </p>
                     <CardTitle className="text-base mt-1">{session.title}</CardTitle>
                     {isAdmin && lecturerProfiles[session.created_by] && (
                       <p className="text-xs text-muted-foreground mt-0.5">👤 {lecturerProfiles[session.created_by]}</p>
