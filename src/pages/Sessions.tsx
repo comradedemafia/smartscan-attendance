@@ -241,27 +241,31 @@ export default function Sessions() {
                   </div>
                   <div className="space-y-2">
                     <Label>{t("sessions.course")}</Label>
-                    <Select value={courseId} onValueChange={(v) => { setCourseId(v); setSubjectId(""); }}>
-                      <SelectTrigger><SelectValue placeholder="Select course" /></SelectTrigger>
-                      <SelectContent>
-                        {courses.map((c: any) => (
-                          <SelectItem key={c.id} value={c.id}>{c.code} - {c.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <select
+                      value={courseId}
+                      onChange={(e) => { setCourseId(e.target.value); setSubjectId(""); }}
+                      className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      required
+                    >
+                      <option value="">Select course</option>
+                      {courses.map((c: any) => (
+                        <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
+                      ))}
+                    </select>
                   </div>
                   {courseId && subjects.length > 0 && (
                     <div className="space-y-2">
                       <Label>{t("subjects.subject")}</Label>
-                      <Select value={subjectId} onValueChange={setSubjectId}>
-                        <SelectTrigger><SelectValue placeholder={t("subjects.selectSubject")} /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="">— {t("subjects.selectSubject")} —</SelectItem>
-                          {subjects.map((s: any) => (
-                            <SelectItem key={s.id} value={s.id}>{s.code} - {s.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <select
+                      value={subjectId}
+                      onChange={(e) => setSubjectId(e.target.value)}
+                      className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                    >
+                      <option value="">— {t("subjects.selectSubject")} —</option>
+                      {subjects.map((s: any) => (
+                        <option key={s.id} value={s.id}>{s.code} - {s.name}</option>
+                      ))}
+                    </select>
                     </div>
                   )}
                   <div className="space-y-2">

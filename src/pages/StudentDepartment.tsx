@@ -154,7 +154,7 @@ export default function StudentDepartment() {
   }
 
   const lecturerSubjects = (lecturerId: string, courseId: string) =>
-    deptSubjects.filter((s: any) => s.course_id === courseId && s.created_by === lecturerId);
+    deptSubjects.filter((s: any) => s.course_id === courseId);
 
   const selectedLecturerData = deptLecturers.find((l) => l.lecturer_id === selectedLecturer);
 
