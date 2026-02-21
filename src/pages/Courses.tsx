@@ -53,11 +53,11 @@ export default function Courses() {
     queryFn: async () => {
       if (role === "lecturer") {
         const { data, error } = await supabase
-          .from("course_lecturers")
-          .select("course_id, courses(*, course_enrollments(count), departments(name, code))")
-          .eq("lecturer_id", user!.id);
+          .from("courses")
+          .select("*, course_enrollments(count), departments(name, code)")
+          .order("created_at", { ascending: false });
         if (error) throw error;
-        return (data || []).map((r: any) => r.courses).filter(Boolean);
+        return data;
       }
       if (role === "student") {
         // Students only see courses from their department
