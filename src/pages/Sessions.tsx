@@ -60,6 +60,7 @@ export default function Sessions() {
         const { data, error } = await supabase
           .from("courses")
           .select("id, code, name, department_id")
+          .eq("created_by", user!.id)
           .order("name");
         if (error) throw error;
         return data;
