@@ -58,11 +58,11 @@ export default function Sessions() {
     queryFn: async () => {
       if (role === "lecturer") {
         const { data, error } = await supabase
-          .from("course_lecturers")
-          .select("course_id, courses(id, code, name, department_id)")
-          .eq("lecturer_id", user!.id);
+          .from("courses")
+          .select("id, code, name, department_id")
+          .order("name");
         if (error) throw error;
-        return (data || []).map((r: any) => r.courses).filter(Boolean);
+        return data;
       }
       const { data, error } = await supabase.from("courses").select("id, code, name, department_id").order("name");
       if (error) throw error;
