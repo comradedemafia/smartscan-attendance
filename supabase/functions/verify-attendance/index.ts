@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
 
     const { data: session, error: sessionError } = await adminClient
       .from("sessions")
-      .select("id, qr_code_secret, qr_expires_at, status, course_id, subject_id")
+      .select("id, qr_code_secret, qr_expires_at, status, course_id")
       .eq("id", sessionId)
       .single();
 
@@ -112,17 +112,6 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (courseEnroll) enrolled = true;
-
-    if (!enrolled && session.subject_id) {
-      const { data: subjectEnroll } = await adminClient
-        .from("subject_enrollments")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("subject_id", session.subject_id)
-        .maybeSingle();
-
-      if (subjectEnroll) enrolled = true;
-    }
 
     if (!enrolled) {
       return new Response(JSON.stringify({ error: "Not enrolled" }), {
