@@ -111,26 +111,34 @@ export default function Attendance() {
 
   // ==================== LECTURER/ADMIN VIEW DATA ====================
   const { data: allCourses = [] } = useQuery({
-    queryKey: ["attendance-courses", role],
+    queryKey: ["attendance-courses", role, user?.id],
     queryFn: async () => {
-      let q = supabase.from("courses").select("id, name, code, department_id");
       if (role === "lecturer") {
-        const { data: assignments } = await supabase.from("course_lecturers").select("course_id").eq("lecturer_id", user!.id);
-        const courseIds = (assignments || []).map((a) => a.course_id);
+        // Get courses from course_lecturers AND courses created by lecturer
+        const [assignmentsRes, createdRes] = await Promise.all([
+          supabase.from("course_lecturers").select("course_id").eq("lecturer_id", user!.id),
+          supabase.from("courses").select("id").eq("created_by", user!.id),
+        ]);
+        const assignedIds = (assignmentsRes.data || []).map((a) => a.course_id);
+        const createdIds = (createdRes.data || []).map((c) => c.id);
+        const courseIds = [...new Set([...assignedIds, ...createdIds])];
         if (!courseIds.length) return [];
-        q = q.in("id", courseIds);
+        const { data, error } = await supabase.from("courses").select("id, name, code, department_id").in("id", courseIds).order("name");
+        if (error) throw error;
+        return data;
       }
-      const { data, error } = await q.order("name");
+      const { data, error } = await supabase.from("courses").select("id, name, code, department_id").order("name");
       if (error) throw error;
       return data;
     },
     enabled: (isAdmin || role === "lecturer") && !!user,
   });
 
+  const courseIds = allCourses.map((c) => c.id);
+
   const { data: allSessions = [] } = useQuery({
-    queryKey: ["attendance-sessions", role],
+    queryKey: ["attendance-sessions", courseIds],
     queryFn: async () => {
-      const courseIds = allCourses.map((c) => c.id);
       if (!courseIds.length) return [];
       const { data, error } = await supabase.from("sessions")
         .select("id, title, session_date, course_id, status, created_by, venue_name, duration_minutes")
@@ -139,31 +147,31 @@ export default function Attendance() {
       if (error) throw error;
       return data;
     },
-    enabled: allCourses.length > 0,
+    enabled: courseIds.length > 0,
   });
 
+  const sessionIds = allSessions.map((s) => s.id);
+
   const { data: allRecords = [] } = useQuery({
-    queryKey: ["attendance-records-all", allSessions.length],
+    queryKey: ["attendance-records-all", sessionIds],
     queryFn: async () => {
-      const sessionIds = allSessions.map((s) => s.id);
       if (!sessionIds.length) return [];
       const { data, error } = await supabase.from("attendance_records").select("id, session_id, user_id, status, scanned_at").in("session_id", sessionIds);
       if (error) throw error;
       return data;
     },
-    enabled: allSessions.length > 0,
+    enabled: sessionIds.length > 0,
   });
 
   const { data: courseEnrollments = [] } = useQuery({
-    queryKey: ["attendance-enrollments", allCourses.length],
+    queryKey: ["attendance-enrollments", courseIds],
     queryFn: async () => {
-      const courseIds = allCourses.map((c) => c.id);
       if (!courseIds.length) return [];
       const { data, error } = await supabase.from("course_enrollments").select("course_id, user_id").in("course_id", courseIds);
       if (error) throw error;
       return data;
     },
-    enabled: allCourses.length > 0,
+    enabled: courseIds.length > 0,
   });
 
   const { data: studentProfiles = {} } = useQuery({
