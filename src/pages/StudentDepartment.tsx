@@ -23,7 +23,7 @@ export default function StudentDepartment() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("department_id, academic_year, study_year, departments(id, name, code, description)")
+        .select("department_id, academic_year, study_year, departments(id, name, description)")
         .eq("id", user!.id)
         .maybeSingle();
       if (error) throw error;
@@ -121,7 +121,6 @@ export default function StudentDepartment() {
         <CardHeader>
           <div className="flex items-start justify-between flex-wrap gap-2">
             <div>
-              <Badge className="mb-2">{dept.code}</Badge>
               <CardTitle className="text-xl">{dept.name}</CardTitle>
               {dept.description && <p className="text-sm text-muted-foreground mt-1">{dept.description}</p>}
             </div>

@@ -55,7 +55,7 @@ export default function UsersAdmin() {
   const { data: departments = [] } = useQuery({
     queryKey: ["admin-departments-users"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("departments").select("id, name, code").order("name");
+      const { data, error } = await supabase.from("departments").select("id, name").order("name");
       if (error) throw error;
       return data;
     },
@@ -246,7 +246,7 @@ export default function UsersAdmin() {
           <SelectContent>
             <SelectItem value="all">{t("admin.allDepartments")}</SelectItem>
             {departments.map((d) => (
-              <SelectItem key={d.id} value={d.id}>{d.code} — {d.name}</SelectItem>
+              <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -273,8 +273,7 @@ export default function UsersAdmin() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Building2 className="h-5 w-5 text-primary" />
-                    <CardTitle className="text-base">{dept.name}</CardTitle>
-                    <Badge variant="secondary">{dept.code}</Badge>
+                     <CardTitle className="text-base">{dept.name}</CardTitle>
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline">{dept.totalStudents} {t("admin.totalStudents")}</Badge>

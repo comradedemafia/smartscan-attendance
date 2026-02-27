@@ -46,7 +46,7 @@ export default function Sessions() {
   const { data: departments = [] } = useQuery({
     queryKey: ["departments-for-sessions"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("departments").select("id, name, code").order("name");
+      const { data, error } = await supabase.from("departments").select("id, name").order("name");
       if (error) throw error;
       return data;
     },
@@ -204,7 +204,7 @@ export default function Sessions() {
               <SelectContent>
                 <SelectItem value="all">{t("admin.allDepartments")}</SelectItem>
                 {departments.map((d) => (
-                  <SelectItem key={d.id} value={d.id}>{d.code} — {d.name}</SelectItem>
+                  <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
