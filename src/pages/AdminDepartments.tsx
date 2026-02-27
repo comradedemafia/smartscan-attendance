@@ -12,9 +12,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Users, BookOpen, Plus, ChevronDown, ChevronRight, AlertCircle, Edit, Trash2, UserPlus } from "lucide-react";
+import { Building2, Users, BookOpen, Plus, ChevronDown, ChevronRight, AlertCircle, Edit, Trash2, UserPlus, GraduationCap } from "lucide-react";
 
 type Department = { id: string; name: string; description: string | null };
+type Level = { id: string; name: string; code: string; department_id: string; sort_order: number };
 type Lecturer = { lecturer_id: string; full_name: string; university_id: string; courses: { id: string; name: string; code: string }[] };
 
 export default function AdminDepartments() {
@@ -23,13 +24,13 @@ export default function AdminDepartments() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [expandedDept, setExpandedDept] = useState<string | null>(null);
+  const [expandedLevel, setExpandedLevel] = useState<string | null>(null);
   const [expandedLecturer, setExpandedLecturer] = useState<string | null>(null);
   
   // Department dialogs
   const [openDeptDialog, setOpenDeptDialog] = useState(false);
   const [editingDept, setEditingDept] = useState<Department | null>(null);
   const [deptName, setDeptName] = useState("");
-  
   const [deptDesc, setDeptDesc] = useState("");
   
   // Assign lecturer dialog
@@ -45,6 +46,7 @@ export default function AdminDepartments() {
   const [courseCode, setCourseCode] = useState("");
   const [courseDesc, setCourseDesc] = useState("");
   const [courseDeptId, setCourseDeptId] = useState("");
+  const [courseLevelId, setCourseLevelId] = useState("");
 
   // Register lecturer dialog
   const [openRegisterDialog, setOpenRegisterDialog] = useState(false);
@@ -65,7 +67,6 @@ export default function AdminDepartments() {
   // Delete lecturer
   const [deleteLecturerId, setDeleteLecturerId] = useState<string | null>(null);
 
-
   // Departments
   const { data: departments = [] } = useQuery<Department[]>({
     queryKey: ["departments"],
@@ -76,11 +77,21 @@ export default function AdminDepartments() {
     },
   });
 
+  // All levels
+  const { data: allLevels = [] } = useQuery<Level[]>({
+    queryKey: ["all-levels"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("levels").select("*").order("sort_order");
+      if (error) throw error;
+      return data as Level[];
+    },
+  });
+
   // All courses
   const { data: allCourses = [] } = useQuery({
     queryKey: ["all-courses-admin"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("courses").select("id, name, code, department_id, description").order("name");
+      const { data, error } = await supabase.from("courses").select("id, name, code, department_id, level_id, description").order("name");
       if (error) throw error;
       return data;
     },
@@ -119,7 +130,6 @@ export default function AdminDepartments() {
     enabled: !!expandedDept,
   });
 
-
   // Session stats
   const { data: sessionStats = {} } = useQuery({
     queryKey: ["session-stats-by-course"],
@@ -149,12 +159,22 @@ export default function AdminDepartments() {
         const { error } = await supabase.from("departments").update({ name: deptName, description: deptDesc || null } as any).eq("id", editingDept.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("departments").insert({ name: deptName, description: deptDesc || null } as any);
+        const { data: newDept, error } = await supabase.from("departments").insert({ name: deptName, description: deptDesc || null } as any).select("id").single();
         if (error) throw error;
+        // Auto-create the 3 levels for new semester
+        if (newDept) {
+          const { error: levelsError } = await supabase.from("levels").insert([
+            { department_id: newDept.id, name: "Basic Technician Certificate (NTA LEVEL 4)", code: "BTCCD", sort_order: 1 },
+            { department_id: newDept.id, name: "Technician Certificate (NTA LEVEL 5)", code: "TCCD", sort_order: 2 },
+            { department_id: newDept.id, name: "Ordinary Diploma (NTA LEVEL 6)", code: "ODCD", sort_order: 3 },
+          ] as any);
+          if (levelsError) console.error("Failed to create levels:", levelsError);
+        }
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["departments"] });
+      queryClient.invalidateQueries({ queryKey: ["all-levels"] });
       toast({ title: t("common.success"), description: editingDept ? t("dept.deptUpdated") : t("dept.deptCreated") });
       resetDeptForm();
     },
@@ -168,6 +188,7 @@ export default function AdminDepartments() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["departments"] });
+      queryClient.invalidateQueries({ queryKey: ["all-levels"] });
       toast({ title: t("common.success"), description: t("dept.deptDeleted") });
       if (expandedDept) setExpandedDept(null);
     },
@@ -177,10 +198,10 @@ export default function AdminDepartments() {
   const saveCourseMutation = useMutation({
     mutationFn: async () => {
       if (editingCourse) {
-        const { error } = await supabase.from("courses").update({ name: courseName, code: courseCode.toUpperCase(), description: courseDesc || null, department_id: courseDeptId || null }).eq("id", editingCourse.id);
+        const { error } = await supabase.from("courses").update({ name: courseName, code: courseCode.toUpperCase(), description: courseDesc || null, department_id: courseDeptId || null, level_id: courseLevelId || null }).eq("id", editingCourse.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("courses").insert({ name: courseName, code: courseCode.toUpperCase(), description: courseDesc || null, department_id: courseDeptId || null, created_by: user!.id });
+        const { error } = await supabase.from("courses").insert({ name: courseName, code: courseCode.toUpperCase(), description: courseDesc || null, department_id: courseDeptId || null, level_id: courseLevelId || null, created_by: user!.id });
         if (error) throw error;
       }
     },
@@ -299,13 +320,12 @@ export default function AdminDepartments() {
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
-
   // ─── Form helpers ───
   const resetDeptForm = () => { setOpenDeptDialog(false); setEditingDept(null); setDeptName(""); setDeptDesc(""); };
   const openEditDept = (dept: Department) => { setEditingDept(dept); setDeptName(dept.name); setDeptDesc(dept.description || ""); setOpenDeptDialog(true); };
-  const resetCourseForm = () => { setOpenCourseDialog(false); setEditingCourse(null); setCourseName(""); setCourseCode(""); setCourseDesc(""); setCourseDeptId(""); };
-  const openEditCourse = (course: any) => { setEditingCourse(course); setCourseName(course.name); setCourseCode(course.code); setCourseDesc(course.description || ""); setCourseDeptId(course.department_id || ""); setOpenCourseDialog(true); };
-  const openAddCourseForDept = (deptId: string) => { resetCourseForm(); setCourseDeptId(deptId); setOpenCourseDialog(true); };
+  const resetCourseForm = () => { setOpenCourseDialog(false); setEditingCourse(null); setCourseName(""); setCourseCode(""); setCourseDesc(""); setCourseDeptId(""); setCourseLevelId(""); };
+  const openEditCourse = (course: any) => { setEditingCourse(course); setCourseName(course.name); setCourseCode(course.code); setCourseDesc(course.description || ""); setCourseDeptId(course.department_id || ""); setCourseLevelId(course.level_id || ""); setOpenCourseDialog(true); };
+  const openAddCourseForLevel = (deptId: string, levelId: string) => { resetCourseForm(); setCourseDeptId(deptId); setCourseLevelId(levelId); setOpenCourseDialog(true); };
   const openAssignForDept = (deptId: string) => { setAssignDeptId(deptId); setAssignCourseId(""); setAssignLecturerId(""); setOpenAssignDialog(true); };
   const openRegisterForDept = (deptId: string) => { setRegDeptId(deptId); setRegName(""); setRegEmail(""); setRegUniId(""); setRegGender("M"); setRegPhone(""); setOpenRegisterDialog(true); };
   const openEditLecturer = (l: any) => {
@@ -318,11 +338,15 @@ export default function AdminDepartments() {
   };
 
   const deptCourses = (deptId: string) => allCourses.filter((c: any) => c.department_id === deptId);
+  const levelCourses = (levelId: string) => allCourses.filter((c: any) => c.level_id === levelId);
+  const deptLevels = (deptId: string) => allLevels.filter((l) => l.department_id === deptId);
   const assignFilteredCourses = assignDeptId ? deptCourses(assignDeptId) : allCourses;
-  // Filter lecturers: only show lecturers whose department matches the assign department
   const assignFilteredLecturers = assignDeptId
     ? allLecturers.filter((l: any) => l.department_id === assignDeptId)
     : allLecturers;
+
+  // Levels available for selected dept in course dialog
+  const courseDeptLevels = courseDeptId ? deptLevels(courseDeptId) : [];
 
   return (
     <div className="space-y-6">
@@ -360,11 +384,20 @@ export default function AdminDepartments() {
             <div className="space-y-2"><Label>{t("courses.description")}</Label><Input value={courseDesc} onChange={(e) => setCourseDesc(e.target.value)} placeholder="Optional" /></div>
             <div className="space-y-2">
               <Label>{t("auth.department")}</Label>
-              <Select value={courseDeptId} onValueChange={setCourseDeptId}>
+              <Select value={courseDeptId} onValueChange={(v) => { setCourseDeptId(v); setCourseLevelId(""); }}>
                 <SelectTrigger><SelectValue placeholder={t("auth.selectDepartment")} /></SelectTrigger>
                 <SelectContent>{departments.map((d) => (<SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>))}</SelectContent>
               </Select>
             </div>
+            {courseDeptLevels.length > 0 && (
+              <div className="space-y-2">
+                <Label>{t("dept.level")}</Label>
+                <Select value={courseLevelId} onValueChange={setCourseLevelId}>
+                  <SelectTrigger><SelectValue placeholder={t("dept.selectLevel")} /></SelectTrigger>
+                  <SelectContent>{courseDeptLevels.map((l) => (<SelectItem key={l.id} value={l.id}>{l.code} — {l.name}</SelectItem>))}</SelectContent>
+                </Select>
+              </div>
+            )}
             <Button className="w-full" onClick={() => saveCourseMutation.mutate()} disabled={!courseName || !courseCode || saveCourseMutation.isPending}>
               {editingCourse ? t("common.save") : t("dept.addCourse")}
             </Button>
@@ -397,7 +430,6 @@ export default function AdminDepartments() {
           </div>
         </DialogContent>
       </Dialog>
-
 
       {/* Register Lecturer Dialog */}
       <Dialog open={openRegisterDialog} onOpenChange={setOpenRegisterDialog}>
@@ -469,6 +501,7 @@ export default function AdminDepartments() {
       <div className="space-y-4">
         {departments.map((dept) => {
           const courses = deptCourses(dept.id);
+          const levels = deptLevels(dept.id);
           const isExpanded = expandedDept === dept.id;
           return (
             <Card key={dept.id} className={isExpanded ? "border-primary/40" : ""}>
@@ -483,6 +516,7 @@ export default function AdminDepartments() {
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="text-right text-xs text-muted-foreground mr-2">
+                      <div>{levels.length} {t("dept.levels")}</div>
                       <div>{courses.length} {t("dept.courses")}</div>
                     </div>
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); openEditDept(dept); }}>
@@ -497,41 +531,68 @@ export default function AdminDepartments() {
               </CardHeader>
 
               {isExpanded && (
-                <CardContent className="pt-0">
-                  {/* Courses in this department */}
-                  <div className="mb-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-                        <BookOpen className="h-3.5 w-3.5" />{t("dept.coursesInDept")}
-                      </h3>
-                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => openAddCourseForDept(dept.id)}>
-                        <Plus className="h-3 w-3 mr-1" />{t("dept.addCourse")}
-                      </Button>
-                    </div>
-                    {courses.length === 0 ? (
-                      <p className="text-xs text-muted-foreground py-2">{t("dept.noCourses")}</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {courses.map((c: any) => {
-                          const subjects: any[] = [];
-                          return (
-                            <div key={c.id} className="border rounded-md">
-                              <div className="flex items-center justify-between px-3 py-2">
+                <CardContent className="pt-0 space-y-4">
+                  {/* Levels in this semester */}
+                  {levels.length === 0 ? (
+                    <p className="text-xs text-muted-foreground py-2">{t("dept.noLevels")}</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {levels.map((level) => {
+                        const lvlCourses = levelCourses(level.id);
+                        const isLevelExpanded = expandedLevel === level.id;
+                        return (
+                          <div key={level.id} className="border rounded-lg overflow-hidden">
+                            <div
+                              className="flex items-center justify-between px-3 py-2.5 cursor-pointer hover:bg-muted/50"
+                              onClick={() => setExpandedLevel(isLevelExpanded ? null : level.id)}
+                            >
+                              <div className="flex items-center gap-2">
+                                <GraduationCap className="h-4 w-4 text-primary" />
                                 <div>
-                                  <span className="font-mono text-xs text-muted-foreground mr-2">{c.code}</span>
-                                  <span className="text-sm">{c.name}</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditCourse(c)}><Edit className="h-3 w-3" /></Button>
-                                  <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => deleteCourseMutation.mutate(c.id)}><Trash2 className="h-3 w-3" /></Button>
+                                  <span className="text-sm font-medium">{level.name}</span>
+                                  <Badge variant="outline" className="ml-2 text-xs">{level.code}</Badge>
                                 </div>
                               </div>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="secondary" className="text-xs">{lvlCourses.length} {t("dept.courses")}</Badge>
+                                {isLevelExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                              </div>
                             </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
+                            {isLevelExpanded && (
+                              <div className="px-3 pb-3 bg-muted/20">
+                                <div className="flex items-center justify-between mb-2 pt-2">
+                                  <h4 className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                                    <BookOpen className="h-3 w-3" />{t("dept.modulesInLevel")}
+                                  </h4>
+                                  <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => openAddCourseForLevel(dept.id, level.id)}>
+                                    <Plus className="h-3 w-3 mr-1" />{t("dept.addCourse")}
+                                  </Button>
+                                </div>
+                                {lvlCourses.length === 0 ? (
+                                  <p className="text-xs text-muted-foreground py-2">{t("dept.noCourses")}</p>
+                                ) : (
+                                  <div className="space-y-1">
+                                    {lvlCourses.map((c: any) => (
+                                      <div key={c.id} className="flex items-center justify-between px-2 py-1.5 rounded-md bg-background border">
+                                        <div>
+                                          <span className="font-mono text-xs text-muted-foreground mr-2">{c.code}</span>
+                                          <span className="text-sm">{c.name}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditCourse(c)}><Edit className="h-3 w-3" /></Button>
+                                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => deleteCourseMutation.mutate(c.id)}><Trash2 className="h-3 w-3" /></Button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
 
                   {/* Lecturers */}
                   <div className="flex items-center justify-between mb-2">

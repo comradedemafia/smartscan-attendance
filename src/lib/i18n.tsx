@@ -285,6 +285,11 @@ const translations = {
     "dept.lecturerUpdated": "Lecturer updated successfully",
     "dept.lecturerDeleted": "Lecturer deleted successfully",
     "dept.confirmDeleteLecturer": "Are you sure you want to delete this lecturer? All their data will be removed.",
+    "dept.levels": "Levels",
+    "dept.level": "Level",
+    "dept.selectLevel": "Select level",
+    "dept.modulesInLevel": "Modules in this level",
+    "dept.noLevels": "No levels found",
 
     // Subjects
     "subjects.title": "Subjects",
@@ -589,6 +594,11 @@ const translations = {
     "dept.lecturerUpdated": "Mhadhiri amebadilishwa",
     "dept.lecturerDeleted": "Mhadhiri amefutwa",
     "dept.confirmDeleteLecturer": "Una uhakika unataka kumfuta mhadhiri huyu? Data zake zote zitaondolewa.",
+    "dept.levels": "Level",
+    "dept.level": "Level",
+    "dept.selectLevel": "Chagua level",
+    "dept.modulesInLevel": "Moduli katika level hii",
+    "dept.noLevels": "Hakuna level zilizopatikana",
 
     // Subjects
     "subjects.title": "Masomo",
