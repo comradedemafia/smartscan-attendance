@@ -128,6 +128,7 @@ export type Database = {
           department_id: string | null
           description: string | null
           id: string
+          level_id: string | null
           name: string
           updated_at: string
         }
@@ -138,6 +139,7 @@ export type Database = {
           department_id?: string | null
           description?: string | null
           id?: string
+          level_id?: string | null
           name: string
           updated_at?: string
         }
@@ -148,6 +150,7 @@ export type Database = {
           department_id?: string | null
           description?: string | null
           id?: string
+          level_id?: string | null
           name?: string
           updated_at?: string
         }
@@ -157,6 +160,13 @@ export type Database = {
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "courses_level_id_fkey"
+            columns: ["level_id"]
+            isOneToOne: false
+            referencedRelation: "levels"
             referencedColumns: ["id"]
           },
         ]
@@ -184,6 +194,44 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      levels: {
+        Row: {
+          code: string
+          created_at: string
+          department_id: string
+          id: string
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          department_id: string
+          id?: string
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          department_id?: string
+          id?: string
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "levels_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notifications: {
         Row: {

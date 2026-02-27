@@ -11,8 +11,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { BookOpen, Plus, Trash2, Edit, Users, LogIn, LogOut, UserCog, Building2, ChevronDown, ChevronRight } from "lucide-react";
+import { BookOpen, Plus, Trash2, Edit, Users, LogIn, LogOut, UserCog, Building2, ChevronDown, ChevronRight, GraduationCap } from "lucide-react";
+
+type Level = { id: string; name: string; code: string; department_id: string; sort_order: number };
 
 export default function Courses() {
   const { user, role } = useAuth();
@@ -26,14 +29,15 @@ export default function Courses() {
   const [courseName, setCourseName] = useState("");
   const [courseDesc, setCourseDesc] = useState("");
   const [courseDeptId, setCourseDeptId] = useState("");
+  const [courseLevelId, setCourseLevelId] = useState("");
   const [expandedDept, setExpandedDept] = useState<string | null>(null);
+  const [expandedLevel, setExpandedLevel] = useState<string | null>(null);
 
   const isAdmin = role === "admin";
   const isLecturer = role === "lecturer";
   const isStudent = role === "student";
   const canCreate = isAdmin || isLecturer;
 
-  // Fetch lecturer's own department
   const { data: lecturerProfile } = useQuery({
     queryKey: ["lecturer-profile-dept", user?.id],
     queryFn: async () => {
@@ -54,18 +58,17 @@ export default function Courses() {
       if (role === "lecturer") {
         const { data, error } = await supabase
           .from("courses")
-           .select("*, course_enrollments(count), departments(name)")
+          .select("*, course_enrollments(count), departments(name)")
           .order("created_at", { ascending: false });
         if (error) throw error;
         return data;
       }
       if (role === "student") {
-        // Students only see courses from their department
         const { data: prof } = await supabase.from("profiles").select("department_id").eq("id", user!.id).maybeSingle();
         if (prof?.department_id) {
           const { data, error } = await supabase
             .from("courses")
-             .select("*, course_enrollments(count), departments(name)")
+            .select("*, course_enrollments(count), departments(name)")
             .eq("department_id", prof.department_id)
             .order("created_at", { ascending: false });
           if (error) throw error;
@@ -90,7 +93,17 @@ export default function Courses() {
       if (error) throw error;
       return data;
     },
-    enabled: canCreate,
+    enabled: canCreate || isAdmin,
+  });
+
+  const { data: allLevels = [] } = useQuery<Level[]>({
+    queryKey: ["all-levels-courses"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("levels").select("*").order("sort_order");
+      if (error) throw error;
+      return data as Level[];
+    },
+    enabled: isAdmin || canCreate,
   });
 
   const { data: myEnrollments = [] } = useQuery({
@@ -137,10 +150,10 @@ export default function Courses() {
         name: courseName,
         description: courseDesc || null,
         department_id: deptId,
+        level_id: courseLevelId || null,
         created_by: user!.id,
       }).select("id").single();
       if (error) throw error;
-      // If lecturer creates course, auto-assign themselves
       if (isLecturer && newCourse) {
         await supabase.from("course_lecturers").insert({
           course_id: newCourse.id,
@@ -164,6 +177,7 @@ export default function Courses() {
         name: courseName,
         description: courseDesc || null,
         department_id: courseDeptId || null,
+        level_id: courseLevelId || null,
       }).eq("id", editingCourse.id);
       if (error) throw error;
     },
@@ -194,6 +208,7 @@ export default function Courses() {
     setCourseName("");
     setCourseDesc("");
     setCourseDeptId("");
+    setCourseLevelId("");
   };
 
   const openEditCourse = (course: any) => {
@@ -202,6 +217,7 @@ export default function Courses() {
     setCourseName(course.name);
     setCourseDesc(course.description || "");
     setCourseDeptId(course.department_id || "");
+    setCourseLevelId(course.level_id || "");
     setOpen(true);
   };
 
@@ -211,11 +227,8 @@ export default function Courses() {
     editingCourse ? updateCourseMutation.mutate() : createCourseMutation.mutate();
   };
 
-  const coursesByDept = isAdmin ? departments.map((dept) => ({
-    ...dept,
-    courses: courses.filter((c: any) => c.department_id === dept.id),
-  })) : [];
-  const unassignedCourses = isAdmin ? courses.filter((c: any) => !c.department_id) : [];
+  const deptLevels = (deptId: string) => allLevels.filter((l) => l.department_id === deptId);
+  const courseDeptLevels = courseDeptId ? deptLevels(courseDeptId) : [];
 
   const renderCourseCard = (course: any) => (
     <Card key={course.id} className="relative group">
@@ -267,6 +280,115 @@ export default function Courses() {
     </Card>
   );
 
+  // Admin view: Semester -> Level -> Modules
+  const renderAdminView = () => {
+    const coursesByDept = departments.map((dept) => ({
+      ...dept,
+      courses: courses.filter((c: any) => c.department_id === dept.id),
+      levels: deptLevels(dept.id),
+    }));
+    const unassignedCourses = courses.filter((c: any) => !c.department_id);
+
+    return (
+      <div className="space-y-4">
+        {coursesByDept.map((dept) => {
+          const isExpanded = expandedDept === dept.id;
+          return (
+            <Card key={dept.id}>
+              <CardHeader className="cursor-pointer pb-3" onClick={() => setExpandedDept(isExpanded ? null : dept.id)}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="h-5 w-5 text-primary" />
+                    <CardTitle className="text-base">{dept.name}</CardTitle>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">{dept.levels.length} {t("dept.levels")}</Badge>
+                    <Badge variant="outline">{dept.courses.length} {t("dept.courses")}</Badge>
+                    {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  </div>
+                </div>
+              </CardHeader>
+              {isExpanded && (
+                <CardContent className="pt-0 space-y-3">
+                  {dept.levels.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">{t("dept.noLevels")}</p>
+                  ) : (
+                    dept.levels.map((level) => {
+                      const lvlCourses = courses.filter((c: any) => c.level_id === level.id);
+                      const isLvlExpanded = expandedLevel === level.id;
+                      return (
+                        <div key={level.id} className="border rounded-lg overflow-hidden">
+                          <div
+                            className="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-muted/50"
+                            onClick={() => setExpandedLevel(isLvlExpanded ? null : level.id)}
+                          >
+                            <div className="flex items-center gap-2">
+                              <GraduationCap className="h-4 w-4 text-primary" />
+                              <span className="text-sm font-medium">{level.name}</span>
+                              <Badge variant="outline" className="text-xs">{level.code}</Badge>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary" className="text-xs">{lvlCourses.length} {t("dept.courses")}</Badge>
+                              {isLvlExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                            </div>
+                          </div>
+                          {isLvlExpanded && (
+                            <div className="px-3 pb-3 bg-muted/20">
+                              {lvlCourses.length === 0 ? (
+                                <p className="text-sm text-muted-foreground py-2">{t("courses.empty")}</p>
+                              ) : (
+                                <div className="grid gap-4 sm:grid-cols-2 pt-2">
+                                  {lvlCourses.map((course: any) => renderCourseCard(course))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                  {/* Courses without level in this dept */}
+                  {(() => {
+                    const noLevelCourses = dept.courses.filter((c: any) => !c.level_id);
+                    if (noLevelCourses.length === 0) return null;
+                    return (
+                      <div className="pt-2">
+                        <p className="text-xs text-muted-foreground mb-2">{t("dept.unassignedCourses")}</p>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          {noLevelCourses.map((course: any) => renderCourseCard(course))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </CardContent>
+              )}
+            </Card>
+          );
+        })}
+        {unassignedCourses.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base text-muted-foreground">{t("dept.unassignedCourses")}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {unassignedCourses.map((course: any) => renderCourseCard(course))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        {courses.length === 0 && (
+          <Card>
+            <CardContent className="py-8 text-center">
+              <BookOpen className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
+              <p className="text-muted-foreground">{t("courses.empty")}</p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -291,17 +413,28 @@ export default function Courses() {
                 </div>
                 <div className="space-y-2">
                   <Label>{t("auth.department")}</Label>
-                  <select
-                    value={courseDeptId}
-                    onChange={(e) => setCourseDeptId(e.target.value)}
-                    className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                  >
-                    <option value="">{t("auth.selectDepartment")}</option>
-                    {departments.map((d) => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                  </select>
+                  <Select value={courseDeptId} onValueChange={(v) => { setCourseDeptId(v); setCourseLevelId(""); }}>
+                    <SelectTrigger><SelectValue placeholder={t("auth.selectDepartment")} /></SelectTrigger>
+                    <SelectContent>
+                      {departments.map((d) => (
+                        <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
+                {courseDeptLevels.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>{t("dept.level")}</Label>
+                    <Select value={courseLevelId} onValueChange={setCourseLevelId}>
+                      <SelectTrigger><SelectValue placeholder={t("dept.selectLevel")} /></SelectTrigger>
+                      <SelectContent>
+                        {courseDeptLevels.map((l) => (
+                          <SelectItem key={l.id} value={l.id}>{l.code} — {l.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label>{t("courses.description")}</Label>
                   <Textarea value={courseDesc} onChange={(e) => setCourseDesc(e.target.value)} placeholder="Optional description" />
@@ -318,58 +451,7 @@ export default function Courses() {
       {isLoading ? (
         <p className="text-muted-foreground">{t("common.loading")}</p>
       ) : isAdmin ? (
-        <div className="space-y-4">
-          {coursesByDept.map((dept) => {
-            const isExpanded = expandedDept === dept.id;
-            return (
-              <Card key={dept.id}>
-                <CardHeader className="cursor-pointer pb-3" onClick={() => setExpandedDept(isExpanded ? null : dept.id)}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Building2 className="h-5 w-5 text-primary" />
-                       <CardTitle className="text-base">{dept.name}</CardTitle>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline">{dept.courses.length} {t("dept.courses")}</Badge>
-                      {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                    </div>
-                  </div>
-                </CardHeader>
-                {isExpanded && (
-                  <CardContent className="pt-0">
-                    {dept.courses.length === 0 ? (
-                      <p className="text-muted-foreground text-sm">{t("courses.empty")}</p>
-                    ) : (
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        {dept.courses.map((course: any) => renderCourseCard(course))}
-                      </div>
-                    )}
-                  </CardContent>
-                )}
-              </Card>
-            );
-          })}
-          {unassignedCourses.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base text-muted-foreground">{t("dept.unassignedCourses")}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {unassignedCourses.map((course: any) => renderCourseCard(course))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-          {courses.length === 0 && (
-            <Card>
-              <CardContent className="py-8 text-center">
-                <BookOpen className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
-                <p className="text-muted-foreground">{t("courses.empty")}</p>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+        renderAdminView()
       ) : courses.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center">
