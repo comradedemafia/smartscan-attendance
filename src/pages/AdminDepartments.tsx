@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Building2, Users, BookOpen, Plus, ChevronDown, ChevronRight, AlertCircle, Edit, Trash2, UserPlus } from "lucide-react";
 
-type Department = { id: string; name: string; code: string; description: string | null };
+type Department = { id: string; name: string; description: string | null };
 type Lecturer = { lecturer_id: string; full_name: string; university_id: string; courses: { id: string; name: string; code: string }[] };
 
 export default function AdminDepartments() {
@@ -29,7 +29,7 @@ export default function AdminDepartments() {
   const [openDeptDialog, setOpenDeptDialog] = useState(false);
   const [editingDept, setEditingDept] = useState<Department | null>(null);
   const [deptName, setDeptName] = useState("");
-  const [deptCode, setDeptCode] = useState("");
+  
   const [deptDesc, setDeptDesc] = useState("");
   
   // Assign lecturer dialog
@@ -146,10 +146,10 @@ export default function AdminDepartments() {
   const saveDeptMutation = useMutation({
     mutationFn: async () => {
       if (editingDept) {
-        const { error } = await supabase.from("departments").update({ name: deptName, code: deptCode.toUpperCase(), description: deptDesc || null }).eq("id", editingDept.id);
+        const { error } = await supabase.from("departments").update({ name: deptName, description: deptDesc || null } as any).eq("id", editingDept.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("departments").insert({ name: deptName, code: deptCode.toUpperCase(), description: deptDesc || null });
+        const { error } = await supabase.from("departments").insert({ name: deptName, description: deptDesc || null } as any);
         if (error) throw error;
       }
     },
@@ -301,8 +301,8 @@ export default function AdminDepartments() {
 
 
   // ─── Form helpers ───
-  const resetDeptForm = () => { setOpenDeptDialog(false); setEditingDept(null); setDeptName(""); setDeptCode(""); setDeptDesc(""); };
-  const openEditDept = (dept: Department) => { setEditingDept(dept); setDeptName(dept.name); setDeptCode(dept.code); setDeptDesc(dept.description || ""); setOpenDeptDialog(true); };
+  const resetDeptForm = () => { setOpenDeptDialog(false); setEditingDept(null); setDeptName(""); setDeptDesc(""); };
+  const openEditDept = (dept: Department) => { setEditingDept(dept); setDeptName(dept.name); setDeptDesc(dept.description || ""); setOpenDeptDialog(true); };
   const resetCourseForm = () => { setOpenCourseDialog(false); setEditingCourse(null); setCourseName(""); setCourseCode(""); setCourseDesc(""); setCourseDeptId(""); };
   const openEditCourse = (course: any) => { setEditingCourse(course); setCourseName(course.name); setCourseCode(course.code); setCourseDesc(course.description || ""); setCourseDeptId(course.department_id || ""); setOpenCourseDialog(true); };
   const openAddCourseForDept = (deptId: string) => { resetCourseForm(); setCourseDeptId(deptId); setOpenCourseDialog(true); };
@@ -334,16 +334,15 @@ export default function AdminDepartments() {
         <div className="flex gap-2">
           <Dialog open={openDeptDialog} onOpenChange={(o) => { if (!o) resetDeptForm(); setOpenDeptDialog(o); }}>
             <DialogTrigger asChild>
-              <Button><Plus className="h-4 w-4 mr-2" />{t("dept.addDepartment")}</Button>
+              <Button><Plus className="h-4 w-4 mr-2" />{t("dept.addSemester")}</Button>
             </DialogTrigger>
             <DialogContent>
-              <DialogHeader><DialogTitle>{editingDept ? t("dept.editDepartment") : t("dept.addDepartment")}</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle>{editingDept ? t("dept.editSemester") : t("dept.addSemester")}</DialogTitle></DialogHeader>
               <div className="space-y-4">
-                <div className="space-y-2"><Label>{t("dept.deptName")}</Label><Input value={deptName} onChange={(e) => setDeptName(e.target.value)} placeholder="Computer Science" /></div>
-                <div className="space-y-2"><Label>{t("dept.deptCode")}</Label><Input value={deptCode} onChange={(e) => setDeptCode(e.target.value)} placeholder="CS" /></div>
+                <div className="space-y-2"><Label>{t("dept.deptName")}</Label><Input value={deptName} onChange={(e) => setDeptName(e.target.value)} placeholder="Semester 1" /></div>
                 <div className="space-y-2"><Label>{t("courses.description")}</Label><Input value={deptDesc} onChange={(e) => setDeptDesc(e.target.value)} placeholder="Optional description" /></div>
-                <Button className="w-full" onClick={() => saveDeptMutation.mutate()} disabled={!deptName || !deptCode || saveDeptMutation.isPending}>
-                  {editingDept ? t("common.save") : t("dept.addDepartment")}
+                <Button className="w-full" onClick={() => saveDeptMutation.mutate()} disabled={!deptName || saveDeptMutation.isPending}>
+                  {editingDept ? t("common.save") : t("dept.addSemester")}
                 </Button>
               </div>
             </DialogContent>
@@ -363,7 +362,7 @@ export default function AdminDepartments() {
               <Label>{t("auth.department")}</Label>
               <Select value={courseDeptId} onValueChange={setCourseDeptId}>
                 <SelectTrigger><SelectValue placeholder={t("auth.selectDepartment")} /></SelectTrigger>
-                <SelectContent>{departments.map((d) => (<SelectItem key={d.id} value={d.id}>{d.code} — {d.name}</SelectItem>))}</SelectContent>
+                <SelectContent>{departments.map((d) => (<SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>))}</SelectContent>
               </Select>
             </div>
             <Button className="w-full" onClick={() => saveCourseMutation.mutate()} disabled={!courseName || !courseCode || saveCourseMutation.isPending}>
@@ -478,10 +477,7 @@ export default function AdminDepartments() {
                   <div className="flex items-center gap-3 cursor-pointer flex-1" onClick={() => setExpandedDept(isExpanded ? null : dept.id)}>
                     <Building2 className="h-5 w-5 text-primary" />
                     <div>
-                      <div className="flex items-center gap-2">
-                        <CardTitle className="text-base">{dept.name}</CardTitle>
-                        <Badge variant="secondary">{dept.code}</Badge>
-                      </div>
+                      <CardTitle className="text-base">{dept.name}</CardTitle>
                       {dept.description && <p className="text-xs text-muted-foreground mt-0.5">{dept.description}</p>}
                     </div>
                   </div>

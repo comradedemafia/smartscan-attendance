@@ -28,7 +28,7 @@ const signupSchema = loginSchema.extend({
   studyYear: z.coerce.number().min(1).max(6).optional(),
 });
 
-type Department = { id: string; name: string; code: string };
+type Department = { id: string; name: string };
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
@@ -53,7 +53,7 @@ export default function Auth() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    supabase.from("departments").select("id, name, code").order("name").then(({ data }) => {
+    supabase.from("departments").select("id, name").order("name").then(({ data }) => {
       if (data) setDepartments(data);
     });
   }, []);
@@ -252,7 +252,7 @@ export default function Auth() {
                       <SelectTrigger><SelectValue placeholder={t("auth.selectDepartment")} /></SelectTrigger>
                       <SelectContent>
                         {departments.map((d) => (
-                          <SelectItem key={d.id} value={d.id}>{d.name} ({d.code})</SelectItem>
+                          <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>

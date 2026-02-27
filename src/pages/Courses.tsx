@@ -54,7 +54,7 @@ export default function Courses() {
       if (role === "lecturer") {
         const { data, error } = await supabase
           .from("courses")
-          .select("*, course_enrollments(count), departments(name, code)")
+           .select("*, course_enrollments(count), departments(name)")
           .order("created_at", { ascending: false });
         if (error) throw error;
         return data;
@@ -65,7 +65,7 @@ export default function Courses() {
         if (prof?.department_id) {
           const { data, error } = await supabase
             .from("courses")
-            .select("*, course_enrollments(count), departments(name, code)")
+             .select("*, course_enrollments(count), departments(name)")
             .eq("department_id", prof.department_id)
             .order("created_at", { ascending: false });
           if (error) throw error;
@@ -75,7 +75,7 @@ export default function Courses() {
       }
       const { data, error } = await supabase
         .from("courses")
-        .select("*, course_enrollments(count), departments(name, code)")
+        .select("*, course_enrollments(count), departments(name)")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
@@ -86,7 +86,7 @@ export default function Courses() {
   const { data: departments = [] } = useQuery({
     queryKey: ["departments-for-courses"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("departments").select("id, name, code").order("name");
+      const { data, error } = await supabase.from("departments").select("id, name").order("name");
       if (error) throw error;
       return data;
     },
@@ -298,7 +298,7 @@ export default function Courses() {
                   >
                     <option value="">{t("auth.selectDepartment")}</option>
                     {departments.map((d) => (
-                      <option key={d.id} value={d.id}>{d.code} — {d.name}</option>
+                      <option key={d.id} value={d.id}>{d.name}</option>
                     ))}
                   </select>
                 </div>
@@ -327,8 +327,7 @@ export default function Courses() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Building2 className="h-5 w-5 text-primary" />
-                      <CardTitle className="text-base">{dept.name}</CardTitle>
-                      <Badge variant="secondary">{dept.code}</Badge>
+                       <CardTitle className="text-base">{dept.name}</CardTitle>
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant="outline">{dept.courses.length} {t("dept.courses")}</Badge>

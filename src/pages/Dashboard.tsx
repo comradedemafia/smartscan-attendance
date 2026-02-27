@@ -44,7 +44,7 @@ export default function Dashboard() {
     queryKey: ["user-department", userProfile?.department_id],
     queryFn: async () => {
       if (!userProfile?.department_id) return null;
-      const { data } = await supabase.from("departments").select("name, code").eq("id", userProfile.department_id).single();
+      const { data } = await supabase.from("departments").select("name").eq("id", userProfile.department_id).single();
       return data;
     },
     enabled: !!userProfile?.department_id && role !== "admin",
@@ -53,7 +53,7 @@ export default function Dashboard() {
   const { data: departments = [] } = useQuery({
     queryKey: ["departments-for-dashboard"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("departments").select("id, name, code").order("name");
+      const { data, error } = await supabase.from("departments").select("id, name").order("name");
       if (error) throw error;
       return data;
     },
@@ -66,7 +66,7 @@ export default function Dashboard() {
       if (role === "lecturer") {
         const { data, error } = await supabase
           .from("course_lecturers")
-          .select("course_id, courses(id, code, name, description, created_by, department_id, departments(name, code))")
+          .select("course_id, courses(id, code, name, description, created_by, department_id, departments(name))")
           .eq("lecturer_id", user!.id);
         if (error) throw error;
         return (data || []).map((r: any) => r.courses).filter(Boolean);
@@ -171,7 +171,7 @@ export default function Dashboard() {
           {role !== "admin" && userDepartment && (
             <Badge variant="outline" className="flex items-center gap-1">
               <Building2 className="h-3 w-3" />
-              {userDepartment.name} ({userDepartment.code})
+              {userDepartment.name}
             </Badge>
           )}
         </div>
@@ -223,7 +223,7 @@ export default function Dashboard() {
                       >
                         <option value="">{userProfile?.department_id ? "My Department (default)" : t("auth.selectDepartment")}</option>
                         {departments.map((d) => (
-                          <option key={d.id} value={d.id}>{d.code} — {d.name}</option>
+                          <option key={d.id} value={d.id}>{d.name}</option>
                         ))}
                       </select>
                     </div>

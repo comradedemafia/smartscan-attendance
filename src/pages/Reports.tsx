@@ -26,7 +26,7 @@ export default function Reports() {
     queryKey: ["report-departments"],
     enabled: !!user && role === "admin",
     queryFn: async () => {
-      const { data, error } = await supabase.from("departments").select("id, name, code").order("name");
+      const { data, error } = await supabase.from("departments").select("id, name").order("name");
       if (error) throw error;
       return data || [];
     },
@@ -298,7 +298,7 @@ export default function Reports() {
             </SelectTrigger>
             <SelectContent>
               {departments.map((d) => (
-                <SelectItem key={d.id} value={d.id}>{d.code} — {d.name}</SelectItem>
+                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>

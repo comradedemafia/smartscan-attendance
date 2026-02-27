@@ -21,7 +21,7 @@ export default function Attendance() {
   const { data: departments = [] } = useQuery({
     queryKey: ["departments-for-attendance"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("departments").select("id, name, code").order("name");
+      const { data, error } = await supabase.from("departments").select("id, name").order("name");
       if (error) throw error;
       return data;
     },
@@ -258,7 +258,7 @@ export default function Attendance() {
             <SelectContent>
               <SelectItem value="all">{t("admin.allDepartments")}</SelectItem>
               {departments.map((d) => (
-                <SelectItem key={d.id} value={d.id}>{d.code} — {d.name}</SelectItem>
+                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -353,7 +353,7 @@ export default function Attendance() {
                         <span>{course.code} — {course.name}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        {dept && <Badge variant="outline"><Building2 className="h-3 w-3 mr-1" />{dept.code}</Badge>}
+                        {dept && <Badge variant="outline"><Building2 className="h-3 w-3 mr-1" />{dept.name}</Badge>}
                         <Badge variant="secondary">{sessionHistory.length} sessions</Badge>
                       </div>
                     </CardTitle>
