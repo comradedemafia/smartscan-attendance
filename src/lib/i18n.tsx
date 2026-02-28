@@ -234,6 +234,8 @@ const translations = {
     // Auth extra
     "auth.department": "Department",
     "auth.selectDepartment": "Select your department",
+    "auth.programme": "Level / Programme",
+    "auth.selectProgramme": "Select your programme",
     "auth.academicYear": "Academic Year",
     "auth.studyYear": "Year of Study",
     "auth.year": "Year",
@@ -543,6 +545,8 @@ const translations = {
     // Auth extra
     "auth.department": "Idara",
     "auth.selectDepartment": "Chagua idara yako",
+    "auth.programme": "Ngazi / Programu",
+    "auth.selectProgramme": "Chagua programu yako",
     "auth.academicYear": "Mwaka wa Masomo",
     "auth.studyYear": "Mwaka wa Chuo",
     "auth.year": "Mwaka",

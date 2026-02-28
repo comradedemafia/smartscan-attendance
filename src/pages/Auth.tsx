@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,13 +22,17 @@ const signupSchema = loginSchema.extend({
   fullName: z.string().min(2, "Full name is required"),
   role: z.enum(["student", "lecturer"]),
   gender: z.enum(["M", "F"], { required_error: "Gender is required" }),
-  departmentId: z.string().min(1, "Department is required"),
+  programme: z.string().min(1, "Programme is required"),
   phone: z.string().regex(/^\+255\d{9}$/, "Phone must be in format +255XXXXXXXXX"),
   academicYear: z.string().min(4, "Academic year is required"),
   studyYear: z.coerce.number().min(1).max(6).optional(),
 });
 
-type Department = { id: string; name: string };
+const PROGRAMMES = [
+  { value: "BTCCD", label: "Basic Technician Certificate (NTA LEVEL 4)" },
+  { value: "TCCD", label: "Technician Certificate (NTA LEVEL 5)" },
+  { value: "ODCD", label: "Ordinary Diploma (NTA LEVEL 6)" },
+];
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
@@ -39,11 +43,10 @@ export default function Auth() {
   const [fullName, setFullName] = useState("");
   const [role, setRole] = useState<"student" | "lecturer">("student");
   const [gender, setGender] = useState<"M" | "F">("M");
-  const [departmentId, setDepartmentId] = useState("");
+  const [programme, setProgramme] = useState("");
   const [phone, setPhone] = useState("+255");
   const [academicYear, setAcademicYear] = useState("2024/2025");
   const [studyYear, setStudyYear] = useState("1");
-  const [departments, setDepartments] = useState<Department[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -51,12 +54,6 @@ export default function Auth() {
   const { t } = useI18n();
   const { toast } = useToast();
   const navigate = useNavigate();
-
-  useEffect(() => {
-    supabase.from("departments").select("id, name").order("name").then(({ data }) => {
-      if (data) setDepartments(data);
-    });
-  }, []);
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,7 +105,7 @@ export default function Auth() {
       } else {
         const parsed = signupSchema.safeParse({
           email, password, universityId, fullName, role, gender,
-          departmentId, phone, academicYear,
+          programme, phone, academicYear,
           studyYear: role === "student" ? studyYear : undefined,
         });
         if (!parsed.success) {
@@ -126,7 +123,7 @@ export default function Auth() {
           full_name: fullName,
           role,
           gender,
-          department_id: departmentId,
+          programme,
           phone,
           academic_year: academicYear,
           study_year: role === "student" ? parseInt(studyYear) : undefined,
@@ -245,18 +242,18 @@ export default function Auth() {
                     {errors.gender && <p className="text-sm text-destructive">{errors.gender}</p>}
                   </div>
 
-                  {/* Department */}
+                  {/* Level / Programme */}
                   <div className="space-y-2">
-                    <Label>{t("auth.department")}</Label>
-                    <Select value={departmentId} onValueChange={setDepartmentId}>
-                      <SelectTrigger><SelectValue placeholder={t("auth.selectDepartment")} /></SelectTrigger>
+                    <Label>{t("auth.programme")}</Label>
+                    <Select value={programme} onValueChange={setProgramme}>
+                      <SelectTrigger><SelectValue placeholder={t("auth.selectProgramme")} /></SelectTrigger>
                       <SelectContent>
-                        {departments.map((d) => (
-                          <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                        {PROGRAMMES.map((p) => (
+                          <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                    {errors.departmentId && <p className="text-sm text-destructive">{errors.departmentId}</p>}
+                    {errors.programme && <p className="text-sm text-destructive">{errors.programme}</p>}
                   </div>
 
                   {/* Academic Year */}

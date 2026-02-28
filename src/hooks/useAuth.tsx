@@ -20,6 +20,7 @@ interface AuthContextType {
       role: string;
       gender?: string;
       department_id?: string;
+      programme?: string;
       phone?: string;
       academic_year?: string;
       study_year?: number;
@@ -93,6 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       role: string;
       gender?: string;
       department_id?: string;
+      programme?: string;
       phone?: string;
       academic_year?: string;
       study_year?: number;
