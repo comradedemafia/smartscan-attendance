@@ -6,10 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Users, Search, UserCheck, UserX, BookOpen, Plus, Trash2, Building2, ChevronDown, ChevronRight } from "lucide-react";
+import { Users, Search, UserCheck, UserX, BookOpen, Plus, Trash2, Building2, ChevronDown, ChevronRight, GraduationCap } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -28,6 +29,7 @@ export default function UsersAdmin() {
   const [deleteStudentId, setDeleteStudentId] = useState<string | null>(null);
   const [expandedDept, setExpandedDept] = useState<string | null>(null);
   const [expandedCourse, setExpandedCourse] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>("students");
 
   const { data: profiles = [], isLoading } = useQuery({
     queryKey: ["admin-profiles"],
@@ -65,7 +67,17 @@ export default function UsersAdmin() {
   const { data: courses = [] } = useQuery({
     queryKey: ["admin-courses-list"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("courses").select("id, name, code, department_id");
+      const { data, error } = await supabase.from("courses").select("id, name, code, department_id, level_id");
+      if (error) throw error;
+      return data;
+    },
+    enabled: role === "admin",
+  });
+
+  const { data: levels = [] } = useQuery({
+    queryKey: ["admin-levels-list"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("levels").select("id, name, code, sort_order, department_id").order("sort_order");
       if (error) throw error;
       return data;
     },
@@ -76,6 +88,18 @@ export default function UsersAdmin() {
     queryKey: ["admin-enrollments"],
     queryFn: async () => {
       const { data, error } = await supabase.from("course_enrollments").select("id, user_id, course_id");
+      if (error) throw error;
+      return data;
+    },
+    enabled: role === "admin",
+  });
+
+  const { data: courseLecturers = [] } = useQuery({
+    queryKey: ["admin-course-lecturers"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("course_lecturers")
+        .select("id, course_id, lecturer_id");
       if (error) throw error;
       return data;
     },
@@ -141,6 +165,14 @@ export default function UsersAdmin() {
   });
 
   const students = profiles.filter((p) => roleMap[p.id] === "student");
+  const lecturers = profiles.filter((p) => roleMap[p.id] === "lecturer");
+
+  // Build lecturer → courses map
+  const lecturerCoursesMap: Record<string, string[]> = {};
+  courseLecturers.forEach((cl) => {
+    if (!lecturerCoursesMap[cl.lecturer_id]) lecturerCoursesMap[cl.lecturer_id] = [];
+    lecturerCoursesMap[cl.lecturer_id].push(cl.course_id);
+  });
 
   // Filter courses by selected department
   const filteredCourseOptions = filterDept === "all" ? courses : courses.filter((c: any) => c.department_id === filterDept);
@@ -187,266 +219,403 @@ export default function UsersAdmin() {
     };
   });
 
+  // Get level name for a course
+  const getLevelForCourse = (courseId: string) => {
+    const course = courses.find(c => c.id === courseId);
+    if (!course?.level_id) return null;
+    return levels.find(l => l.id === course.level_id);
+  };
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold tracking-tight font-['Space_Grotesk']">{t("nav.users")}</h1>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-6 text-center">
-            <Users className="h-6 w-6 mx-auto mb-2 text-primary" />
-            <p className="text-2xl font-bold">{filtered.length}</p>
-            <p className="text-xs text-muted-foreground">{t("admin.totalStudents")}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6 text-center">
-            <UserCheck className="h-6 w-6 mx-auto mb-2 text-primary" />
-            <p className="text-2xl font-bold">{maleCount}</p>
-            <p className="text-xs text-muted-foreground">{t("auth.male")}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6 text-center">
-            <UserX className="h-6 w-6 mx-auto mb-2 text-primary" />
-            <p className="text-2xl font-bold">{femaleCount}</p>
-            <p className="text-xs text-muted-foreground">{t("auth.female")}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6 text-center">
-            <BookOpen className="h-6 w-6 mx-auto mb-2 text-primary" />
-            <p className="text-2xl font-bold">{courses.length}</p>
-            <p className="text-xs text-muted-foreground">{t("dashboard.totalCourses")}</p>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Tabs: Students vs Lecturers */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="students" className="gap-1">
+            <Users className="h-4 w-4" />
+            {t("admin.students")}
+          </TabsTrigger>
+          <TabsTrigger value="lecturers" className="gap-1">
+            <GraduationCap className="h-4 w-4" />
+            {t("admin.lecturers")}
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-9" placeholder={t("common.search")} value={search} onChange={(e) => setSearch(e.target.value)} />
-        </div>
-        <Select value={filterGender} onValueChange={setFilterGender}>
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder={t("auth.gender")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("admin.allGenders")}</SelectItem>
-            <SelectItem value="M">{t("auth.male")}</SelectItem>
-            <SelectItem value="F">{t("auth.female")}</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={filterDept} onValueChange={(v) => { setFilterDept(v); setFilterCourse("all"); }}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder={t("auth.department")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("admin.allDepartments")}</SelectItem>
-            {departments.map((d) => (
-              <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={filterCourse} onValueChange={setFilterCourse}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder={t("admin.filterByCourse")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("admin.allCourses")}</SelectItem>
-            {filteredCourseOptions.map((c: any) => (
-              <SelectItem key={c.id} value={c.id}>{c.code} — {c.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Department → Course → Students grouped view */}
-      <div className="space-y-3">
-        {deptGroupedView.map((dept) => {
-          const isDeptExpanded = expandedDept === dept.id;
-          return (
-            <Card key={dept.id} className={isDeptExpanded ? "border-primary/40" : ""}>
-              <CardHeader className="pb-2 cursor-pointer" onClick={() => setExpandedDept(isDeptExpanded ? null : dept.id)}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Building2 className="h-5 w-5 text-primary" />
-                     <CardTitle className="text-base">{dept.name}</CardTitle>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline">{dept.totalStudents} {t("admin.totalStudents")}</Badge>
-                    <Badge variant="outline">{dept.courses.length} {t("dept.courses")}</Badge>
-                    {isDeptExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                  </div>
-                </div>
-              </CardHeader>
-              {isDeptExpanded && (
-                <CardContent className="pt-0 space-y-2">
-                  {dept.courses.map((course: any) => {
-                    const isCourseExpanded = expandedCourse === course.id;
-                    return (
-                      <div key={course.id} className="border rounded-lg">
-                        <div className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50" onClick={() => setExpandedCourse(isCourseExpanded ? null : course.id)}>
-                          <div className="flex items-center gap-2">
-                            <BookOpen className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-mono text-xs text-muted-foreground">{course.code}</span>
-                            <span className="text-sm font-medium">{course.name}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="text-xs">{course.students.length} {t("courses.students")}</Badge>
-                            {isCourseExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                          </div>
-                        </div>
-                        {isCourseExpanded && (
-                          <div className="px-3 pb-3">
-                            {course.students.length === 0 ? (
-                              <p className="text-xs text-muted-foreground text-center py-2">{t("reports.noData")}</p>
-                            ) : (
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead className="w-10">#</TableHead>
-                                    <TableHead>{t("reports.studentName")}</TableHead>
-                                    <TableHead>{t("reports.universityId")}</TableHead>
-                                    <TableHead>{t("auth.gender")}</TableHead>
-                                    <TableHead className="w-20">{t("common.actions")}</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {course.students.map((s: any, i: number) => (
-                                    <TableRow key={s.id}>
-                                      <TableCell className="text-muted-foreground text-xs">{i + 1}</TableCell>
-                                      <TableCell className="text-sm font-medium">{s.full_name}</TableCell>
-                                      <TableCell className="text-sm">{s.university_id}</TableCell>
-                                      <TableCell>
-                                        <Badge variant={s.gender === "M" ? "default" : "secondary"} className="text-xs">
-                                          {s.gender === "M" ? t("auth.male") : t("auth.female")}
-                                        </Badge>
-                                      </TableCell>
-                                      <TableCell>
-                                        <div className="flex items-center gap-1">
-                                          <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="h-7 text-xs gap-1"
-                                            onClick={(e) => { e.stopPropagation(); openEnrollDialog(s); }}
-                                          >
-                                            <BookOpen className="h-3 w-3" />
-                                          </Button>
-                                          <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                            onClick={(e) => { e.stopPropagation(); setDeleteStudentId(s.id); }}
-                                          >
-                                            <Trash2 className="h-3.5 w-3.5" />
-                                          </Button>
-                                        </div>
-                                      </TableCell>
-                                    </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                  {dept.courses.length === 0 && (
-                    <p className="text-xs text-muted-foreground text-center py-2">{t("dept.noCourses")}</p>
-                  )}
-                </CardContent>
-              )}
+      {/* ══════ STUDENTS TAB ══════ */}
+      {activeTab === "students" && (
+        <>
+          {/* Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="pt-6 text-center">
+                <Users className="h-6 w-6 mx-auto mb-2 text-primary" />
+                <p className="text-2xl font-bold">{filtered.length}</p>
+                <p className="text-xs text-muted-foreground">{t("admin.totalStudents")}</p>
+              </CardContent>
             </Card>
-          );
-        })}
-      </div>
+            <Card>
+              <CardContent className="pt-6 text-center">
+                <UserCheck className="h-6 w-6 mx-auto mb-2 text-primary" />
+                <p className="text-2xl font-bold">{maleCount}</p>
+                <p className="text-xs text-muted-foreground">{t("auth.male")}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6 text-center">
+                <UserX className="h-6 w-6 mx-auto mb-2 text-primary" />
+                <p className="text-2xl font-bold">{femaleCount}</p>
+                <p className="text-xs text-muted-foreground">{t("auth.female")}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6 text-center">
+                <BookOpen className="h-6 w-6 mx-auto mb-2 text-primary" />
+                <p className="text-2xl font-bold">{courses.length}</p>
+                <p className="text-xs text-muted-foreground">{t("dashboard.totalCourses")}</p>
+              </CardContent>
+            </Card>
+          </div>
 
-      {/* Full student table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            {t("admin.studentList")} ({filtered.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <p className="text-muted-foreground">{t("common.loading")}</p>
-          ) : filtered.length === 0 ? (
-            <p className="text-muted-foreground text-center py-4">{t("reports.noData")}</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>#</TableHead>
-                    <TableHead>{t("reports.studentName")}</TableHead>
-                    <TableHead>{t("reports.universityId")}</TableHead>
-                    <TableHead>{t("auth.email")}</TableHead>
-                    <TableHead>{t("auth.gender")}</TableHead>
-                    <TableHead>{t("admin.enrolledCourses")}</TableHead>
-                    <TableHead className="w-28">{t("common.actions")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.map((p, i) => {
-                    const studentCourses = courses.filter((c) => enrollmentsByCourse[c.id]?.has(p.id));
-                    return (
-                      <TableRow key={p.id}>
-                        <TableCell className="text-muted-foreground">{i + 1}</TableCell>
-                        <TableCell className="font-medium">{p.full_name}</TableCell>
-                        <TableCell>{p.university_id}</TableCell>
-                        <TableCell className="text-muted-foreground">{p.email || "—"}</TableCell>
-                        <TableCell>
-                          <Badge variant={p.gender === "M" ? "default" : p.gender === "F" ? "secondary" : "outline"}>
-                            {p.gender === "M" ? t("auth.male") : p.gender === "F" ? t("auth.female") : "—"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            {studentCourses.length === 0 ? (
-                              <span className="text-muted-foreground text-xs">—</span>
-                            ) : (
-                              studentCourses.map((c) => (
-                                <Badge key={c.id} variant="outline" className="text-xs">{c.code}</Badge>
-                              ))
+          {/* Filters */}
+          <div className="flex flex-wrap gap-3">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input className="pl-9" placeholder={t("common.search")} value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+            <Select value={filterGender} onValueChange={setFilterGender}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder={t("auth.gender")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("admin.allGenders")}</SelectItem>
+                <SelectItem value="M">{t("auth.male")}</SelectItem>
+                <SelectItem value="F">{t("auth.female")}</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filterDept} onValueChange={(v) => { setFilterDept(v); setFilterCourse("all"); }}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder={t("auth.department")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("admin.allDepartments")}</SelectItem>
+                {departments.map((d) => (
+                  <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={filterCourse} onValueChange={setFilterCourse}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder={t("admin.filterByCourse")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("admin.allCourses")}</SelectItem>
+                {filteredCourseOptions.map((c: any) => (
+                  <SelectItem key={c.id} value={c.id}>{c.code} — {c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Department → Course → Students grouped view */}
+          <div className="space-y-3">
+            {deptGroupedView.map((dept) => {
+              const isDeptExpanded = expandedDept === dept.id;
+              return (
+                <Card key={dept.id} className={isDeptExpanded ? "border-primary/40" : ""}>
+                  <CardHeader className="pb-2 cursor-pointer" onClick={() => setExpandedDept(isDeptExpanded ? null : dept.id)}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-5 w-5 text-primary" />
+                         <CardTitle className="text-base">{dept.name}</CardTitle>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">{dept.totalStudents} {t("admin.totalStudents")}</Badge>
+                        <Badge variant="outline">{dept.courses.length} {t("dept.courses")}</Badge>
+                        {isDeptExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      </div>
+                    </div>
+                  </CardHeader>
+                  {isDeptExpanded && (
+                    <CardContent className="pt-0 space-y-2">
+                      {dept.courses.map((course: any) => {
+                        const isCourseExpanded = expandedCourse === course.id;
+                        return (
+                          <div key={course.id} className="border rounded-lg">
+                            <div className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50" onClick={() => setExpandedCourse(isCourseExpanded ? null : course.id)}>
+                              <div className="flex items-center gap-2">
+                                <BookOpen className="h-4 w-4 text-muted-foreground" />
+                                <span className="font-mono text-xs text-muted-foreground">{course.code}</span>
+                                <span className="text-sm font-medium">{course.name}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-xs">{course.students.length} {t("courses.students")}</Badge>
+                                {isCourseExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                              </div>
+                            </div>
+                            {isCourseExpanded && (
+                              <div className="px-3 pb-3">
+                                {course.students.length === 0 ? (
+                                  <p className="text-xs text-muted-foreground text-center py-2">{t("reports.noData")}</p>
+                                ) : (
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead className="w-10">#</TableHead>
+                                        <TableHead>{t("reports.studentName")}</TableHead>
+                                        <TableHead>{t("reports.universityId")}</TableHead>
+                                        <TableHead>{t("auth.gender")}</TableHead>
+                                        <TableHead className="w-20">{t("common.actions")}</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {course.students.map((s: any, i: number) => (
+                                        <TableRow key={s.id}>
+                                          <TableCell className="text-muted-foreground text-xs">{i + 1}</TableCell>
+                                          <TableCell className="text-sm font-medium">{s.full_name}</TableCell>
+                                          <TableCell className="text-sm">{s.university_id}</TableCell>
+                                          <TableCell>
+                                            <Badge variant={s.gender === "M" ? "default" : "secondary"} className="text-xs">
+                                              {s.gender === "M" ? t("auth.male") : t("auth.female")}
+                                            </Badge>
+                                          </TableCell>
+                                          <TableCell>
+                                            <div className="flex items-center gap-1">
+                                              <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="h-7 text-xs gap-1"
+                                                onClick={(e) => { e.stopPropagation(); openEnrollDialog(s); }}
+                                              >
+                                                <BookOpen className="h-3 w-3" />
+                                              </Button>
+                                              <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                onClick={(e) => { e.stopPropagation(); setDeleteStudentId(s.id); }}
+                                              >
+                                                <Trash2 className="h-3.5 w-3.5" />
+                                              </Button>
+                                            </div>
+                                          </TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                )}
+                              </div>
                             )}
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="gap-1 text-xs h-7"
-                              onClick={() => openEnrollDialog(p)}
-                            >
-                              <BookOpen className="h-3.5 w-3.5" />
-                              {t("admin.manageCourses")}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                              onClick={() => setDeleteStudentId(p.id)}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </TableCell>
+                        );
+                      })}
+                      {dept.courses.length === 0 && (
+                        <p className="text-xs text-muted-foreground text-center py-2">{t("dept.noCourses")}</p>
+                      )}
+                    </CardContent>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Full student table */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                {t("admin.studentList")} ({filtered.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <p className="text-muted-foreground">{t("common.loading")}</p>
+              ) : filtered.length === 0 ? (
+                <p className="text-muted-foreground text-center py-4">{t("reports.noData")}</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>#</TableHead>
+                        <TableHead>{t("reports.studentName")}</TableHead>
+                        <TableHead>{t("reports.universityId")}</TableHead>
+                        <TableHead>{t("auth.email")}</TableHead>
+                        <TableHead>{t("auth.gender")}</TableHead>
+                        <TableHead>{t("admin.enrolledCourses")}</TableHead>
+                        <TableHead className="w-28">{t("common.actions")}</TableHead>
                       </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                    </TableHeader>
+                    <TableBody>
+                      {filtered.map((p, i) => {
+                        const studentCourses = courses.filter((c) => enrollmentsByCourse[c.id]?.has(p.id));
+                        return (
+                          <TableRow key={p.id}>
+                            <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                            <TableCell className="font-medium">{p.full_name}</TableCell>
+                            <TableCell>{p.university_id}</TableCell>
+                            <TableCell className="text-muted-foreground">{p.email || "—"}</TableCell>
+                            <TableCell>
+                              <Badge variant={p.gender === "M" ? "default" : p.gender === "F" ? "secondary" : "outline"}>
+                                {p.gender === "M" ? t("auth.male") : p.gender === "F" ? t("auth.female") : "—"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-1">
+                                {studentCourses.length === 0 ? (
+                                  <span className="text-muted-foreground text-xs">—</span>
+                                ) : (
+                                  studentCourses.map((c) => (
+                                    <Badge key={c.id} variant="outline" className="text-xs">{c.code}</Badge>
+                                  ))
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="gap-1 text-xs h-7"
+                                  onClick={() => openEnrollDialog(p)}
+                                >
+                                  <BookOpen className="h-3.5 w-3.5" />
+                                  {t("admin.manageCourses")}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={() => setDeleteStudentId(p.id)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      {/* ══════ LECTURERS TAB ══════ */}
+      {activeTab === "lecturers" && (
+        <>
+          {/* Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <Card>
+              <CardContent className="pt-6 text-center">
+                <GraduationCap className="h-6 w-6 mx-auto mb-2 text-primary" />
+                <p className="text-2xl font-bold">{lecturers.length}</p>
+                <p className="text-xs text-muted-foreground">{t("admin.totalLecturers")}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6 text-center">
+                <BookOpen className="h-6 w-6 mx-auto mb-2 text-primary" />
+                <p className="text-2xl font-bold">{courses.length}</p>
+                <p className="text-xs text-muted-foreground">{t("dashboard.totalCourses")}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6 text-center">
+                <Building2 className="h-6 w-6 mx-auto mb-2 text-primary" />
+                <p className="text-2xl font-bold">{levels.length}</p>
+                <p className="text-xs text-muted-foreground">{t("dept.levels")}</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Lecturer list */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <GraduationCap className="h-5 w-5" />
+                {t("admin.lecturerList")} ({lecturers.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {lecturers.length === 0 ? (
+                <p className="text-muted-foreground text-center py-4">{t("reports.noData")}</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>#</TableHead>
+                        <TableHead>{t("reports.studentName")}</TableHead>
+                        <TableHead>{t("reports.universityId")}</TableHead>
+                        <TableHead>{t("auth.email")}</TableHead>
+                        <TableHead>{t("auth.gender")}</TableHead>
+                        <TableHead>{t("admin.lecturerLevel")}</TableHead>
+                        <TableHead>{t("admin.lecturerModules")}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {lecturers.map((lec, i) => {
+                        const lecCourseIds = lecturerCoursesMap[lec.id] || [];
+                        const lecCourses = courses.filter(c => lecCourseIds.includes(c.id));
+                        // Get unique levels for this lecturer's courses
+                        const lecLevelIds = [...new Set(lecCourses.map(c => c.level_id).filter(Boolean))];
+                        const lecLevels = levels.filter(l => lecLevelIds.includes(l.id));
+
+                        return (
+                          <TableRow key={lec.id}>
+                            <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                            <TableCell className="font-medium">{lec.full_name}</TableCell>
+                            <TableCell>{lec.university_id}</TableCell>
+                            <TableCell className="text-muted-foreground">{lec.email || "—"}</TableCell>
+                            <TableCell>
+                              <Badge variant={lec.gender === "M" ? "default" : lec.gender === "F" ? "secondary" : "outline"} className="text-xs">
+                                {lec.gender === "M" ? t("auth.male") : lec.gender === "F" ? t("auth.female") : "—"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-1">
+                                {lecLevels.length === 0 ? (
+                                  <span className="text-muted-foreground text-xs">—</span>
+                                ) : (
+                                  lecLevels.map(l => (
+                                    <Badge key={l.id} variant="outline" className="text-xs">
+                                      <GraduationCap className="h-3 w-3 mr-1" />
+                                      {l.code}
+                                    </Badge>
+                                  ))
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-1">
+                                {lecCourses.length === 0 ? (
+                                  <span className="text-muted-foreground text-xs">—</span>
+                                ) : (
+                                  lecCourses.map(c => (
+                                    <Badge key={c.id} variant="secondary" className="text-xs">
+                                      {c.code}
+                                    </Badge>
+                                  ))
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
 
       {/* Manage Enrollments Dialog */}
       <Dialog open={enrollDialogOpen} onOpenChange={setEnrollDialogOpen}>
