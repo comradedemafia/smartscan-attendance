@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, Users, CalendarCheck, Percent, FileDown, User, Building2, BookOpen } from "lucide-react";
+import { BarChart3, Users, CalendarCheck, Percent, FileDown, User, Building2, BookOpen, GraduationCap } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -19,7 +19,9 @@ export default function Reports() {
   const [selectedCourse, setSelectedCourse] = useState<string>("");
   const [selectedStudent, setSelectedStudent] = useState<string>("");
   const [selectedDepartment, setSelectedDepartment] = useState<string>("");
-  const [activeTab, setActiveTab] = useState(role === "admin" ? "department" : "course");
+  const [selectedLevel, setSelectedLevel] = useState<string>("");
+  const [selectedLevelModule, setSelectedLevelModule] = useState<string>("");
+  const [activeTab, setActiveTab] = useState(role === "admin" ? "department" : "level");
 
   // Departments (admin only)
   const { data: departments = [] } = useQuery({
@@ -36,13 +38,27 @@ export default function Reports() {
     queryKey: ["report-courses", user?.id, role],
     enabled: !!user && (role === "lecturer" || role === "admin"),
     queryFn: async () => {
-      let q = supabase.from("courses").select("id, name, code, created_by, department_id");
+      let q = supabase.from("courses").select("id, name, code, created_by, department_id, level_id");
       if (role === "lecturer") q = q.eq("created_by", user!.id);
       const { data, error } = await q;
       if (error) throw error;
       return data || [];
     },
   });
+
+  // Levels
+  const { data: levels = [] } = useQuery({
+    queryKey: ["report-levels"],
+    enabled: !!user && (role === "admin" || role === "lecturer"),
+    queryFn: async () => {
+      const { data, error } = await supabase.from("levels").select("id, name, code, sort_order, department_id").order("sort_order");
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Modules filtered by selected level
+  const levelModules = (courses || []).filter((c: any) => c.level_id === selectedLevel);
 
   // Department report
   const { data: deptReport, isLoading: deptLoading } = useQuery({
@@ -281,8 +297,9 @@ export default function Reports() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="no-print">
-        <TabsList>
+        <TabsList className="flex-wrap">
           {role === "admin" && <TabsTrigger value="department">{t("reports.byDepartment")}</TabsTrigger>}
+          <TabsTrigger value="level">{t("reports.byLevel")}</TabsTrigger>
           <TabsTrigger value="course">{t("reports.byCourse")}</TabsTrigger>
           <TabsTrigger value="student">{t("reports.individualReport")}</TabsTrigger>
           <TabsTrigger value="all">{t("reports.exportAll")}</TabsTrigger>
@@ -416,6 +433,91 @@ export default function Reports() {
                 </CardContent>
               </Card>
             </>
+          )}
+        </>
+      )}
+
+      {/* ── Level/Programme Report Tab ── */}
+      {activeTab === "level" && (
+        <>
+          <div className="flex flex-wrap gap-3">
+            <Select value={selectedLevel} onValueChange={(v) => { setSelectedLevel(v); setSelectedLevelModule(""); }}>
+              <SelectTrigger className="w-full max-w-xs no-print">
+                <SelectValue placeholder={t("reports.selectLevel")} />
+              </SelectTrigger>
+              <SelectContent>
+                {levels.map((l) => (
+                  <SelectItem key={l.id} value={l.id}>
+                    <span className="flex items-center gap-2">
+                      <GraduationCap className="h-4 w-4" />
+                      {l.name}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {selectedLevel && levelModules.length > 0 && (
+              <Select value={selectedLevelModule} onValueChange={setSelectedLevelModule}>
+                <SelectTrigger className="w-full max-w-xs no-print">
+                  <SelectValue placeholder={t("reports.selectModule")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all-modules">{t("reports.levelModules")}</SelectItem>
+                  {levelModules.map((c: any) => (
+                    <SelectItem key={c.id} value={c.id}>{c.code} — {c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          {selectedLevel && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <GraduationCap className="h-5 w-5" />
+                  {t("reports.levelModules")} — {levels.find(l => l.id === selectedLevel)?.name}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {levelModules.length === 0 ? (
+                  <p className="text-muted-foreground">{t("reports.noData")}</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>{t("courses.code")}</TableHead>
+                          <TableHead>{t("courses.name")}</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {levelModules.map((c: any) => (
+                          <TableRow
+                            key={c.id}
+                            className={selectedLevelModule === c.id ? "bg-primary/5" : "cursor-pointer hover:bg-muted/50"}
+                            onClick={() => setSelectedLevelModule(c.id)}
+                          >
+                            <TableCell className="font-mono text-sm">{c.code}</TableCell>
+                            <TableCell className="font-medium">{c.name}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {selectedLevelModule && selectedLevelModule !== "all-modules" && (
+            <p className="text-sm text-muted-foreground">
+              {t("reports.byCourse")}: {levelModules.find((c: any) => c.id === selectedLevelModule)?.name} —{" "}
+              <Button variant="link" className="h-auto p-0 ml-1" onClick={() => { setActiveTab("course"); setSelectedCourse(selectedLevelModule); }}>
+                {t("reports.courseReport")} →
+              </Button>
+            </p>
           )}
         </>
       )}

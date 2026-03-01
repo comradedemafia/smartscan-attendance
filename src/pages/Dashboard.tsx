@@ -3,12 +3,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { useI18n } from "@/lib/i18n";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { BookOpen, Calendar, Users, TrendingUp, Clock, Building2, Plus } from "lucide-react";
+import { BookOpen, Calendar, Users, TrendingUp, Clock, Building2, Plus, GraduationCap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -29,6 +30,7 @@ export default function Dashboard() {
   const [courseName, setCourseName] = useState("");
   const [courseDesc, setCourseDesc] = useState("");
   const [courseDeptId, setCourseDeptId] = useState("");
+  const [filterLevel, setFilterLevel] = useState<string>("all");
 
   // Fetch user's department
   const { data: userProfile } = useQuery({
@@ -66,7 +68,7 @@ export default function Dashboard() {
       if (role === "lecturer") {
         const { data, error } = await supabase
           .from("course_lecturers")
-          .select("course_id, courses(id, code, name, description, created_by, department_id, departments(name))")
+          .select("course_id, courses(id, code, name, description, created_by, department_id, level_id, departments(name))")
           .eq("lecturer_id", user!.id);
         if (error) throw error;
         return (data || []).map((r: any) => r.courses).filter(Boolean);
@@ -74,16 +76,27 @@ export default function Dashboard() {
       if (role === "student") {
         const { data, error } = await supabase
           .from("course_enrollments")
-          .select("course_id, courses(id, code, name, description)")
+          .select("course_id, courses(id, code, name, description, level_id)")
           .eq("user_id", user!.id);
         if (error) throw error;
         return (data || []).map((r: any) => r.courses).filter(Boolean);
       }
-      const { data, error } = await supabase.from("courses").select("*");
+      const { data, error } = await supabase.from("courses").select("*, departments(name)");
       if (error) throw error;
       return data;
     },
     enabled: !!user,
+  });
+
+  // Levels for filtering
+  const { data: allLevels = [] } = useQuery({
+    queryKey: ["dashboard-levels"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("levels").select("id, name, code, sort_order").order("sort_order");
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user && (role === "admin" || role === "lecturer"),
   });
 
   const { data: sessions = [] } = useQuery({
@@ -160,6 +173,11 @@ export default function Dashboard() {
   const sessionCountByCourse = (courseId: string) =>
     sessions.filter((s) => s.course_id === courseId).length;
 
+  // Filter courses by level
+  const filteredCourses = filterLevel === "all"
+    ? courses
+    : courses.filter((c: any) => c.level_id === filterLevel);
+
   return (
     <div className="space-y-6">
       <div>
@@ -193,9 +211,27 @@ export default function Dashboard() {
 
       {/* Courses with Create button for lecturer */}
       <div>
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <h2 className="text-lg font-semibold">{t("nav.courses")}</h2>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {(role === "admin" || role === "lecturer") && allLevels.length > 0 && (
+              <Select value={filterLevel} onValueChange={setFilterLevel}>
+                <SelectTrigger className="w-[220px] h-8 text-xs">
+                  <SelectValue placeholder={t("reports.selectLevel")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("admin.allCourses")}</SelectItem>
+                  {allLevels.map((l) => (
+                    <SelectItem key={l.id} value={l.id}>
+                      <span className="flex items-center gap-1">
+                        <GraduationCap className="h-3 w-3" />
+                        {l.name}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             {isLecturer && (
               <Dialog open={open} onOpenChange={setOpen}>
                 <DialogTrigger asChild>
@@ -243,7 +279,7 @@ export default function Dashboard() {
             </Link>
           </div>
         </div>
-        {courses.length === 0 ? (
+        {filteredCourses.length === 0 ? (
           <Card>
             <CardContent className="py-6">
               <p className="text-muted-foreground text-sm text-center">{t("courses.empty")}</p>
@@ -251,7 +287,7 @@ export default function Dashboard() {
           </Card>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {courses.map((course: any) => (
+            {filteredCourses.map((course: any) => (
               <Card key={course.id} className="hover:shadow-md transition-shadow">
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
@@ -265,6 +301,15 @@ export default function Dashboard() {
                       {course.departments.name}
                     </p>
                   )}
+                  {course.level_id && (() => {
+                    const level = allLevels.find(l => l.id === course.level_id);
+                    return level ? (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <GraduationCap className="h-3 w-3" />
+                        {level.code}
+                      </p>
+                    ) : null;
+                  })()}
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {course.description && (

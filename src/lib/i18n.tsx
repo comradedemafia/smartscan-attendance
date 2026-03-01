@@ -169,6 +169,10 @@ const translations = {
     "reports.deptCourses": "Department Modules",
     "reports.deptLecturers": "Department Lecturers",
     "reports.deptStudents": "Department Students",
+    "reports.byLevel": "By Level/Programme",
+    "reports.selectLevel": "Select a level/programme",
+    "reports.selectModule": "Select a module",
+    "reports.levelModules": "Modules in Level",
 
     // Admin
     "admin.totalStudents": "Total Students",
@@ -191,6 +195,14 @@ const translations = {
     "admin.deleteStudent": "Delete Student",
     "admin.studentDeleted": "Student deleted successfully",
     "admin.confirmDeleteStudent": "Are you sure you want to delete this student? All their data will be removed.",
+    "admin.lecturers": "Lecturers",
+    "admin.lecturerList": "Lecturer List",
+    "admin.totalLecturers": "Total Lecturers",
+    "admin.lecturerModules": "Modules Teaching",
+    "admin.lecturerLevel": "Level/Programme",
+    "admin.students": "Students",
+    "admin.viewStudents": "View Students",
+    "admin.viewLecturers": "View Lecturers",
 
     // Settings
     "settings.title": "Settings",
@@ -480,6 +492,10 @@ const translations = {
     "reports.deptCourses": "Moduli za Idara",
     "reports.deptLecturers": "Wahadhiri wa Idara",
     "reports.deptStudents": "Wanafunzi wa Idara",
+    "reports.byLevel": "Kwa Ngazi/Programu",
+    "reports.selectLevel": "Chagua ngazi/programu",
+    "reports.selectModule": "Chagua moduli",
+    "reports.levelModules": "Moduli katika Ngazi",
 
     // Admin
     "admin.totalStudents": "Wanafunzi Wote",
@@ -502,6 +518,14 @@ const translations = {
     "admin.deleteStudent": "Futa Mwanafunzi",
     "admin.studentDeleted": "Mwanafunzi amefutwa",
     "admin.confirmDeleteStudent": "Una uhakika unataka kumfuta mwanafunzi huyu? Data zake zote zitaondolewa.",
+    "admin.lecturers": "Wahadhiri",
+    "admin.lecturerList": "Orodha ya Wahadhiri",
+    "admin.totalLecturers": "Wahadhiri Wote",
+    "admin.lecturerModules": "Moduli Anazofundisha",
+    "admin.lecturerLevel": "Ngazi/Programu",
+    "admin.students": "Wanafunzi",
+    "admin.viewStudents": "Angalia Wanafunzi",
+    "admin.viewLecturers": "Angalia Wahadhiri",
 
     // Settings
     "settings.title": "Mipangilio",
