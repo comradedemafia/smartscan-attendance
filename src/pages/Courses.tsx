@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,41 +41,36 @@ export default function Courses() {
   const { data: lecturerProfile } = useQuery({
     queryKey: ["lecturer-profile-dept", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("department_id")
-        .eq("id", user!.id)
-        .maybeSingle();
+      const { data, error } = await supabase.from("profiles").select("department_id").eq("id", user!.id).maybeSingle();
       if (error) throw error;
       return data;
     },
-    enabled: isLecturer && !!user,
+    enabled: (isLecturer || isStudent) && !!user,
   });
 
+  // Lecturer: fetch only assigned courses via course_lecturers
   const { data: courses = [], isLoading } = useQuery({
     queryKey: ["courses", user?.id, role],
     queryFn: async () => {
       if (role === "lecturer") {
+        // Only modules assigned to this lecturer
         const { data, error } = await supabase
-          .from("courses")
-          .select("*, course_enrollments(count), departments(name)")
-          .order("created_at", { ascending: false });
+          .from("course_lecturers")
+          .select("course_id, courses(*, course_enrollments(count), departments(name))")
+          .eq("lecturer_id", user!.id);
         if (error) throw error;
-        return data;
+        return (data || []).map((r: any) => r.courses).filter(Boolean);
       }
       if (role === "student") {
-        const { data: prof } = await supabase.from("profiles").select("department_id").eq("id", user!.id).maybeSingle();
-        if (prof?.department_id) {
-          const { data, error } = await supabase
-            .from("courses")
-            .select("*, course_enrollments(count), departments(name)")
-            .eq("department_id", prof.department_id)
-            .order("created_at", { ascending: false });
-          if (error) throw error;
-          return data;
-        }
-        return [];
+        // Only enrolled modules
+        const { data, error } = await supabase
+          .from("course_enrollments")
+          .select("course_id, courses(*, course_enrollments(count), departments(name))")
+          .eq("user_id", user!.id);
+        if (error) throw error;
+        return (data || []).map((r: any) => r.courses).filter(Boolean);
       }
+      // Admin sees all
       const { data, error } = await supabase
         .from("courses")
         .select("*, course_enrollments(count), departments(name)")
@@ -103,7 +98,6 @@ export default function Courses() {
       if (error) throw error;
       return data as Level[];
     },
-    enabled: isAdmin || canCreate,
   });
 
   const { data: myEnrollments = [] } = useQuery({
@@ -146,20 +140,12 @@ export default function Courses() {
     mutationFn: async () => {
       const deptId = isLecturer ? (lecturerProfile?.department_id || courseDeptId || null) : (courseDeptId || null);
       const { data: newCourse, error } = await supabase.from("courses").insert({
-        code: courseCode.toUpperCase(),
-        name: courseName,
-        description: courseDesc || null,
-        department_id: deptId,
-        level_id: courseLevelId || null,
-        created_by: user!.id,
+        code: courseCode.toUpperCase(), name: courseName, description: courseDesc || null,
+        department_id: deptId, level_id: courseLevelId || null, created_by: user!.id,
       }).select("id").single();
       if (error) throw error;
       if (isLecturer && newCourse) {
-        await supabase.from("course_lecturers").insert({
-          course_id: newCourse.id,
-          lecturer_id: user!.id,
-          assigned_by: user!.id,
-        });
+        await supabase.from("course_lecturers").insert({ course_id: newCourse.id, lecturer_id: user!.id, assigned_by: user!.id });
       }
     },
     onSuccess: () => {
@@ -173,11 +159,8 @@ export default function Courses() {
   const updateCourseMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from("courses").update({
-        code: courseCode.toUpperCase(),
-        name: courseName,
-        description: courseDesc || null,
-        department_id: courseDeptId || null,
-        level_id: courseLevelId || null,
+        code: courseCode.toUpperCase(), name: courseName, description: courseDesc || null,
+        department_id: courseDeptId || null, level_id: courseLevelId || null,
       }).eq("id", editingCourse.id);
       if (error) throw error;
     },
@@ -201,31 +184,9 @@ export default function Courses() {
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
-  const resetForm = () => {
-    setOpen(false);
-    setEditingCourse(null);
-    setCourseCode("");
-    setCourseName("");
-    setCourseDesc("");
-    setCourseDeptId("");
-    setCourseLevelId("");
-  };
-
-  const openEditCourse = (course: any) => {
-    setEditingCourse(course);
-    setCourseCode(course.code);
-    setCourseName(course.name);
-    setCourseDesc(course.description || "");
-    setCourseDeptId(course.department_id || "");
-    setCourseLevelId(course.level_id || "");
-    setOpen(true);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!courseCode.trim() || !courseName.trim()) return;
-    editingCourse ? updateCourseMutation.mutate() : createCourseMutation.mutate();
-  };
+  const resetForm = () => { setOpen(false); setEditingCourse(null); setCourseCode(""); setCourseName(""); setCourseDesc(""); setCourseDeptId(""); setCourseLevelId(""); };
+  const openEditCourse = (course: any) => { setEditingCourse(course); setCourseCode(course.code); setCourseName(course.name); setCourseDesc(course.description || ""); setCourseDeptId(course.department_id || ""); setCourseLevelId(course.level_id || ""); setOpen(true); };
+  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); if (!courseCode.trim() || !courseName.trim()) return; editingCourse ? updateCourseMutation.mutate() : createCourseMutation.mutate(); };
 
   const deptLevels = (deptId: string) => allLevels.filter((l) => l.department_id === deptId);
   const courseDeptLevels = courseDeptId ? deptLevels(courseDeptId) : [];
@@ -265,9 +226,7 @@ export default function Courses() {
             )}
             {isStudent && (
               myEnrollments.includes(course.id) ? (
-                <Button variant="outline" size="sm" onClick={() => unenrollMutation.mutate(course.id)} disabled={unenrollMutation.isPending}>
-                  <LogOut className="h-3.5 w-3.5 mr-1" />{t("courses.unenroll")}
-                </Button>
+                <Badge variant="secondary" className="text-xs">✓ {t("courses.enrolled")}</Badge>
               ) : (
                 <Button size="sm" onClick={() => enrollMutation.mutate(course.id)} disabled={enrollMutation.isPending}>
                   <LogIn className="h-3.5 w-3.5 mr-1" />{t("courses.joinCourse")}
@@ -279,6 +238,65 @@ export default function Courses() {
       </CardContent>
     </Card>
   );
+
+  // Group courses by level for lecturer & student
+  const renderGroupedByLevel = () => {
+    const levelMap = new Map<string, { level: Level | null; courses: any[] }>();
+    courses.forEach((c: any) => {
+      const lid = c.level_id || "unassigned";
+      if (!levelMap.has(lid)) {
+        levelMap.set(lid, { level: allLevels.find((l) => l.id === lid) || null, courses: [] });
+      }
+      levelMap.get(lid)!.courses.push(c);
+    });
+    const groups = Array.from(levelMap.values()).sort((a, b) => (a.level?.sort_order || 999) - (b.level?.sort_order || 999));
+
+    return (
+      <div className="space-y-4">
+        {groups.map((g) => {
+          const levelId = g.level?.id || "unassigned";
+          const isExpanded = expandedLevel === levelId;
+          return (
+            <Card key={levelId}>
+              <CardHeader
+                className="cursor-pointer pb-3"
+                onClick={() => setExpandedLevel(isExpanded ? null : levelId)}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <GraduationCap className="h-5 w-5 text-primary" />
+                    <CardTitle className="text-base">
+                      {g.level ? g.level.name : t("dept.unassignedCourses")}
+                    </CardTitle>
+                    {g.level && <Badge variant="outline" className="text-xs">{g.level.code}</Badge>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="text-xs">{g.courses.length} {t("dept.courses")}</Badge>
+                    {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  </div>
+                </div>
+              </CardHeader>
+              {isExpanded && (
+                <CardContent className="pt-0">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {g.courses.map((course: any) => renderCourseCard(course))}
+                  </div>
+                </CardContent>
+              )}
+            </Card>
+          );
+        })}
+        {courses.length === 0 && (
+          <Card>
+            <CardContent className="py-8 text-center">
+              <BookOpen className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
+              <p className="text-muted-foreground">{t("courses.empty")}</p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
+  };
 
   // Admin view: Semester -> Level -> Modules
   const renderAdminView = () => {
@@ -318,10 +336,7 @@ export default function Courses() {
                       const isLvlExpanded = expandedLevel === level.id;
                       return (
                         <div key={level.id} className="border rounded-lg overflow-hidden">
-                          <div
-                            className="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-muted/50"
-                            onClick={() => setExpandedLevel(isLvlExpanded ? null : level.id)}
-                          >
+                          <div className="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-muted/50" onClick={() => setExpandedLevel(isLvlExpanded ? null : level.id)}>
                             <div className="flex items-center gap-2">
                               <GraduationCap className="h-4 w-4 text-primary" />
                               <span className="text-sm font-medium">{level.name}</span>
@@ -347,16 +362,13 @@ export default function Courses() {
                       );
                     })
                   )}
-                  {/* Courses without level in this dept */}
                   {(() => {
                     const noLevelCourses = dept.courses.filter((c: any) => !c.level_id);
                     if (noLevelCourses.length === 0) return null;
                     return (
                       <div className="pt-2">
                         <p className="text-xs text-muted-foreground mb-2">{t("dept.unassignedCourses")}</p>
-                        <div className="grid gap-4 sm:grid-cols-2">
-                          {noLevelCourses.map((course: any) => renderCourseCard(course))}
-                        </div>
+                        <div className="grid gap-4 sm:grid-cols-2">{noLevelCourses.map((course: any) => renderCourseCard(course))}</div>
                       </div>
                     );
                   })()}
@@ -367,23 +379,12 @@ export default function Courses() {
         })}
         {unassignedCourses.length > 0 && (
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base text-muted-foreground">{t("dept.unassignedCourses")}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 sm:grid-cols-2">
-                {unassignedCourses.map((course: any) => renderCourseCard(course))}
-              </div>
-            </CardContent>
+            <CardHeader><CardTitle className="text-base text-muted-foreground">{t("dept.unassignedCourses")}</CardTitle></CardHeader>
+            <CardContent><div className="grid gap-4 sm:grid-cols-2">{unassignedCourses.map((course: any) => renderCourseCard(course))}</div></CardContent>
           </Card>
         )}
         {courses.length === 0 && (
-          <Card>
-            <CardContent className="py-8 text-center">
-              <BookOpen className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
-              <p className="text-muted-foreground">{t("courses.empty")}</p>
-            </CardContent>
-          </Card>
+          <Card><CardContent className="py-8 text-center"><BookOpen className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" /><p className="text-muted-foreground">{t("courses.empty")}</p></CardContent></Card>
         )}
       </div>
     );
@@ -416,9 +417,7 @@ export default function Courses() {
                   <Select value={courseDeptId} onValueChange={(v) => { setCourseDeptId(v); setCourseLevelId(""); }}>
                     <SelectTrigger><SelectValue placeholder={t("auth.selectDepartment")} /></SelectTrigger>
                     <SelectContent>
-                      {departments.map((d) => (
-                        <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                      ))}
+                      {departments.map((d) => (<SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -428,9 +427,7 @@ export default function Courses() {
                     <Select value={courseLevelId} onValueChange={setCourseLevelId}>
                       <SelectTrigger><SelectValue placeholder={t("dept.selectLevel")} /></SelectTrigger>
                       <SelectContent>
-                        {courseDeptLevels.map((l) => (
-                          <SelectItem key={l.id} value={l.id}>{l.code} — {l.name}</SelectItem>
-                        ))}
+                        {courseDeptLevels.map((l) => (<SelectItem key={l.id} value={l.id}>{l.code} — {l.name}</SelectItem>))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -452,17 +449,8 @@ export default function Courses() {
         <p className="text-muted-foreground">{t("common.loading")}</p>
       ) : isAdmin ? (
         renderAdminView()
-      ) : courses.length === 0 ? (
-        <Card>
-          <CardContent className="py-8 text-center">
-            <BookOpen className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
-            <p className="text-muted-foreground">{t("courses.empty")}</p>
-          </CardContent>
-        </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {courses.map((course: any) => renderCourseCard(course))}
-        </div>
+        renderGroupedByLevel()
       )}
     </div>
   );
