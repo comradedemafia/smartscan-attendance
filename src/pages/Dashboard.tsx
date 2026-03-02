@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useI18n } from "@/lib/i18n";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { BookOpen, Calendar, Users, TrendingUp, Clock, Building2, Plus, GraduationCap } from "lucide-react";
+import { BookOpen, Calendar, Users, TrendingUp, Clock, Building2, Plus, GraduationCap, ChevronDown, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -23,16 +23,17 @@ export default function Dashboard() {
   const queryClient = useQueryClient();
 
   const isLecturer = role === "lecturer";
+  const isStudent = role === "student";
+  const isAdmin = role === "admin";
 
-  // Create course state
   const [open, setOpen] = useState(false);
   const [courseCode, setCourseCode] = useState("");
   const [courseName, setCourseName] = useState("");
   const [courseDesc, setCourseDesc] = useState("");
   const [courseDeptId, setCourseDeptId] = useState("");
   const [filterLevel, setFilterLevel] = useState<string>("all");
+  const [expandedLevel, setExpandedLevel] = useState<string | null>(null);
 
-  // Fetch user's department
   const { data: userProfile } = useQuery({
     queryKey: ["user-profile-dept", user?.id],
     queryFn: async () => {
@@ -49,7 +50,7 @@ export default function Dashboard() {
       const { data } = await supabase.from("departments").select("name").eq("id", userProfile.department_id).single();
       return data;
     },
-    enabled: !!userProfile?.department_id && role !== "admin",
+    enabled: !!userProfile?.department_id && !isAdmin,
   });
 
   const { data: departments = [] } = useQuery({
@@ -62,10 +63,11 @@ export default function Dashboard() {
     enabled: isLecturer,
   });
 
+  // Courses: role-specific
   const { data: courses = [] } = useQuery({
     queryKey: ["dashboard-courses", user?.id, role],
     queryFn: async () => {
-      if (role === "lecturer") {
+      if (isLecturer) {
         const { data, error } = await supabase
           .from("course_lecturers")
           .select("course_id, courses(id, code, name, description, created_by, department_id, level_id, departments(name))")
@@ -73,10 +75,10 @@ export default function Dashboard() {
         if (error) throw error;
         return (data || []).map((r: any) => r.courses).filter(Boolean);
       }
-      if (role === "student") {
+      if (isStudent) {
         const { data, error } = await supabase
           .from("course_enrollments")
-          .select("course_id, courses(id, code, name, description, level_id)")
+          .select("course_id, courses(id, code, name, description, level_id, departments(name))")
           .eq("user_id", user!.id);
         if (error) throw error;
         return (data || []).map((r: any) => r.courses).filter(Boolean);
@@ -88,7 +90,6 @@ export default function Dashboard() {
     enabled: !!user,
   });
 
-  // Levels for filtering
   const { data: allLevels = [] } = useQuery({
     queryKey: ["dashboard-levels"],
     queryFn: async () => {
@@ -96,11 +97,10 @@ export default function Dashboard() {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!user && (role === "admin" || role === "lecturer"),
   });
 
   const { data: sessions = [] } = useQuery({
-    queryKey: ["dashboard-sessions", user?.id],
+    queryKey: ["dashboard-sessions", user?.id, role],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("sessions")
@@ -124,35 +124,23 @@ export default function Dashboard() {
     enabled: !!user,
   });
 
-  // Create course mutation for lecturer
   const createCourseMutation = useMutation({
     mutationFn: async () => {
       const deptId = courseDeptId || userProfile?.department_id || null;
       const { data: newCourse, error } = await supabase.from("courses").insert({
-        code: courseCode.toUpperCase(),
-        name: courseName,
-        description: courseDesc || null,
-        department_id: deptId,
-        created_by: user!.id,
+        code: courseCode.toUpperCase(), name: courseName, description: courseDesc || null,
+        department_id: deptId, created_by: user!.id,
       }).select("id").single();
       if (error) throw error;
       if (newCourse) {
-        await supabase.from("course_lecturers").insert({
-          course_id: newCourse.id,
-          lecturer_id: user!.id,
-          assigned_by: user!.id,
-        });
+        await supabase.from("course_lecturers").insert({ course_id: newCourse.id, lecturer_id: user!.id, assigned_by: user!.id });
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["dashboard-courses"] });
       queryClient.invalidateQueries({ queryKey: ["courses"] });
       toast({ title: t("common.success"), description: t("dept.courseCreated") });
-      setOpen(false);
-      setCourseCode("");
-      setCourseName("");
-      setCourseDesc("");
-      setCourseDeptId("");
+      setOpen(false); setCourseCode(""); setCourseName(""); setCourseDesc(""); setCourseDeptId("");
     },
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
@@ -166,17 +154,25 @@ export default function Dashboard() {
   const stats = [
     { label: t("dashboard.activeSessions"), value: String(activeSessions), icon: Calendar, color: "text-primary" },
     { label: t("dashboard.totalCourses"), value: String(courses.length), icon: BookOpen, color: "text-accent-foreground" },
-    { label: t("dashboard.totalStudents"), value: String(totalStudents), icon: Users, color: "text-primary" },
+    ...(isStudent ? [] : [{ label: t("dashboard.totalStudents"), value: String(totalStudents), icon: Users, color: "text-primary" }]),
     { label: t("dashboard.attendanceRate"), value: "—", icon: TrendingUp, color: "text-primary" },
   ];
 
-  const sessionCountByCourse = (courseId: string) =>
-    sessions.filter((s) => s.course_id === courseId).length;
+  // Group courses by level
+  const coursesGroupedByLevel = useMemo(() => {
+    const levelMap = new Map<string, { level: any; courses: any[] }>();
+    const filtered = filterLevel === "all" ? courses : courses.filter((c: any) => c.level_id === filterLevel);
+    filtered.forEach((c: any) => {
+      const lid = c.level_id || "unassigned";
+      if (!levelMap.has(lid)) {
+        levelMap.set(lid, { level: allLevels.find((l) => l.id === lid) || null, courses: [] });
+      }
+      levelMap.get(lid)!.courses.push(c);
+    });
+    return Array.from(levelMap.values()).sort((a, b) => (a.level?.sort_order || 999) - (b.level?.sort_order || 999));
+  }, [courses, allLevels, filterLevel]);
 
-  // Filter courses by level
-  const filteredCourses = filterLevel === "all"
-    ? courses
-    : courses.filter((c: any) => c.level_id === filterLevel);
+  const sessionCountByCourse = (courseId: string) => sessions.filter((s) => s.course_id === courseId).length;
 
   return (
     <div className="space-y-6">
@@ -186,11 +182,8 @@ export default function Dashboard() {
         </h1>
         <div className="flex items-center gap-2 mt-1">
           <p className="text-muted-foreground capitalize">{role} {t("nav.dashboard")}</p>
-          {role !== "admin" && userDepartment && (
-            <Badge variant="outline" className="flex items-center gap-1">
-              <Building2 className="h-3 w-3" />
-              {userDepartment.name}
-            </Badge>
+          {!isAdmin && userDepartment && (
+            <Badge variant="outline" className="flex items-center gap-1"><Building2 className="h-3 w-3" />{userDepartment.name}</Badge>
           )}
         </div>
       </div>
@@ -202,31 +195,26 @@ export default function Dashboard() {
               <CardTitle className="text-sm font-medium text-muted-foreground">{stat.label}</CardTitle>
               <stat.icon className={`h-5 w-5 ${stat.color}`} />
             </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{stat.value}</div>
-            </CardContent>
+            <CardContent><div className="text-3xl font-bold">{stat.value}</div></CardContent>
           </Card>
         ))}
       </div>
 
-      {/* Courses with Create button for lecturer */}
+      {/* Courses grouped by Level */}
       <div>
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-          <h2 className="text-lg font-semibold">{t("nav.courses")}</h2>
+          <h2 className="text-lg font-semibold">
+            {isLecturer ? t("admin.lecturerModules") : t("nav.courses")}
+          </h2>
           <div className="flex items-center gap-2 flex-wrap">
-            {(role === "admin" || role === "lecturer") && allLevels.length > 0 && (
+            {(isAdmin || isLecturer) && allLevels.length > 0 && (
               <Select value={filterLevel} onValueChange={setFilterLevel}>
-                <SelectTrigger className="w-[220px] h-8 text-xs">
-                  <SelectValue placeholder={t("reports.selectLevel")} />
-                </SelectTrigger>
+                <SelectTrigger className="w-[220px] h-8 text-xs"><SelectValue placeholder={t("reports.selectLevel")} /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{t("admin.allCourses")}</SelectItem>
                   {allLevels.map((l) => (
                     <SelectItem key={l.id} value={l.id}>
-                      <span className="flex items-center gap-1">
-                        <GraduationCap className="h-3 w-3" />
-                        {l.name}
-                      </span>
+                      <span className="flex items-center gap-1"><GraduationCap className="h-3 w-3" />{l.name}</span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -234,110 +222,115 @@ export default function Dashboard() {
             )}
             {isLecturer && (
               <Dialog open={open} onOpenChange={setOpen}>
-                <DialogTrigger asChild>
-                  <Button size="sm"><Plus className="h-4 w-4 mr-1" />{t("courses.create")}</Button>
-                </DialogTrigger>
+                <DialogTrigger asChild><Button size="sm"><Plus className="h-4 w-4 mr-1" />{t("courses.create")}</Button></DialogTrigger>
                 <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>{t("courses.create")}</DialogTitle>
-                  </DialogHeader>
+                  <DialogHeader><DialogTitle>{t("courses.create")}</DialogTitle></DialogHeader>
                   <form onSubmit={(e) => { e.preventDefault(); if (courseCode.trim() && courseName.trim()) createCourseMutation.mutate(); }} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>{t("courses.code")}</Label>
-                      <Input value={courseCode} onChange={(e) => setCourseCode(e.target.value)} placeholder="CS101" required />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>{t("courses.name")}</Label>
-                      <Input value={courseName} onChange={(e) => setCourseName(e.target.value)} placeholder="Introduction to CS" required />
-                    </div>
+                    <div className="space-y-2"><Label>{t("courses.code")}</Label><Input value={courseCode} onChange={(e) => setCourseCode(e.target.value)} placeholder="CS101" required /></div>
+                    <div className="space-y-2"><Label>{t("courses.name")}</Label><Input value={courseName} onChange={(e) => setCourseName(e.target.value)} placeholder="Introduction to CS" required /></div>
                     <div className="space-y-2">
                       <Label>{t("auth.department")}</Label>
-                      <select
-                        value={courseDeptId}
-                        onChange={(e) => setCourseDeptId(e.target.value)}
-                        className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                      >
+                      <select value={courseDeptId} onChange={(e) => setCourseDeptId(e.target.value)} className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
                         <option value="">{userProfile?.department_id ? "My Department (default)" : t("auth.selectDepartment")}</option>
-                        {departments.map((d) => (
-                          <option key={d.id} value={d.id}>{d.name}</option>
-                        ))}
+                        {departments.map((d) => (<option key={d.id} value={d.id}>{d.name}</option>))}
                       </select>
                     </div>
-                    <div className="space-y-2">
-                      <Label>{t("courses.description")}</Label>
-                      <Textarea value={courseDesc} onChange={(e) => setCourseDesc(e.target.value)} placeholder="Optional description" />
-                    </div>
-                    <Button type="submit" className="w-full" disabled={createCourseMutation.isPending}>
-                      {t("courses.create")}
-                    </Button>
+                    <div className="space-y-2"><Label>{t("courses.description")}</Label><Textarea value={courseDesc} onChange={(e) => setCourseDesc(e.target.value)} placeholder="Optional description" /></div>
+                    <Button type="submit" className="w-full" disabled={createCourseMutation.isPending}>{t("courses.create")}</Button>
                   </form>
                 </DialogContent>
               </Dialog>
             )}
-            <Link to="/courses" className="text-sm text-primary hover:underline">
-              {t("common.actions")} →
-            </Link>
+            <Link to="/courses" className="text-sm text-primary hover:underline">{t("common.actions")} →</Link>
           </div>
         </div>
-        {filteredCourses.length === 0 ? (
-          <Card>
-            <CardContent className="py-6">
-              <p className="text-muted-foreground text-sm text-center">{t("courses.empty")}</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredCourses.map((course: any) => (
-              <Card key={course.id} className="hover:shadow-md transition-shadow">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <Badge variant="secondary" className="text-xs">{course.code}</Badge>
-                    <BookOpen className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <CardTitle className="text-base mt-1">{course.name}</CardTitle>
-                  {course.departments && (
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Building2 className="h-3 w-3" />
-                      {course.departments.name}
-                    </p>
+
+        {/* Show modules grouped by level for student/lecturer */}
+        {(isStudent || isLecturer) ? (
+          <div className="space-y-3">
+            {coursesGroupedByLevel.length === 0 ? (
+              <Card><CardContent className="py-6"><p className="text-muted-foreground text-sm text-center">{t("courses.empty")}</p></CardContent></Card>
+            ) : coursesGroupedByLevel.map((g) => {
+              const levelId = g.level?.id || "unassigned";
+              const isExpanded = expandedLevel === levelId;
+              return (
+                <Card key={levelId}>
+                  <CardHeader className="cursor-pointer pb-2" onClick={() => setExpandedLevel(isExpanded ? null : levelId)}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <GraduationCap className="h-5 w-5 text-primary" />
+                        <CardTitle className="text-sm">{g.level ? g.level.name : t("dept.unassignedCourses")}</CardTitle>
+                        {g.level && <Badge variant="outline" className="text-xs">{g.level.code}</Badge>}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="text-xs">{g.courses.length} modules</Badge>
+                        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      </div>
+                    </div>
+                  </CardHeader>
+                  {isExpanded && (
+                    <CardContent className="pt-0">
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {g.courses.map((course: any) => (
+                          <Card key={course.id} className="hover:shadow-md transition-shadow">
+                            <CardHeader className="pb-2">
+                              <div className="flex items-center justify-between">
+                                <Badge variant="secondary" className="text-xs">{course.code}</Badge>
+                                <BookOpen className="h-4 w-4 text-muted-foreground" />
+                              </div>
+                              <CardTitle className="text-base mt-1">{course.name}</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-2">
+                              {course.description && <p className="text-xs text-muted-foreground line-clamp-2">{course.description}</p>}
+                              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                                <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" />{enrollmentCounts[course.id] || 0} {t("courses.students")}</span>
+                                <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{sessionCountByCourse(course.id)} {t("courses.sessions")}</span>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </CardContent>
                   )}
-                  {course.level_id && (() => {
-                    const level = allLevels.find(l => l.id === course.level_id);
-                    return level ? (
-                      <p className="text-xs text-muted-foreground flex items-center gap-1">
-                        <GraduationCap className="h-3 w-3" />
-                        {level.code}
-                      </p>
-                    ) : null;
-                  })()}
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {course.description && (
-                    <p className="text-xs text-muted-foreground line-clamp-2">{course.description}</p>
-                  )}
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Users className="h-3.5 w-3.5" />
-                      {enrollmentCounts[course.id] || 0} {t("courses.students")}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Calendar className="h-3.5 w-3.5" />
-                      {sessionCountByCourse(course.id)} {t("courses.sessions")}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
           </div>
+        ) : (
+          /* Admin flat view */
+          courses.length === 0 ? (
+            <Card><CardContent className="py-6"><p className="text-muted-foreground text-sm text-center">{t("courses.empty")}</p></CardContent></Card>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {(filterLevel === "all" ? courses : courses.filter((c: any) => c.level_id === filterLevel)).map((course: any) => (
+                <Card key={course.id} className="hover:shadow-md transition-shadow">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <Badge variant="secondary" className="text-xs">{course.code}</Badge>
+                      <BookOpen className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <CardTitle className="text-base mt-1">{course.name}</CardTitle>
+                    {course.departments && (<p className="text-xs text-muted-foreground flex items-center gap-1"><Building2 className="h-3 w-3" />{course.departments.name}</p>)}
+                    {course.level_id && (() => { const level = allLevels.find(l => l.id === course.level_id); return level ? (<p className="text-xs text-muted-foreground flex items-center gap-1"><GraduationCap className="h-3 w-3" />{level.code}</p>) : null; })()}
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {course.description && <p className="text-xs text-muted-foreground line-clamp-2">{course.description}</p>}
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" />{enrollmentCounts[course.id] || 0} {t("courses.students")}</span>
+                      <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{sessionCountByCourse(course.id)} {t("courses.sessions")}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )
         )}
       </div>
 
       {/* Upcoming Sessions & Recent Activity */}
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">{t("dashboard.upcomingSessions")}</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle className="text-lg">{t("dashboard.upcomingSessions")}</CardTitle></CardHeader>
           <CardContent>
             {upcomingSessions.length === 0 ? (
               <p className="text-muted-foreground text-sm">{t("dashboard.noSessions")}</p>
@@ -348,13 +341,9 @@ export default function Dashboard() {
                     <Clock className="h-4 w-4 text-primary shrink-0" />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium truncate">{session.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {(session as any).courses?.code} • {format(new Date(session.session_date), "dd MMM yyyy")}
-                      </p>
+                      <p className="text-xs text-muted-foreground">{(session as any).courses?.code} • {format(new Date(session.session_date), "dd MMM yyyy")}</p>
                     </div>
-                    <Badge variant={session.status === "active" ? "default" : "secondary"} className="text-xs shrink-0">
-                      {session.status}
-                    </Badge>
+                    <Badge variant={session.status === "active" ? "default" : "secondary"} className="text-xs shrink-0">{session.status}</Badge>
                   </div>
                 ))}
               </div>
@@ -362,12 +351,8 @@ export default function Dashboard() {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">{t("dashboard.recentActivity")}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground text-sm">—</p>
-          </CardContent>
+          <CardHeader><CardTitle className="text-lg">{t("dashboard.recentActivity")}</CardTitle></CardHeader>
+          <CardContent><p className="text-muted-foreground text-sm">—</p></CardContent>
         </Card>
       </div>
     </div>

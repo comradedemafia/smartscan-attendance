@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, Plus, QrCode, LayoutGrid, List, ChevronLeft, ChevronRight, Edit, Trash2, Building2, ChevronDown, Users } from "lucide-react";
+import { Calendar, Plus, QrCode, LayoutGrid, List, ChevronLeft, ChevronRight, Edit, Trash2, Building2, ChevronDown, Users, GraduationCap } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay } from "date-fns";
 
@@ -39,6 +39,7 @@ export default function Sessions() {
     startOfWeek(new Date(), { weekStartsOn: 1 })
   );
   const [selectedDeptId, setSelectedDeptId] = useState<string>("all");
+  const [selectedFilterLevel, setSelectedFilterLevel] = useState<string>("all");
 
   const canManage = role === "lecturer" || role === "admin";
   const isAdmin = role === "admin";
@@ -97,11 +98,35 @@ export default function Sessions() {
 
 
   const { data: sessions = [], isLoading } = useQuery({
-    queryKey: ["sessions"],
+    queryKey: ["sessions", role, user?.id],
     queryFn: async () => {
+      if (role === "lecturer") {
+        // Only sessions created by this lecturer
+        const { data, error } = await supabase
+          .from("sessions")
+          .select("*, courses(code, name, department_id, level_id)")
+          .eq("created_by", user!.id)
+          .order("session_date", { ascending: false });
+        if (error) throw error;
+        return data;
+      }
+      if (role === "student") {
+        // Only sessions for enrolled courses
+        const { data: enrollments } = await supabase.from("course_enrollments").select("course_id").eq("user_id", user!.id);
+        const courseIds = (enrollments || []).map(e => e.course_id);
+        if (courseIds.length === 0) return [];
+        const { data, error } = await supabase
+          .from("sessions")
+          .select("*, courses(code, name, department_id, level_id)")
+          .in("course_id", courseIds)
+          .order("session_date", { ascending: false });
+        if (error) throw error;
+        return data;
+      }
+      // Admin sees all
       const { data, error } = await supabase
         .from("sessions")
-        .select("*, courses(code, name, department_id)")
+        .select("*, courses(code, name, department_id, level_id)")
         .order("session_date", { ascending: false });
       if (error) throw error;
       return data;
@@ -122,9 +147,15 @@ export default function Sessions() {
 
   // Filter sessions by department
   const filteredSessions = useMemo(() => {
-    if (!isAdmin || selectedDeptId === "all") return sessions;
-    return sessions.filter((s: any) => s.courses?.department_id === selectedDeptId);
-  }, [sessions, selectedDeptId, isAdmin]);
+    let result = sessions;
+    if (isAdmin && selectedDeptId !== "all") {
+      result = result.filter((s: any) => s.courses?.department_id === selectedDeptId);
+    }
+    if (selectedFilterLevel !== "all") {
+      result = result.filter((s: any) => s.courses?.level_id === selectedFilterLevel);
+    }
+    return result;
+  }, [sessions, selectedDeptId, selectedFilterLevel, isAdmin]);
 
   // ===== SESSION MUTATIONS =====
   const createMutation = useMutation({
@@ -228,6 +259,22 @@ export default function Sessions() {
                 <SelectItem value="all">{t("admin.allDepartments")}</SelectItem>
                 {departments.map((d) => (
                   <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {/* Level/Programme filter */}
+          {allLevels.length > 0 && (
+            <Select value={selectedFilterLevel} onValueChange={setSelectedFilterLevel}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder={t("reports.selectLevel")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("admin.allCourses")}</SelectItem>
+                {allLevels.map((l) => (
+                  <SelectItem key={l.id} value={l.id}>
+                    <span className="flex items-center gap-1"><GraduationCap className="h-3 w-3" />{l.name}</span>
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -434,15 +481,24 @@ export default function Sessions() {
             <Card key={session.id} className="relative group">
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs text-muted-foreground">
-                      {(session.courses as any)?.code}
-                    </p>
-                    <CardTitle className="text-base mt-1">{session.title}</CardTitle>
-                    {isAdmin && lecturerProfiles[session.created_by] && (
-                      <p className="text-xs text-muted-foreground mt-0.5">👤 {lecturerProfiles[session.created_by]}</p>
-                    )}
-                  </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">
+                        {(session.courses as any)?.code}
+                      </p>
+                      <CardTitle className="text-base mt-1">{session.title}</CardTitle>
+                      {(() => {
+                        const levelId = (session.courses as any)?.level_id;
+                        const level = levelId ? allLevels.find(l => l.id === levelId) : null;
+                        return level ? (
+                          <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                            <GraduationCap className="h-3 w-3" />{level.code}
+                          </p>
+                        ) : null;
+                      })()}
+                      {isAdmin && lecturerProfiles[session.created_by] && (
+                        <p className="text-xs text-muted-foreground mt-0.5">👤 {lecturerProfiles[session.created_by]}</p>
+                      )}
+                    </div>
                   <div className="flex items-center gap-1">
                     {canEditSession(session) && (
                       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
