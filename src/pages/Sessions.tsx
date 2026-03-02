@@ -31,6 +31,7 @@ export default function Sessions() {
   
   const [venueName, setVenueName] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("30");
+  const [selectedLevelId, setSelectedLevelId] = useState("");
 
 
   const [viewMode, setViewMode] = useState<"list" | "week">("week");
@@ -53,24 +54,46 @@ export default function Sessions() {
     enabled: isAdmin,
   });
 
+  const { data: allLevels = [] } = useQuery({
+    queryKey: ["levels-for-sessions"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("levels").select("id, name, code, department_id, sort_order").order("sort_order");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
   const { data: courses = [] } = useQuery({
     queryKey: ["courses-for-sessions", user?.id, role],
     queryFn: async () => {
       if (role === "lecturer") {
         const { data, error } = await supabase
           .from("courses")
-          .select("id, code, name, department_id")
+          .select("id, code, name, department_id, level_id")
           .eq("created_by", user!.id)
           .order("name");
         if (error) throw error;
         return data;
       }
-      const { data, error } = await supabase.from("courses").select("id, code, name, department_id").order("name");
+      const { data, error } = await supabase.from("courses").select("id, code, name, department_id, level_id").order("name");
       if (error) throw error;
       return data;
     },
     enabled: !!user,
   });
+
+  // Filter courses by selected level in the form
+  const filteredFormCourses = useMemo(() => {
+    if (!selectedLevelId) return courses;
+    return courses.filter((c: any) => c.level_id === selectedLevelId);
+  }, [courses, selectedLevelId]);
+
+  // Get unique levels that have courses (for the form dropdown)
+  const availableLevels = useMemo(() => {
+    const levelIds = new Set(courses.map((c: any) => c.level_id).filter(Boolean));
+    return allLevels.filter((l) => levelIds.has(l.id));
+  }, [courses, allLevels]);
 
 
   const { data: sessions = [], isLoading } = useQuery({
@@ -161,8 +184,8 @@ export default function Sessions() {
   });
 
 
-  const resetSessionForm = () => { setOpen(false); setEditingSession(null); setTitle(""); setCourseId(""); setVenueName(""); setDurationMinutes("30"); };
-  const openEdit = (session: any) => { setEditingSession(session); setTitle(session.title); setCourseId(session.course_id); setVenueName(session.venue_name || ""); setDurationMinutes(String(session.duration_minutes)); setOpen(true); };
+  const resetSessionForm = () => { setOpen(false); setEditingSession(null); setTitle(""); setCourseId(""); setVenueName(""); setDurationMinutes("30"); setSelectedLevelId(""); };
+  const openEdit = (session: any) => { setEditingSession(session); setTitle(session.title); setCourseId(session.course_id); setVenueName(session.venue_name || ""); setDurationMinutes(String(session.duration_minutes)); const course = courses.find((c: any) => c.id === session.course_id); setSelectedLevelId(course?.level_id || ""); setOpen(true); };
   const handleSessionSubmit = (e: React.FormEvent) => { e.preventDefault(); if (!title.trim() || !courseId) return; editingSession ? updateMutation.mutate() : createMutation.mutate(); };
   const canEditSession = (session: any) => role === "admin" || (role === "lecturer" && session.created_by === user?.id);
   const statusColor = (status: string) => { switch (status) { case "active": return "default"; case "completed": return "secondary"; default: return "outline"; } };
@@ -234,15 +257,30 @@ export default function Sessions() {
                       <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Week 1 Lecture" required />
                     </div>
                     <div className="space-y-2">
+                      <Label>{t("auth.programme")}</Label>
+                      <select
+                        value={selectedLevelId}
+                        onChange={(e) => { setSelectedLevelId(e.target.value); setCourseId(""); }}
+                        className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                        required
+                      >
+                        <option value="">{t("auth.selectProgramme")}</option>
+                        {availableLevels.map((l) => (
+                          <option key={l.id} value={l.id}>{l.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
                       <Label>{t("sessions.course")}</Label>
                       <select
                         value={courseId}
                         onChange={(e) => setCourseId(e.target.value)}
                         className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                         required
+                        disabled={!selectedLevelId}
                       >
-                        <option value="">Select course</option>
-                        {courses.map((c: any) => (
+                        <option value="">Select module</option>
+                        {filteredFormCourses.map((c: any) => (
                           <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
                         ))}
                       </select>
