@@ -107,6 +107,21 @@ export default function Dashboard() {
     },
   });
 
+  // Fetch ALL courses for session creation (not filtered by lecturer assignment)
+  const { data: allCoursesForSession = [] } = useQuery({
+    queryKey: ["all-courses-for-session", userProfile?.department_id],
+    queryFn: async () => {
+      let query = supabase.from("courses").select("id, code, name, level_id, department_id");
+      if (!isAdmin && userProfile?.department_id) {
+        query = query.eq("department_id", userProfile.department_id);
+      }
+      const { data, error } = await query.order("code");
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user && (isLecturer || isAdmin),
+  });
+
   const { data: sessions = [] } = useQuery({
     queryKey: ["dashboard-sessions", user?.id, role],
     queryFn: async () => {
@@ -153,16 +168,16 @@ export default function Dashboard() {
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
-  // Session creation: filter courses by selected level
+  // Session creation: filter ALL courses (not just assigned ones) by selected level
   const sessionFilteredCourses = useMemo(() => {
     if (!sessionLevelId) return [];
-    return courses.filter((c: any) => c.level_id === sessionLevelId);
-  }, [courses, sessionLevelId]);
+    return allCoursesForSession.filter((c: any) => c.level_id === sessionLevelId);
+  }, [allCoursesForSession, sessionLevelId]);
 
   const sessionAvailableLevels = useMemo(() => {
-    const levelIds = new Set(courses.map((c: any) => c.level_id).filter(Boolean));
+    const levelIds = new Set(allCoursesForSession.map((c: any) => c.level_id).filter(Boolean));
     return allLevels.filter((l) => levelIds.has(l.id));
-  }, [courses, allLevels]);
+  }, [allCoursesForSession, allLevels]);
 
   const createSessionMutation = useMutation({
     mutationFn: async () => {
