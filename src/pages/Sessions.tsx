@@ -287,7 +287,7 @@ export default function Sessions() {
               <List className="h-4 w-4 mr-1" />{t("sessions.listView")}
             </Button>
           </div>
-          {canManage && (
+          {canManage && !isAdmin && (
             <>
               {/* Create Session Dialog */}
               <Dialog open={open} onOpenChange={(o) => { if (!o) resetSessionForm(); setOpen(o); }}>
