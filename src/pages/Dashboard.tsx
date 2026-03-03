@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { BookOpen, Calendar, Users, TrendingUp, Clock, Building2, Plus, GraduationCap, ChevronDown, ChevronRight } from "lucide-react";
+import { BookOpen, Calendar, Users, TrendingUp, Clock, Building2, Plus, GraduationCap, ChevronDown, ChevronRight, CalendarPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -33,6 +33,14 @@ export default function Dashboard() {
   const [courseDeptId, setCourseDeptId] = useState("");
   const [filterLevel, setFilterLevel] = useState<string>("all");
   const [expandedLevel, setExpandedLevel] = useState<string | null>(null);
+
+  // Session creation state
+  const [sessionOpen, setSessionOpen] = useState(false);
+  const [sessionTitle, setSessionTitle] = useState("");
+  const [sessionCourseId, setSessionCourseId] = useState("");
+  const [sessionLevelId, setSessionLevelId] = useState("");
+  const [sessionVenue, setSessionVenue] = useState("");
+  const [sessionDuration, setSessionDuration] = useState("30");
 
   const { data: userProfile } = useQuery({
     queryKey: ["user-profile-dept", user?.id],
@@ -141,6 +149,47 @@ export default function Dashboard() {
       queryClient.invalidateQueries({ queryKey: ["courses"] });
       toast({ title: t("common.success"), description: t("dept.courseCreated") });
       setOpen(false); setCourseCode(""); setCourseName(""); setCourseDesc(""); setCourseDeptId("");
+    },
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
+  });
+
+  // Session creation: filter courses by selected level
+  const sessionFilteredCourses = useMemo(() => {
+    if (!sessionLevelId) return [];
+    return courses.filter((c: any) => c.level_id === sessionLevelId);
+  }, [courses, sessionLevelId]);
+
+  const sessionAvailableLevels = useMemo(() => {
+    const levelIds = new Set(courses.map((c: any) => c.level_id).filter(Boolean));
+    return allLevels.filter((l) => levelIds.has(l.id));
+  }, [courses, allLevels]);
+
+  const createSessionMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("sessions").insert({
+        title: sessionTitle, course_id: sessionCourseId, venue_name: sessionVenue || null,
+        duration_minutes: parseInt(sessionDuration), created_by: user!.id, status: "scheduled",
+      });
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      queryClient.invalidateQueries({ queryKey: ["dashboard-sessions"] });
+      queryClient.invalidateQueries({ queryKey: ["sessions"] });
+      try {
+        const { data: newSessions } = await supabase
+          .from("sessions").select("id").eq("created_by", user!.id)
+          .order("created_at", { ascending: false }).limit(1);
+        if (newSessions?.[0]) {
+          await supabase.rpc("notify_enrolled_students", {
+            _session_id: newSessions[0].id,
+            _title: "📅 New Session",
+            _message: `New session "${sessionTitle}" has been scheduled`,
+            _type: "session",
+          });
+        }
+      } catch {}
+      toast({ title: t("common.success"), description: "Session created" });
+      setSessionOpen(false); setSessionTitle(""); setSessionCourseId(""); setSessionLevelId(""); setSessionVenue(""); setSessionDuration("30");
     },
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
@@ -330,7 +379,72 @@ export default function Dashboard() {
       {/* Upcoming Sessions & Recent Activity */}
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader><CardTitle className="text-lg">{t("dashboard.upcomingSessions")}</CardTitle></CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-lg">{t("dashboard.upcomingSessions")}</CardTitle>
+            {(isLecturer || isAdmin) && (
+              <Dialog open={sessionOpen} onOpenChange={setSessionOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" variant="outline"><CalendarPlus className="h-4 w-4 mr-1" />{t("sessions.create")}</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader><DialogTitle>{t("sessions.create")}</DialogTitle></DialogHeader>
+                  <form onSubmit={(e) => { e.preventDefault(); if (sessionTitle.trim() && sessionCourseId) createSessionMutation.mutate(); }} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Title</Label>
+                      <Input value={sessionTitle} onChange={(e) => setSessionTitle(e.target.value)} placeholder="Week 1 Lecture" required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t("auth.programme")}</Label>
+                      <select
+                        value={sessionLevelId}
+                        onChange={(e) => { setSessionLevelId(e.target.value); setSessionCourseId(""); }}
+                        className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                        required
+                      >
+                        <option value="">{t("auth.selectProgramme")}</option>
+                        {sessionAvailableLevels.map((l) => (
+                          <option key={l.id} value={l.id}>{l.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t("nav.courses")}</Label>
+                      <select
+                        value={sessionCourseId}
+                        onChange={(e) => setSessionCourseId(e.target.value)}
+                        className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                        required
+                        disabled={!sessionLevelId}
+                      >
+                        <option value="">{sessionLevelId ? t("sessions.selectModule") : t("auth.selectProgramme")}</option>
+                        {sessionFilteredCourses.map((c: any) => (
+                          <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t("sessions.venue")}</Label>
+                      <Input value={sessionVenue} onChange={(e) => setSessionVenue(e.target.value)} placeholder="Room 101" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t("sessions.duration")}</Label>
+                      <select
+                        value={sessionDuration}
+                        onChange={(e) => setSessionDuration(e.target.value)}
+                        className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      >
+                        <option value="30">30 min</option>
+                        <option value="60">1 hr</option>
+                        <option value="90">1.5 hrs</option>
+                        <option value="120">2 hrs</option>
+                      </select>
+                    </div>
+                    <Button type="submit" className="w-full" disabled={createSessionMutation.isPending}>{t("sessions.create")}</Button>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            )}
+          </CardHeader>
           <CardContent>
             {upcomingSessions.length === 0 ? (
               <p className="text-muted-foreground text-sm">{t("dashboard.noSessions")}</p>
