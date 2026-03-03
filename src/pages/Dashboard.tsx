@@ -76,12 +76,13 @@ export default function Dashboard() {
     queryKey: ["dashboard-courses", user?.id, role],
     queryFn: async () => {
       if (isLecturer) {
+        // Lecturer sees only modules they created
         const { data, error } = await supabase
-          .from("course_lecturers")
-          .select("course_id, courses(id, code, name, description, created_by, department_id, level_id, departments(name))")
-          .eq("lecturer_id", user!.id);
+          .from("courses")
+          .select("id, code, name, description, created_by, department_id, level_id, departments(name)")
+          .eq("created_by", user!.id);
         if (error) throw error;
-        return (data || []).map((r: any) => r.courses).filter(Boolean);
+        return data || [];
       }
       if (isStudent) {
         const { data, error } = await supabase
@@ -119,7 +120,7 @@ export default function Dashboard() {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!user && (isLecturer || isAdmin),
+    enabled: !!user && isLecturer,
   });
 
   const { data: sessions = [] } = useQuery({
@@ -396,7 +397,7 @@ export default function Dashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg">{t("dashboard.upcomingSessions")}</CardTitle>
-            {(isLecturer || isAdmin) && (
+          {isLecturer && (
               <Dialog open={sessionOpen} onOpenChange={setSessionOpen}>
                 <DialogTrigger asChild>
                   <Button size="sm" variant="outline"><CalendarPlus className="h-4 w-4 mr-1" />{t("sessions.create")}</Button>
