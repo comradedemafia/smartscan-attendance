@@ -46,7 +46,7 @@ export default function AppLayout() {
     { to: "/departments", icon: Building2, label: t("dept.departments"), roles: ["admin"] },
     { to: "/courses", icon: BookOpen, label: t("nav.courses"), roles: ["admin", "lecturer"] },
     
-    { to: "/sessions", icon: Calendar, label: t("nav.sessions"), roles: ["admin", "lecturer", "student"] },
+    { to: "/sessions", icon: Calendar, label: t("nav.sessions"), roles: ["lecturer", "student"] },
     { to: "/scan", icon: QrCode, label: t("nav.scanQr"), roles: ["student"] },
     { to: "/attendance", icon: ClipboardList, label: t("nav.attendance"), roles: ["admin", "lecturer", "student"] },
     { to: "/reports", icon: BarChart3, label: t("nav.reports"), roles: ["admin", "lecturer"] },
