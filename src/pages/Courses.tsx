@@ -414,9 +414,9 @@ export default function Courses() {
                   <Input value={courseName} onChange={(e) => setCourseName(e.target.value)} placeholder="Introduction to CS" required />
                 </div>
                 <div className="space-y-2">
-                  <Label>{t("auth.department")}</Label>
+                  <Label>Semester</Label>
                   <Select value={courseDeptId} onValueChange={(v) => { setCourseDeptId(v); setCourseLevelId(""); }}>
-                    <SelectTrigger><SelectValue placeholder={t("auth.selectDepartment")} /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Select Semester" /></SelectTrigger>
                     <SelectContent>
                       {departments.map((d) => (<SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>))}
                     </SelectContent>
