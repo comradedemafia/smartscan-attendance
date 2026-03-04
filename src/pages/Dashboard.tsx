@@ -294,9 +294,9 @@ export default function Dashboard() {
                     <div className="space-y-2"><Label>{t("courses.code")}</Label><Input value={courseCode} onChange={(e) => setCourseCode(e.target.value)} placeholder="CS101" required /></div>
                     <div className="space-y-2"><Label>{t("courses.name")}</Label><Input value={courseName} onChange={(e) => setCourseName(e.target.value)} placeholder="Introduction to CS" required /></div>
                     <div className="space-y-2">
-                      <Label>{t("auth.department")}</Label>
+                      <Label>Semester</Label>
                       <select value={courseDeptId} onChange={(e) => setCourseDeptId(e.target.value)} className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
-                        <option value="">{userProfile?.department_id ? "My Department (default)" : t("auth.selectDepartment")}</option>
+                        <option value="">{userProfile?.department_id ? "My Semester (default)" : "Select Semester"}</option>
                         {departments.map((d) => (<option key={d.id} value={d.id}>{d.name}</option>))}
                       </select>
                     </div>

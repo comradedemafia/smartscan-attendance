@@ -253,10 +253,10 @@ export default function Sessions() {
           {isAdmin && (
             <Select value={selectedDeptId} onValueChange={setSelectedDeptId}>
               <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder={t("auth.department")} />
+                <SelectValue placeholder="Semester" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">{t("admin.allDepartments")}</SelectItem>
+                <SelectItem value="all">{t("admin.allSemesters")}</SelectItem>
                 {departments.map((d) => (
                   <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                 ))}
