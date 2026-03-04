@@ -53,13 +53,14 @@ export default function Courses() {
     queryKey: ["courses", user?.id, role],
     queryFn: async () => {
       if (role === "lecturer") {
-        // Only modules assigned to this lecturer
+        // Lecturer sees only modules they created
         const { data, error } = await supabase
-          .from("course_lecturers")
-          .select("course_id, courses(*, course_enrollments(count), departments(name))")
-          .eq("lecturer_id", user!.id);
+          .from("courses")
+          .select("*, course_enrollments(count), departments(name)")
+          .eq("created_by", user!.id)
+          .order("created_at", { ascending: false });
         if (error) throw error;
-        return (data || []).map((r: any) => r.courses).filter(Boolean);
+        return data || [];
       }
       if (role === "student") {
         // Only enrolled modules
