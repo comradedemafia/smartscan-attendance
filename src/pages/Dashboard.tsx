@@ -267,6 +267,26 @@ export default function Dashboard() {
         ))}
       </div>
 
+      {/* Student Quick Actions */}
+      {isStudent && (
+        <Card className="bg-primary/5 border-primary/20">
+          <CardContent className="p-4 flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <GraduationCap className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="font-medium text-sm">{t("dept.myModules")}</p>
+                <p className="text-xs text-muted-foreground">{t("dept.viewJoinModules")}</p>
+              </div>
+            </div>
+            <Button onClick={() => navigate("/my-department")} className="gap-1">
+              {t("dept.goToModules")} <ArrowRight className="h-4 w-4" />
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Courses grouped by Level */}
       <div>
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
