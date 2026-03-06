@@ -22,6 +22,7 @@ export default function Dashboard() {
   const { t } = useI18n();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const isLecturer = role === "lecturer";
   const isStudent = role === "student";
