@@ -309,6 +309,11 @@ const translations = {
     "dept.selectLevel": "Select level",
     "dept.modulesInLevel": "Modules in this level",
     "dept.noLevels": "No levels found",
+    "dept.modulesJoined": "joined",
+    "dept.noModulesInLevel": "No modules available in this level yet.",
+    "dept.leave": "Leave",
+    "dept.otherModules": "Other Modules",
+    "dept.noModulesYet": "No modules available in your department yet.",
 
     // Subjects
     "subjects.title": "Subjects",
@@ -637,6 +642,11 @@ const translations = {
     "dept.selectLevel": "Chagua level",
     "dept.modulesInLevel": "Moduli katika level hii",
     "dept.noLevels": "Hakuna level zilizopatikana",
+    "dept.modulesJoined": "umejiunga",
+    "dept.noModulesInLevel": "Hakuna moduli zinazopatikana katika level hii bado.",
+    "dept.leave": "Ondoka",
+    "dept.otherModules": "Moduli Nyingine",
+    "dept.noModulesYet": "Hakuna moduli zinazopatikana katika idara yako bado.",
 
     // Subjects
     "subjects.title": "Masomo",
