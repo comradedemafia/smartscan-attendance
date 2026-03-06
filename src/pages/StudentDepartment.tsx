@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { BookOpen, LogIn, LogOut, GraduationCap, Calendar, CheckCircle2 } from "lucide-react";
+import { BookOpen, LogIn, LogOut, GraduationCap, Calendar, CheckCircle2, Filter } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function StudentDepartment() {
   const { user, profile } = useAuth();
@@ -15,6 +17,7 @@ export default function StudentDepartment() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [selectedLevelId, setSelectedLevelId] = useState<string | "all">("all");
 
   // Get student profile with department info
   const { data: studentProfile } = useQuery({
@@ -127,14 +130,29 @@ export default function StudentDepartment() {
     );
   }
 
+  // Auto-select student's level based on study_year → sort_order match
+  useEffect(() => {
+    if (levels.length > 0 && studentProfile?.study_year && selectedLevelId === "all") {
+      const matchedLevel = levels.find((l) => l.sort_order === studentProfile.study_year);
+      if (matchedLevel) setSelectedLevelId(matchedLevel.id);
+    }
+  }, [levels, studentProfile?.study_year]);
+
+  // Filter levels based on selection
+  const filteredLevels = selectedLevelId === "all"
+    ? levels
+    : levels.filter((l) => l.id === selectedLevelId);
+
   // Group courses by level
-  const coursesByLevel = levels.map((level) => ({
+  const coursesByLevel = filteredLevels.map((level) => ({
     ...level,
     courses: courses.filter((c) => c.level_id === level.id),
   }));
 
-  // Courses without a level
-  const unassignedCourses = courses.filter((c) => !c.level_id);
+  // Courses without a level (only show when "all" is selected)
+  const unassignedCourses = selectedLevelId === "all"
+    ? courses.filter((c) => !c.level_id)
+    : [];
 
   return (
     <div className="space-y-6">
@@ -147,29 +165,38 @@ export default function StudentDepartment() {
         </p>
       </div>
 
-      {/* Department & student info */}
+      {/* Department info + Level filter */}
       <Card className="bg-primary/5 border-primary/20">
         <CardContent className="py-4">
-          <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <GraduationCap className="h-4 w-4" />
               <span>{dept.name}</span>
-            </div>
-            <div className="flex items-center gap-3 text-sm text-muted-foreground">
               {studentProfile?.academic_year && (
                 <span className="flex items-center gap-1">
                   <Calendar className="h-3.5 w-3.5" />
                   {studentProfile.academic_year}
                 </span>
               )}
-              {studentProfile?.study_year && (
-                <span>
-                  {t("auth.year")} {studentProfile.study_year}
-                </span>
-              )}
               <Badge variant="secondary">
                 {myEnrollments.length} {t("dept.modulesJoined")}
               </Badge>
+            </div>
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Select value={selectedLevelId} onValueChange={setSelectedLevelId}>
+                <SelectTrigger className="w-[180px] h-8 text-xs">
+                  <SelectValue placeholder={t("dept.selectLevel")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("dept.allLevels")}</SelectItem>
+                  {levels.map((level) => (
+                    <SelectItem key={level.id} value={level.id}>
+                      {level.name} ({level.code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardContent>
