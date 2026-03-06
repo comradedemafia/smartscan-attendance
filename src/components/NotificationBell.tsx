@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -28,8 +28,21 @@ export default function NotificationBell() {
       return data;
     },
     enabled: !!user,
-    refetchInterval: 30000, // Poll every 30s
   });
+
+  // Realtime subscription for instant notifications
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel('student-notifications')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+        () => queryClient.invalidateQueries({ queryKey: ["notifications"] })
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user, queryClient]);
 
   const unreadCount = notifications.filter((n: any) => !n.is_read).length;
 

@@ -9,8 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { BookOpen, Calendar, Users, TrendingUp, Clock, Building2, Plus, GraduationCap, ChevronDown, ChevronRight, CalendarPlus } from "lucide-react";
+import { BookOpen, Calendar, Users, TrendingUp, Clock, Building2, Plus, GraduationCap, ChevronDown, ChevronRight, CalendarPlus, ArrowRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
@@ -21,6 +22,7 @@ export default function Dashboard() {
   const { t } = useI18n();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const isLecturer = role === "lecturer";
   const isStudent = role === "student";
@@ -264,6 +266,26 @@ export default function Dashboard() {
           </Card>
         ))}
       </div>
+
+      {/* Student Quick Actions */}
+      {isStudent && (
+        <Card className="bg-primary/5 border-primary/20">
+          <CardContent className="p-4 flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <GraduationCap className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="font-medium text-sm">{t("dept.myModules")}</p>
+                <p className="text-xs text-muted-foreground">{t("dept.viewJoinModules")}</p>
+              </div>
+            </div>
+            <Button onClick={() => navigate("/my-department")} className="gap-1">
+              {t("dept.goToModules")} <ArrowRight className="h-4 w-4" />
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Courses grouped by Level */}
       <div>
