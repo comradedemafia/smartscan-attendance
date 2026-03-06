@@ -112,6 +112,14 @@ export default function StudentDepartment() {
       toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
+  // Auto-select student's level based on study_year → sort_order match
+  useEffect(() => {
+    if (levels.length > 0 && studentProfile?.study_year && selectedLevelId === "all") {
+      const matchedLevel = levels.find((l) => l.sort_order === studentProfile.study_year);
+      if (matchedLevel) setSelectedLevelId(matchedLevel.id);
+    }
+  }, [levels, studentProfile?.study_year]);
+
   const dept = studentProfile?.departments as any;
 
   if (!dept) {
@@ -129,14 +137,6 @@ export default function StudentDepartment() {
       </div>
     );
   }
-
-  // Auto-select student's level based on study_year → sort_order match
-  useEffect(() => {
-    if (levels.length > 0 && studentProfile?.study_year && selectedLevelId === "all") {
-      const matchedLevel = levels.find((l) => l.sort_order === studentProfile.study_year);
-      if (matchedLevel) setSelectedLevelId(matchedLevel.id);
-    }
-  }, [levels, studentProfile?.study_year]);
 
   // Filter levels based on selection
   const filteredLevels = selectedLevelId === "all"
