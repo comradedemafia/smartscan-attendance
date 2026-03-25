@@ -46,6 +46,47 @@ export default function Auth() {
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Auto-fetch departments and levels from DB
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+  const [levels, setLevels] = useState<{ id: string; name: string; code: string; department_id: string; sort_order: number }[]>([]);
+  const [selectedDeptId, setSelectedDeptId] = useState("");
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const [deptRes, levelRes] = await Promise.all([
+        supabase.from("departments").select("id, name").order("name"),
+        supabase.from("levels").select("id, name, code, department_id, sort_order").order("sort_order"),
+      ]);
+      const depts = deptRes.data || [];
+      setDepartments(depts);
+      setLevels(levelRes.data || []);
+      // Auto-select if only one department
+      if (depts.length === 1) {
+        setSelectedDeptId(depts[0].id);
+      }
+    };
+    fetchData();
+  }, []);
+
+  // Filter levels by selected department
+  const filteredLevels = useMemo(
+    () => levels.filter((l) => l.department_id === selectedDeptId),
+    [levels, selectedDeptId]
+  );
+
+  // Map selected programme (level code) to department_id
+  const selectedLevel = useMemo(
+    () => levels.find((l) => l.code === programme),
+    [levels, programme]
+  );
+
+  // Auto-set department when programme changes
+  useEffect(() => {
+    if (selectedLevel) {
+      setSelectedDeptId(selectedLevel.department_id);
+    }
+  }, [selectedLevel]);
+
   const { signIn, signUp } = useAuth();
   const { t } = useI18n();
   const { toast } = useToast();
