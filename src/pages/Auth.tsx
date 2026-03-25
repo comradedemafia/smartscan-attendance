@@ -280,14 +280,29 @@ export default function Auth() {
                     {errors.gender && <p className="text-sm text-destructive">{errors.gender}</p>}
                   </div>
 
-                  {/* Level / Programme */}
+                  {/* Department (auto-selected if only one) */}
+                  {departments.length > 1 && (
+                    <div className="space-y-2">
+                      <Label>{t("auth.department")}</Label>
+                      <Select value={selectedDeptId} onValueChange={(v) => { setSelectedDeptId(v); setProgramme(""); }}>
+                        <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
+                        <SelectContent>
+                          {departments.map((d) => (
+                            <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {/* Level / Programme - loaded from DB */}
                   <div className="space-y-2">
                     <Label>{t("auth.programme")}</Label>
                     <Select value={programme} onValueChange={setProgramme}>
                       <SelectTrigger><SelectValue placeholder={t("auth.selectProgramme")} /></SelectTrigger>
                       <SelectContent>
-                        {PROGRAMMES.map((p) => (
-                          <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                        {filteredLevels.map((l) => (
+                          <SelectItem key={l.code} value={l.code}>{l.name} ({l.code})</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
