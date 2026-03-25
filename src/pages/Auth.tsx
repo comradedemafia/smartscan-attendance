@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,11 +28,7 @@ const signupSchema = loginSchema.extend({
   studyYear: z.coerce.number().min(1).max(6).optional(),
 });
 
-const PROGRAMMES = [
-  { value: "BTCCD", label: "Basic Technician Certificate (NTA LEVEL 4)" },
-  { value: "TCCD", label: "Technician Certificate (NTA LEVEL 5)" },
-  { value: "ODCD", label: "Ordinary Diploma (NTA LEVEL 6)" },
-];
+// Programmes will be loaded dynamically from levels table
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
@@ -49,6 +45,47 @@ export default function Auth() {
   const [studyYear, setStudyYear] = useState("1");
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Auto-fetch departments and levels from DB
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+  const [levels, setLevels] = useState<{ id: string; name: string; code: string; department_id: string; sort_order: number }[]>([]);
+  const [selectedDeptId, setSelectedDeptId] = useState("");
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const [deptRes, levelRes] = await Promise.all([
+        supabase.from("departments").select("id, name").order("name"),
+        supabase.from("levels").select("id, name, code, department_id, sort_order").order("sort_order"),
+      ]);
+      const depts = deptRes.data || [];
+      setDepartments(depts);
+      setLevels(levelRes.data || []);
+      // Auto-select if only one department
+      if (depts.length === 1) {
+        setSelectedDeptId(depts[0].id);
+      }
+    };
+    fetchData();
+  }, []);
+
+  // Filter levels by selected department
+  const filteredLevels = useMemo(
+    () => levels.filter((l) => l.department_id === selectedDeptId),
+    [levels, selectedDeptId]
+  );
+
+  // Map selected programme (level code) to department_id
+  const selectedLevel = useMemo(
+    () => levels.find((l) => l.code === programme),
+    [levels, programme]
+  );
+
+  // Auto-set department when programme changes
+  useEffect(() => {
+    if (selectedLevel) {
+      setSelectedDeptId(selectedLevel.department_id);
+    }
+  }, [selectedLevel]);
 
   const { signIn, signUp } = useAuth();
   const { t } = useI18n();
@@ -123,6 +160,7 @@ export default function Auth() {
           full_name: fullName,
           role,
           gender,
+          department_id: selectedLevel?.department_id || selectedDeptId || undefined,
           programme,
           phone,
           academic_year: academicYear,
@@ -242,14 +280,29 @@ export default function Auth() {
                     {errors.gender && <p className="text-sm text-destructive">{errors.gender}</p>}
                   </div>
 
-                  {/* Level / Programme */}
+                  {/* Department (auto-selected if only one) */}
+                  {departments.length > 1 && (
+                    <div className="space-y-2">
+                      <Label>{t("auth.department")}</Label>
+                      <Select value={selectedDeptId} onValueChange={(v) => { setSelectedDeptId(v); setProgramme(""); }}>
+                        <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
+                        <SelectContent>
+                          {departments.map((d) => (
+                            <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {/* Level / Programme - loaded from DB */}
                   <div className="space-y-2">
                     <Label>{t("auth.programme")}</Label>
                     <Select value={programme} onValueChange={setProgramme}>
                       <SelectTrigger><SelectValue placeholder={t("auth.selectProgramme")} /></SelectTrigger>
                       <SelectContent>
-                        {PROGRAMMES.map((p) => (
-                          <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                        {filteredLevels.map((l) => (
+                          <SelectItem key={l.code} value={l.code}>{l.name} ({l.code})</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
