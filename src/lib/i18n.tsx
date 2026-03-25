@@ -336,6 +336,19 @@ const translations = {
     "subjects.subjectStudents": "Subject Students",
     "subjects.enrollStudent": "Enroll Student in Subject",
     "subjects.createSubject": "Create Subject",
+
+    // Notifications
+    "notify.sendNotification": "Send Notification",
+    "notify.sendDesc": "Send notifications to users by role",
+    "notify.targetRole": "Target Role",
+    "notify.allUsers": "All Users",
+    "notify.type": "Notification Type",
+    "notify.notifTitle": "Title",
+    "notify.titlePlaceholder": "Enter notification title...",
+    "notify.notifMessage": "Message",
+    "notify.messagePlaceholder": "Enter notification message...",
+    "notify.send": "Send Notification",
+    "notify.sent": "Notification sent successfully!",
   },
   sw: {
     // Auth
@@ -670,6 +683,19 @@ const translations = {
     "subjects.subjectStudents": "Wanafunzi wa Somo",
     "subjects.enrollStudent": "Sajili Mwanafunzi kwenye Somo",
     "subjects.createSubject": "Unda Somo",
+
+    // Notifications
+    "notify.sendNotification": "Tuma Arifa",
+    "notify.sendDesc": "Tuma arifa kwa watumiaji kulingana na jukumu",
+    "notify.targetRole": "Jukumu la Walengwa",
+    "notify.allUsers": "Watumiaji Wote",
+    "notify.type": "Aina ya Arifa",
+    "notify.notifTitle": "Kichwa",
+    "notify.titlePlaceholder": "Andika kichwa cha arifa...",
+    "notify.notifMessage": "Ujumbe",
+    "notify.messagePlaceholder": "Andika ujumbe wa arifa...",
+    "notify.send": "Tuma Arifa",
+    "notify.sent": "Arifa imetumwa!",
   },
 } as const;
 
