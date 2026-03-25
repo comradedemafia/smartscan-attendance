@@ -356,6 +356,7 @@ const translations = {
     "notify.markAllRead": "Mark all read",
     "notify.clearAll": "Clear all",
     "notify.noNotifications": "No notifications yet",
+    "notify.viewAll": "View all notifications",
   },
   sw: {
     // Auth
@@ -710,6 +711,7 @@ const translations = {
     "notify.markAllRead": "Soma zote",
     "notify.clearAll": "Futa zote",
     "notify.noNotifications": "Hakuna arifa bado",
+    "notify.viewAll": "Ona arifa zote",
   },
 } as const;
 
