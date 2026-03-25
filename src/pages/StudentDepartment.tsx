@@ -264,6 +264,10 @@ export default function StudentDepartment() {
                           </p>
                         )}
                       </div>
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Users className="h-3.5 w-3.5" />
+                        <span>{enrollmentCounts[course.id] || 0} {t("dept.studentsEnrolled")}</span>
+                      </div>
                       <div className="flex items-center gap-2">
                         {isEnrolled ? (
                           <>
@@ -329,6 +333,10 @@ export default function StudentDepartment() {
                         {isEnrolled && <CheckCircle2 className="h-4 w-4 text-primary" />}
                       </div>
                       <p className="text-sm font-medium">{course.name}</p>
+                    </div>
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Users className="h-3.5 w-3.5" />
+                      <span>{enrollmentCounts[course.id] || 0} {t("dept.studentsEnrolled")}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       {isEnrolled ? (
