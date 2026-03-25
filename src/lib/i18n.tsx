@@ -315,6 +315,7 @@ const translations = {
     "dept.otherModules": "Other Modules",
     "dept.noModulesYet": "No modules available in your department yet.",
     "dept.allLevels": "All Levels",
+    "dept.studentsEnrolled": "students enrolled",
 
     // Subjects
     "subjects.title": "Subjects",
@@ -662,6 +663,7 @@ const translations = {
     "dept.otherModules": "Moduli Nyingine",
     "dept.noModulesYet": "Hakuna moduli zinazopatikana katika idara yako bado.",
     "dept.allLevels": "Level Zote",
+    "dept.studentsEnrolled": "wanafunzi wamejisajili",
 
     // Subjects
     "subjects.title": "Masomo",
