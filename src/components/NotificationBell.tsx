@@ -7,7 +7,7 @@ import { useI18n } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Bell, Check, Calendar, QrCode, Trash2 } from "lucide-react";
+import { Bell, Check, Calendar, QrCode, Trash2, AlertTriangle, Info } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 export default function NotificationBell() {
@@ -40,7 +40,10 @@ export default function NotificationBell() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
-        () => queryClient.invalidateQueries({ queryKey: ["notifications"] })
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["notifications"] });
+          queryClient.invalidateQueries({ queryKey: ["all-notifications"] });
+        }
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -57,7 +60,10 @@ export default function NotificationBell() {
         .eq("is_read", false);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["all-notifications"] });
+    },
   });
 
   const clearMutation = useMutation({
@@ -68,14 +74,41 @@ export default function NotificationBell() {
         .eq("user_id", user!.id);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["all-notifications"] });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("notifications")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["all-notifications"] });
+    },
   });
 
   const typeIcon = (type: string) => {
     switch (type) {
       case "session": return <Calendar className="h-4 w-4 text-primary" />;
       case "qr": return <QrCode className="h-4 w-4 text-primary" />;
-      default: return <Bell className="h-4 w-4 text-muted-foreground" />;
+      case "alert": return <AlertTriangle className="h-4 w-4 text-destructive" />;
+      default: return <Info className="h-4 w-4 text-muted-foreground" />;
+    }
+  };
+
+  const typeBadge = (type: string) => {
+    switch (type) {
+      case "session": return <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Session</Badge>;
+      case "qr": return <Badge variant="secondary" className="text-[10px] px-1.5 py-0">QR</Badge>;
+      case "alert": return <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Alert</Badge>;
+      default: return <Badge variant="outline" className="text-[10px] px-1.5 py-0">Info</Badge>;
     }
   };
 
@@ -85,44 +118,83 @@ export default function NotificationBell() {
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
+            <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground animate-pulse">
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-0" align="end">
-        <div className="flex items-center justify-between px-4 py-3 border-b">
-          <button onClick={() => { setOpen(false); navigate("/notifications"); }} className="font-semibold text-sm hover:text-primary transition-colors">
-            Notifications
+      <PopoverContent className="w-96 p-0" align="end">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <button
+            onClick={() => { setOpen(false); navigate("/notifications"); }}
+            className="font-semibold text-sm hover:text-primary transition-colors"
+          >
+            {t("notify.history")}
           </button>
-          {notifications.length > 0 && (
-            <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => clearMutation.mutate()}>
-              <Trash2 className="h-3 w-3 mr-1" />Clear all
-            </Button>
-          )}
+          <div className="flex items-center gap-1">
+            {unreadCount > 0 && (
+              <Badge variant="default" className="text-[10px] px-1.5">
+                {unreadCount} {t("notify.unread")}
+              </Badge>
+            )}
+            {notifications.length > 0 && (
+              <Button variant="ghost" size="sm" className="text-xs h-7 text-destructive hover:text-destructive" onClick={() => clearMutation.mutate()}>
+                <Trash2 className="h-3 w-3 mr-1" />{t("notify.clearAll")}
+              </Button>
+            )}
+          </div>
         </div>
-        <div className="max-h-80 overflow-y-auto">
+        <div className="max-h-96 overflow-y-auto">
           {notifications.length === 0 ? (
-            <div className="py-8 text-center">
-              <Bell className="h-8 w-8 mx-auto text-muted-foreground/30 mb-2" />
-              <p className="text-xs text-muted-foreground">No notifications</p>
+            <div className="py-10 text-center">
+              <Bell className="h-10 w-10 mx-auto text-muted-foreground/20 mb-2" />
+              <p className="text-xs text-muted-foreground">{t("notify.noNotifications")}</p>
             </div>
           ) : (
             notifications.map((n: any) => (
-              <div key={n.id} className={`px-4 py-3 border-b last:border-0 flex gap-3 ${!n.is_read ? "bg-primary/5" : ""}`}>
+              <div
+                key={n.id}
+                className={`px-4 py-3 border-b border-border last:border-0 flex gap-3 transition-colors ${!n.is_read ? "bg-primary/5" : "hover:bg-muted/50"}`}
+              >
                 <div className="mt-0.5 shrink-0">{typeIcon(n.type)}</div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium">{n.title}</p>
-                  <p className="text-xs text-muted-foreground truncate">{n.message}</p>
-                  <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className="text-sm font-semibold">{n.title}</p>
+                    {typeBadge(n.type)}
+                    {!n.is_read && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{n.message}</p>
+                  <p className="text-[10px] text-muted-foreground/60">
                     {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
                   </p>
                 </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0 h-7 w-7 text-muted-foreground hover:text-destructive"
+                  onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(n.id); }}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
               </div>
             ))
           )}
         </div>
+        {notifications.length > 0 && (
+          <div className="px-4 py-2 border-t border-border">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full text-xs text-primary hover:text-primary"
+              onClick={() => { setOpen(false); navigate("/notifications"); }}
+            >
+              {t("notify.viewAll")}
+            </Button>
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   );
