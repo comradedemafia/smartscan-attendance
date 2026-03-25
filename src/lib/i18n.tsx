@@ -350,6 +350,12 @@ const translations = {
     "notify.messagePlaceholder": "Enter notification message...",
     "notify.send": "Send Notification",
     "notify.sent": "Notification sent successfully!",
+    "notify.history": "Notifications",
+    "notify.total": "total",
+    "notify.unread": "unread",
+    "notify.markAllRead": "Mark all read",
+    "notify.clearAll": "Clear all",
+    "notify.noNotifications": "No notifications yet",
   },
   sw: {
     // Auth
@@ -698,6 +704,12 @@ const translations = {
     "notify.messagePlaceholder": "Andika ujumbe wa arifa...",
     "notify.send": "Tuma Arifa",
     "notify.sent": "Arifa imetumwa!",
+    "notify.history": "Arifa",
+    "notify.total": "jumla",
+    "notify.unread": "hazijasomwa",
+    "notify.markAllRead": "Soma zote",
+    "notify.clearAll": "Futa zote",
+    "notify.noNotifications": "Hakuna arifa bado",
   },
 } as const;
 
