@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { BookOpen, LogIn, LogOut, GraduationCap, Calendar, CheckCircle2, Filter } from "lucide-react";
+import { BookOpen, LogIn, LogOut, GraduationCap, Calendar, CheckCircle2, Filter, Users } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function StudentDepartment() {
@@ -78,6 +78,26 @@ export default function StudentDepartment() {
       return data.map((e) => e.course_id);
     },
     enabled: !!user,
+  });
+
+  // Get enrollment counts per course
+  const { data: enrollmentCounts = {} } = useQuery({
+    queryKey: ["enrollment-counts", departmentId],
+    queryFn: async () => {
+      const courseIds = courses.map((c) => c.id);
+      if (courseIds.length === 0) return {};
+      const { data, error } = await supabase
+        .from("course_enrollments")
+        .select("course_id")
+        .in("course_id", courseIds);
+      if (error) throw error;
+      const counts: Record<string, number> = {};
+      (data || []).forEach((e) => {
+        counts[e.course_id] = (counts[e.course_id] || 0) + 1;
+      });
+      return counts;
+    },
+    enabled: courses.length > 0,
   });
 
   const enrollMutation = useMutation({
