@@ -453,6 +453,15 @@ export type Database = {
         }
         Returns: undefined
       }
+      notify_users_by_role: {
+        Args: {
+          _message: string
+          _role: Database["public"]["Enums"]["app_role"]
+          _title: string
+          _type?: string
+        }
+        Returns: undefined
+      }
       search_profiles_for_enrollment: {
         Args: { search_term: string }
         Returns: {

@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { BookOpen, Calendar, Users, TrendingUp, Clock, Building2, Plus, GraduationCap, ChevronDown, ChevronRight, CalendarPlus, ArrowRight } from "lucide-react";
+import SendNotification from "@/components/SendNotification";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -266,6 +267,9 @@ export default function Dashboard() {
           </Card>
         ))}
       </div>
+
+      {/* Send Notification (admin/lecturer) */}
+      {(isAdmin || isLecturer) && <SendNotification />}
 
       {/* Student Quick Actions */}
       {isStudent && (
