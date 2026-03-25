@@ -28,11 +28,7 @@ const signupSchema = loginSchema.extend({
   studyYear: z.coerce.number().min(1).max(6).optional(),
 });
 
-const PROGRAMMES = [
-  { value: "BTCCD", label: "Basic Technician Certificate (NTA LEVEL 4)" },
-  { value: "TCCD", label: "Technician Certificate (NTA LEVEL 5)" },
-  { value: "ODCD", label: "Ordinary Diploma (NTA LEVEL 6)" },
-];
+// Programmes will be loaded dynamically from levels table
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
