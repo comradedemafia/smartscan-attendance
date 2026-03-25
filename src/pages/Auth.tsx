@@ -160,6 +160,7 @@ export default function Auth() {
           full_name: fullName,
           role,
           gender,
+          department_id: selectedLevel?.department_id || selectedDeptId || undefined,
           programme,
           phone,
           academic_year: academicYear,
