@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useI18n } from "@/lib/i18n";
@@ -14,6 +15,7 @@ export default function NotificationBell() {
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
 
   const { data: notifications = [] } = useQuery({
     queryKey: ["notifications", user?.id],
@@ -91,7 +93,9 @@ export default function NotificationBell() {
       </PopoverTrigger>
       <PopoverContent className="w-80 p-0" align="end">
         <div className="flex items-center justify-between px-4 py-3 border-b">
-          <h3 className="font-semibold text-sm">Notifications</h3>
+          <button onClick={() => { setOpen(false); navigate("/notifications"); }} className="font-semibold text-sm hover:text-primary transition-colors">
+            Notifications
+          </button>
           {notifications.length > 0 && (
             <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => clearMutation.mutate()}>
               <Trash2 className="h-3 w-3 mr-1" />Clear all
