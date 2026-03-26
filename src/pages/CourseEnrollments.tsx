@@ -3,14 +3,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useI18n } from "@/lib/i18n";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Badge } from "@/components/ui/badge";
 import { UserPlus, Trash2, BookOpen, Users, Search } from "lucide-react";
 
 export default function CourseEnrollments() {
@@ -19,11 +18,12 @@ export default function CourseEnrollments() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const [selectedDeptId, setSelectedDeptId] = useState<string>("");
+  const [selectedLevelId, setSelectedLevelId] = useState<string>("");
   const [selectedCourseId, setSelectedCourseId] = useState<string>("");
   const [enrollDialogOpen, setEnrollDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Only admin can access
   if (role !== "admin") {
     return (
       <div className="flex items-center justify-center h-64">
@@ -32,13 +32,46 @@ export default function CourseEnrollments() {
     );
   }
 
-  const { data: courses = [] } = useQuery({
-    queryKey: ["enroll-courses"],
+  // Fetch departments
+  const { data: departments = [] } = useQuery({
+    queryKey: ["enroll-departments"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("courses").select("id, code, name").order("name");
+      const { data, error } = await supabase.from("departments").select("id, name").order("name");
       if (error) throw error;
       return data;
     },
+  });
+
+  // Fetch levels filtered by department
+  const { data: levels = [] } = useQuery({
+    queryKey: ["enroll-levels", selectedDeptId],
+    queryFn: async () => {
+      if (!selectedDeptId) return [];
+      const { data, error } = await supabase
+        .from("levels")
+        .select("id, name, code")
+        .eq("department_id", selectedDeptId)
+        .order("sort_order");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedDeptId,
+  });
+
+  // Fetch courses filtered by level (and department)
+  const { data: courses = [] } = useQuery({
+    queryKey: ["enroll-courses", selectedDeptId, selectedLevelId],
+    queryFn: async () => {
+      if (!selectedDeptId) return [];
+      let query = supabase.from("courses").select("id, code, name").eq("department_id", selectedDeptId);
+      if (selectedLevelId) {
+        query = query.eq("level_id", selectedLevelId);
+      }
+      const { data, error } = await query.order("name");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedDeptId,
   });
 
   const { data: enrollments = [], isLoading: loadingEnrollments } = useQuery({
@@ -55,12 +88,10 @@ export default function CourseEnrollments() {
     enabled: !!selectedCourseId,
   });
 
-  // Get all students not yet enrolled in selected course
   const { data: availableStudents = [], isLoading: loadingStudents } = useQuery({
     queryKey: ["enroll-available-students", selectedCourseId],
     queryFn: async () => {
       if (!selectedCourseId) return [];
-      // Get all students
       const { data: studentRoles, error: rolesErr } = await supabase
         .from("user_roles")
         .select("user_id")
@@ -125,27 +156,66 @@ export default function CourseEnrollments() {
 
   const selectedCourse = courses.find((c) => c.id === selectedCourseId);
 
+  const handleDeptChange = (val: string) => {
+    setSelectedDeptId(val);
+    setSelectedLevelId("");
+    setSelectedCourseId("");
+  };
+
+  const handleLevelChange = (val: string) => {
+    setSelectedLevelId(val);
+    setSelectedCourseId("");
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight font-['Space_Grotesk']">{t("courses.enroll")}</h1>
       </div>
 
-      {/* Course selector */}
-      <div className="max-w-sm space-y-2">
-        <Label>{t("sessions.course")}</Label>
-        <Select value={selectedCourseId} onValueChange={setSelectedCourseId}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select a course" />
-          </SelectTrigger>
-          <SelectContent>
-            {courses.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.code} — {c.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* Cascading filters: Department → Level → Course */}
+      <div className="grid gap-4 sm:grid-cols-3 max-w-3xl">
+        <div className="space-y-2">
+          <Label>Semester</Label>
+          <Select value={selectedDeptId} onValueChange={handleDeptChange}>
+            <SelectTrigger>
+              <SelectValue placeholder="Chagua Semester" />
+            </SelectTrigger>
+            <SelectContent>
+              {departments.map((d) => (
+                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Level</Label>
+          <Select value={selectedLevelId} onValueChange={handleLevelChange} disabled={!selectedDeptId}>
+            <SelectTrigger>
+              <SelectValue placeholder="Chagua Level" />
+            </SelectTrigger>
+            <SelectContent>
+              {levels.map((l) => (
+                <SelectItem key={l.id} value={l.id}>{l.code} — {l.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Module</Label>
+          <Select value={selectedCourseId} onValueChange={setSelectedCourseId} disabled={!selectedDeptId}>
+            <SelectTrigger>
+              <SelectValue placeholder="Chagua Module" />
+            </SelectTrigger>
+            <SelectContent>
+              {courses.map((c) => (
+                <SelectItem key={c.id} value={c.id}>{c.code} — {c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {selectedCourseId && (
@@ -196,7 +266,6 @@ export default function CourseEnrollments() {
             </div>
           )}
 
-          {/* Enroll dialog */}
           <Dialog open={enrollDialogOpen} onOpenChange={setEnrollDialogOpen}>
             <DialogContent className="max-w-md">
               <DialogHeader>
