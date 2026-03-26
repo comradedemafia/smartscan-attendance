@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, Trash2, BookOpen, Users, Search } from "lucide-react";
+import { UserPlus, Trash2, BookOpen, Users, Search, UsersRound } from "lucide-react";
 
 export default function CourseEnrollments() {
   const { role } = useAuth();
@@ -125,7 +125,53 @@ export default function CourseEnrollments() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["enroll-enrollments", selectedCourseId] });
       queryClient.invalidateQueries({ queryKey: ["enroll-available-students", selectedCourseId] });
-      toast({ title: t("common.success"), description: "Student enrolled" });
+      toast({ title: t("common.success"), description: t("courses.studentAdded") });
+    },
+    onError: (e: any) => {
+      toast({ title: t("common.error"), description: e.message, variant: "destructive" });
+    },
+  });
+
+  const bulkEnrollMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedCourseId || !selectedDeptId) return;
+      // Get all students in the selected department
+      const { data: students, error: studErr } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("department_id", selectedDeptId);
+      if (studErr) throw studErr;
+
+      const studentIds = students.map((s) => s.id);
+      if (studentIds.length === 0) return;
+
+      // Filter to only actual students
+      const { data: studentRoles, error: rolesErr } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "student")
+        .in("user_id", studentIds);
+      if (rolesErr) throw rolesErr;
+
+      const enrolledIds = enrollments.map((e) => e.user_id);
+      const toEnroll = studentRoles
+        .map((r) => r.user_id)
+        .filter((id) => !enrolledIds.includes(id));
+
+      if (toEnroll.length === 0) return;
+
+      const rows = toEnroll.map((user_id) => ({
+        course_id: selectedCourseId,
+        user_id,
+      }));
+
+      const { error } = await supabase.from("course_enrollments").insert(rows);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["enroll-enrollments", selectedCourseId] });
+      queryClient.invalidateQueries({ queryKey: ["enroll-available-students", selectedCourseId] });
+      toast({ title: t("common.success"), description: t("enroll.bulkEnrollSuccess") });
     },
     onError: (e: any) => {
       toast({ title: t("common.error"), description: e.message, variant: "destructive" });
@@ -140,7 +186,7 @@ export default function CourseEnrollments() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["enroll-enrollments", selectedCourseId] });
       queryClient.invalidateQueries({ queryKey: ["enroll-available-students", selectedCourseId] });
-      toast({ title: t("common.success"), description: "Student removed" });
+      toast({ title: t("common.success"), description: t("courses.studentRemoved") });
     },
     onError: (e: any) => {
       toast({ title: t("common.error"), description: e.message, variant: "destructive" });
@@ -173,13 +219,13 @@ export default function CourseEnrollments() {
         <h1 className="text-2xl font-bold tracking-tight font-['Space_Grotesk']">{t("courses.enroll")}</h1>
       </div>
 
-      {/* Cascading filters: Department → Level → Course */}
+      {/* Cascading filters */}
       <div className="grid gap-4 sm:grid-cols-3 max-w-3xl">
         <div className="space-y-2">
-          <Label>Semester</Label>
+          <Label>{t("enroll.semester")}</Label>
           <Select value={selectedDeptId} onValueChange={handleDeptChange}>
             <SelectTrigger>
-              <SelectValue placeholder="Chagua Semester" />
+              <SelectValue placeholder={t("enroll.selectSemester")} />
             </SelectTrigger>
             <SelectContent>
               {departments.map((d) => (
@@ -190,10 +236,10 @@ export default function CourseEnrollments() {
         </div>
 
         <div className="space-y-2">
-          <Label>Level</Label>
+          <Label>{t("enroll.level")}</Label>
           <Select value={selectedLevelId} onValueChange={handleLevelChange} disabled={!selectedDeptId}>
             <SelectTrigger>
-              <SelectValue placeholder="Chagua Level" />
+              <SelectValue placeholder={t("enroll.selectLevel")} />
             </SelectTrigger>
             <SelectContent>
               {levels.map((l) => (
@@ -204,10 +250,10 @@ export default function CourseEnrollments() {
         </div>
 
         <div className="space-y-2">
-          <Label>Module</Label>
+          <Label>{t("enroll.module")}</Label>
           <Select value={selectedCourseId} onValueChange={setSelectedCourseId} disabled={!selectedDeptId}>
             <SelectTrigger>
-              <SelectValue placeholder="Chagua Module" />
+              <SelectValue placeholder={t("enroll.selectModule")} />
             </SelectTrigger>
             <SelectContent>
               {courses.map((c) => (
@@ -220,17 +266,31 @@ export default function CourseEnrollments() {
 
       {selectedCourseId && (
         <>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <Users className="h-5 w-5 text-muted-foreground" />
               <span className="text-sm text-muted-foreground">
                 {enrollments.length} {t("courses.students")} — {selectedCourse?.code}
               </span>
             </div>
-            <Button onClick={() => { setEnrollDialogOpen(true); setSearchQuery(""); }}>
-              <UserPlus className="h-4 w-4 mr-2" />
-              {t("courses.enroll")}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (confirm(t("enroll.bulkEnrollConfirm"))) {
+                    bulkEnrollMutation.mutate();
+                  }
+                }}
+                disabled={bulkEnrollMutation.isPending}
+              >
+                <UsersRound className="h-4 w-4 mr-2" />
+                {t("enroll.bulkEnroll")}
+              </Button>
+              <Button onClick={() => { setEnrollDialogOpen(true); setSearchQuery(""); }}>
+                <UserPlus className="h-4 w-4 mr-2" />
+                {t("courses.enroll")}
+              </Button>
+            </div>
           </div>
 
           {loadingEnrollments ? (
@@ -239,7 +299,7 @@ export default function CourseEnrollments() {
             <Card>
               <CardContent className="py-8 text-center">
                 <BookOpen className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
-                <p className="text-muted-foreground">No students enrolled yet</p>
+                <p className="text-muted-foreground">{t("enroll.noStudentsEnrolled")}</p>
               </CardContent>
             </Card>
           ) : (
@@ -284,7 +344,7 @@ export default function CourseEnrollments() {
                 {loadingStudents ? (
                   <p className="text-sm text-muted-foreground text-center py-4">{t("common.loading")}</p>
                 ) : filteredStudents.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">No students available</p>
+                  <p className="text-sm text-muted-foreground text-center py-4">{t("enroll.noStudentsAvailable")}</p>
                 ) : (
                   filteredStudents.map((student) => (
                     <div
@@ -302,7 +362,7 @@ export default function CourseEnrollments() {
                         onClick={() => enrollMutation.mutate(student.id)}
                       >
                         <UserPlus className="h-3.5 w-3.5 mr-1" />
-                        Add
+                        {t("enroll.add")}
                       </Button>
                     </div>
                   ))
