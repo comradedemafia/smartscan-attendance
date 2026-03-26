@@ -357,6 +357,20 @@ const translations = {
     "notify.clearAll": "Clear all",
     "notify.noNotifications": "No notifications yet",
     "notify.viewAll": "View all notifications",
+
+    // Enrollment
+    "enroll.semester": "Semester",
+    "enroll.selectSemester": "Select Semester",
+    "enroll.level": "Level",
+    "enroll.selectLevel": "Select Level",
+    "enroll.module": "Module",
+    "enroll.selectModule": "Select Module",
+    "enroll.bulkEnroll": "Enroll All Level Students",
+    "enroll.bulkEnrollConfirm": "Enroll all students of this level into this module?",
+    "enroll.bulkEnrollSuccess": "All level students enrolled successfully",
+    "enroll.noStudentsEnrolled": "No students enrolled yet",
+    "enroll.noStudentsAvailable": "No students available",
+    "enroll.add": "Add",
   },
   sw: {
     // Auth
@@ -712,6 +726,20 @@ const translations = {
     "notify.clearAll": "Futa zote",
     "notify.noNotifications": "Hakuna arifa bado",
     "notify.viewAll": "Ona arifa zote",
+
+    // Enrollment
+    "enroll.semester": "Semesta",
+    "enroll.selectSemester": "Chagua Semesta",
+    "enroll.level": "Level",
+    "enroll.selectLevel": "Chagua Level",
+    "enroll.module": "Moduli",
+    "enroll.selectModule": "Chagua Moduli",
+    "enroll.bulkEnroll": "Sajili Wanafunzi Wote wa Level",
+    "enroll.bulkEnrollConfirm": "Sajili wanafunzi wote wa level hii kwenye moduli hii?",
+    "enroll.bulkEnrollSuccess": "Wanafunzi wote wa level wamesajiliwa",
+    "enroll.noStudentsEnrolled": "Hakuna wanafunzi waliosajiliwa bado",
+    "enroll.noStudentsAvailable": "Hakuna wanafunzi wanaopatikana",
+    "enroll.add": "Ongeza",
   },
 } as const;
 
