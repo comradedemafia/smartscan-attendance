@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      attendance_otp: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          method: string
+          otp_code: string
+          session_id: string
+          used: boolean
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          id?: string
+          method?: string
+          otp_code: string
+          session_id: string
+          used?: boolean
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          method?: string
+          otp_code?: string
+          session_id?: string
+          used?: boolean
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_otp_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       attendance_records: {
         Row: {
           id: string
@@ -286,6 +327,7 @@ export type Database = {
           id: string
           phone: string | null
           study_year: number | null
+          totp_secret: string | null
           university_id: string
           updated_at: string
         }
@@ -300,6 +342,7 @@ export type Database = {
           id: string
           phone?: string | null
           study_year?: number | null
+          totp_secret?: string | null
           university_id: string
           updated_at?: string
         }
@@ -314,6 +357,7 @@ export type Database = {
           id?: string
           phone?: string | null
           study_year?: number | null
+          totp_secret?: string | null
           university_id?: string
           updated_at?: string
         }
