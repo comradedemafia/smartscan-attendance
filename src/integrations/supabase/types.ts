@@ -462,6 +462,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_2fa_stats: {
+        Args: never
+        Returns: {
+          phone_set: number
+          total_students: number
+          totp_enabled: number
+        }[]
+      }
       get_department_lecturers: {
         Args: { _department_id: string }
         Returns: {
