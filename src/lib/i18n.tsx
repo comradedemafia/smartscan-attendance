@@ -802,6 +802,10 @@ const translations = {
     "otp.enterVerificationCode": "Weka msimbo wa tarakimu 6 kutoka programu yako kuthibitisha:",
     "otp.totpEnabled": "Programu ya uthibitishaji imewezeshwa!",
     "otp.totpDisabled": "Programu ya uthibitishaji imezimwa",
+    "otp.totalStudents": "Wanafunzi Wote",
+    "otp.totpSetup": "2FA Imewezeshwa",
+    "otp.noTotp": "Hakuna 2FA",
+    "otp.adoptionRate": "Kiwango cha 2FA",
   },
 } as const;
 
