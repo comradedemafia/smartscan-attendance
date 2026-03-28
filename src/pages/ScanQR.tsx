@@ -7,7 +7,7 @@ import { useI18n } from "@/lib/i18n";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { QrCode, CheckCircle2, XCircle, Camera, Shield, Smartphone, MessageSquare } from "lucide-react";
+import { QrCode, CheckCircle2, XCircle, Camera, Shield, Smartphone, MessageSquare, Mail } from "lucide-react";
 import { Html5Qrcode } from "html5-qrcode";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { z } from "zod";
@@ -18,7 +18,7 @@ const qrPayloadSchema = z.object({
 });
 
 type OtpStep = "scan" | "choose-method" | "enter-otp";
-type OtpMethod = "totp" | "sms";
+type OtpMethod = "totp" | "sms" | "email";
 
 export default function ScanQR() {
   const { user } = useAuth();
@@ -34,10 +34,11 @@ export default function ScanQR() {
   // 2FA State
   const [otpStep, setOtpStep] = useState<OtpStep>("scan");
   const [otpToken, setOtpToken] = useState<string | null>(null);
-  const [otpMethods, setOtpMethods] = useState<{ totp: boolean; sms: boolean }>({ totp: false, sms: false });
+  const [otpMethods, setOtpMethods] = useState<{ totp: boolean; sms: boolean; email: boolean }>({ totp: false, sms: false, email: false });
   const [selectedMethod, setSelectedMethod] = useState<OtpMethod | null>(null);
   const [otpCode, setOtpCode] = useState("");
   const [phoneHint, setPhoneHint] = useState("");
+  const [emailHint, setEmailHint] = useState("");
 
   // Step 1: Initiate OTP after QR scan
   const initiateMutation = useMutation({
@@ -53,16 +54,25 @@ export default function ScanQR() {
       setOtpToken(data.token);
       setOtpMethods(data.methods);
       // If only one method available, auto-select it
-      if (data.methods.totp && !data.methods.sms) {
-        setSelectedMethod("totp");
-        setOtpStep("enter-otp");
-      } else if (data.methods.sms && !data.methods.totp) {
-        setSelectedMethod("sms");
-        sendSmsMutation.mutate(data.token);
-      } else if (data.methods.totp && data.methods.sms) {
+      const availableMethods = [
+        data.methods.totp && "totp",
+        data.methods.sms && "sms",
+        data.methods.email && "email",
+      ].filter(Boolean) as OtpMethod[];
+
+      if (availableMethods.length === 1) {
+        const method = availableMethods[0];
+        setSelectedMethod(method);
+        if (method === "sms") {
+          sendSmsMutation.mutate(data.token);
+        } else if (method === "email") {
+          sendEmailMutation.mutate(data.token);
+        } else {
+          setOtpStep("enter-otp");
+        }
+      } else if (availableMethods.length > 1) {
         setOtpStep("choose-method");
       } else {
-        // No 2FA method set up - show error
         toast({ title: t("otp.noMethodSetup"), variant: "destructive" });
         setResult("error");
       }
