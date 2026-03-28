@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { BookOpen, Calendar, Users, TrendingUp, Clock, Building2, Plus, GraduationCap, ChevronDown, ChevronRight, CalendarPlus, ArrowRight } from "lucide-react";
+import { BookOpen, Calendar, Users, TrendingUp, Clock, Building2, Plus, GraduationCap, ChevronDown, ChevronRight, CalendarPlus, ArrowRight, Shield, ShieldCheck, ShieldOff } from "lucide-react";
 import SendNotification from "@/components/SendNotification";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -151,6 +151,16 @@ export default function Dashboard() {
     enabled: !!user,
   });
 
+  const { data: twoFaStats } = useQuery({
+    queryKey: ["2fa-stats"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_2fa_stats");
+      if (error) throw error;
+      return data?.[0] || { total_students: 0, totp_enabled: 0, phone_set: 0 };
+    },
+    enabled: isAdmin,
+  });
+
   const createCourseMutation = useMutation({
     mutationFn: async () => {
       const deptId = courseDeptId || userProfile?.department_id || null;
@@ -267,6 +277,51 @@ export default function Dashboard() {
           </Card>
         ))}
       </div>
+
+      {/* 2FA Stats (admin only) */}
+      {isAdmin && twoFaStats && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Shield className="h-5 w-5 text-primary" />
+              {t("otp.twoFactorAuth")} — {t("admin.students")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="text-center p-3 rounded-lg bg-muted">
+                <Users className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+                <p className="text-2xl font-bold">{twoFaStats.total_students}</p>
+                <p className="text-xs text-muted-foreground">{t("otp.totalStudents")}</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-primary/10">
+                <ShieldCheck className="h-5 w-5 mx-auto mb-1 text-primary" />
+                <p className="text-2xl font-bold text-primary">{twoFaStats.totp_enabled}</p>
+                <p className="text-xs text-muted-foreground">{t("otp.totpSetup")}</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-destructive/10">
+                <ShieldOff className="h-5 w-5 mx-auto mb-1 text-destructive" />
+                <p className="text-2xl font-bold text-destructive">{twoFaStats.total_students - twoFaStats.totp_enabled}</p>
+                <p className="text-xs text-muted-foreground">{t("otp.noTotp")}</p>
+              </div>
+            </div>
+            {twoFaStats.total_students > 0 && (
+              <div className="mt-3">
+                <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                  <span>{t("otp.adoptionRate")}</span>
+                  <span>{Math.round((twoFaStats.totp_enabled / twoFaStats.total_students) * 100)}%</span>
+                </div>
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary rounded-full transition-all"
+                    style={{ width: `${(twoFaStats.totp_enabled / twoFaStats.total_students) * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Send Notification (admin/lecturer) */}
       {(isAdmin || isLecturer) && <SendNotification />}
