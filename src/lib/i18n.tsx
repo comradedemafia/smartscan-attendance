@@ -400,6 +400,10 @@ const translations = {
     "otp.enterVerificationCode": "Enter the 6-digit code from your app to verify setup:",
     "otp.totpEnabled": "Authenticator app enabled!",
     "otp.totpDisabled": "Authenticator app disabled",
+    "otp.totalStudents": "Total Students",
+    "otp.totpSetup": "2FA Enabled",
+    "otp.noTotp": "No 2FA",
+    "otp.adoptionRate": "2FA Adoption Rate",
   },
   sw: {
     // Auth
