@@ -3,11 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { Link } from "react-router-dom";
 import { useI18n } from "@/lib/i18n";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { QrCode, CheckCircle2, XCircle, Camera, Shield, Smartphone } from "lucide-react";
+import { QrCode, CheckCircle2, XCircle, Camera, Shield, Smartphone, ShieldAlert, Settings } from "lucide-react";
 import { Html5Qrcode } from "html5-qrcode";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { z } from "zod";
@@ -17,7 +18,7 @@ const qrPayloadSchema = z.object({
   secret: z.string().min(1).max(200),
 });
 
-type OtpStep = "scan" | "enter-otp";
+type OtpStep = "scan" | "enter-otp" | "no-totp";
 
 export default function ScanQR() {
   const { user } = useAuth();
@@ -50,8 +51,7 @@ export default function ScanQR() {
       if (data.methods.totp) {
         setOtpStep("enter-otp");
       } else {
-        toast({ title: t("otp.noMethodSetup"), variant: "destructive" });
-        setResult("error");
+        setOtpStep("no-totp");
       }
     },
     onError: (e: any) => {
@@ -173,6 +173,32 @@ export default function ScanQR() {
               ref={containerRef}
               className="aspect-square bg-muted rounded-lg overflow-hidden"
             />
+          )}
+
+          {/* No TOTP setup message */}
+          {otpStep === "no-totp" && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-4 rounded-lg bg-destructive/10 text-destructive">
+                <ShieldAlert className="h-6 w-6" />
+                <div>
+                  <p className="font-medium">{t("otp.totpNotSetup")}</p>
+                  <p className="text-sm">{t("otp.totpRequiredDesc")}</p>
+                </div>
+              </div>
+              <Button asChild className="w-full" size="lg">
+                <Link to="/settings">
+                  <Settings className="h-4 w-4 mr-2" />
+                  {t("otp.goToSettings")}
+                </Link>
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full"
+                onClick={() => setOtpStep("scan")}
+              >
+                {t("common.cancel")}
+              </Button>
+            </div>
           )}
 
           {/* Enter TOTP code */}
