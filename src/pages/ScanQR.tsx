@@ -111,6 +111,26 @@ export default function ScanQR() {
     },
   });
 
+  // Step 2b: Send Email OTP
+  const sendEmailMutation = useMutation({
+    mutationFn: async (token: string) => {
+      const { data, error } = await supabase.functions.invoke("attendance-otp", {
+        body: { action: "send-email", token },
+      });
+      if (error) throw new Error(error.message || "Network error");
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (data) => {
+      setEmailHint(data.email_hint || "");
+      setOtpStep("enter-otp");
+      toast({ title: t("otp.emailSent") });
+    },
+    onError: (e: any) => {
+      toast({ title: t("common.error"), description: e.message, variant: "destructive" });
+    },
+  });
+
   // Step 3: Verify OTP
   const verifyMutation = useMutation({
     mutationFn: async () => {
