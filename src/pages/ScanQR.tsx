@@ -7,7 +7,7 @@ import { useI18n } from "@/lib/i18n";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { QrCode, CheckCircle2, XCircle, Camera, Shield, Smartphone, MessageSquare } from "lucide-react";
+import { QrCode, CheckCircle2, XCircle, Camera, Shield, Smartphone, MessageSquare, Mail } from "lucide-react";
 import { Html5Qrcode } from "html5-qrcode";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { z } from "zod";
@@ -18,7 +18,7 @@ const qrPayloadSchema = z.object({
 });
 
 type OtpStep = "scan" | "choose-method" | "enter-otp";
-type OtpMethod = "totp" | "sms";
+type OtpMethod = "totp" | "sms" | "email";
 
 export default function ScanQR() {
   const { user } = useAuth();
@@ -34,10 +34,11 @@ export default function ScanQR() {
   // 2FA State
   const [otpStep, setOtpStep] = useState<OtpStep>("scan");
   const [otpToken, setOtpToken] = useState<string | null>(null);
-  const [otpMethods, setOtpMethods] = useState<{ totp: boolean; sms: boolean }>({ totp: false, sms: false });
+  const [otpMethods, setOtpMethods] = useState<{ totp: boolean; sms: boolean; email: boolean }>({ totp: false, sms: false, email: false });
   const [selectedMethod, setSelectedMethod] = useState<OtpMethod | null>(null);
   const [otpCode, setOtpCode] = useState("");
   const [phoneHint, setPhoneHint] = useState("");
+  const [emailHint, setEmailHint] = useState("");
 
   // Step 1: Initiate OTP after QR scan
   const initiateMutation = useMutation({
@@ -53,16 +54,25 @@ export default function ScanQR() {
       setOtpToken(data.token);
       setOtpMethods(data.methods);
       // If only one method available, auto-select it
-      if (data.methods.totp && !data.methods.sms) {
-        setSelectedMethod("totp");
-        setOtpStep("enter-otp");
-      } else if (data.methods.sms && !data.methods.totp) {
-        setSelectedMethod("sms");
-        sendSmsMutation.mutate(data.token);
-      } else if (data.methods.totp && data.methods.sms) {
+      const availableMethods = [
+        data.methods.totp && "totp",
+        data.methods.sms && "sms",
+        data.methods.email && "email",
+      ].filter(Boolean) as OtpMethod[];
+
+      if (availableMethods.length === 1) {
+        const method = availableMethods[0];
+        setSelectedMethod(method);
+        if (method === "sms") {
+          sendSmsMutation.mutate(data.token);
+        } else if (method === "email") {
+          sendEmailMutation.mutate(data.token);
+        } else {
+          setOtpStep("enter-otp");
+        }
+      } else if (availableMethods.length > 1) {
         setOtpStep("choose-method");
       } else {
-        // No 2FA method set up - show error
         toast({ title: t("otp.noMethodSetup"), variant: "destructive" });
         setResult("error");
       }
@@ -95,6 +105,26 @@ export default function ScanQR() {
       setPhoneHint(data.phone_hint || "");
       setOtpStep("enter-otp");
       toast({ title: t("otp.smsSent") });
+    },
+    onError: (e: any) => {
+      toast({ title: t("common.error"), description: e.message, variant: "destructive" });
+    },
+  });
+
+  // Step 2b: Send Email OTP
+  const sendEmailMutation = useMutation({
+    mutationFn: async (token: string) => {
+      const { data, error } = await supabase.functions.invoke("attendance-otp", {
+        body: { action: "send-email", token },
+      });
+      if (error) throw new Error(error.message || "Network error");
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (data) => {
+      setEmailHint(data.email_hint || "");
+      setOtpStep("enter-otp");
+      toast({ title: t("otp.emailSent") });
     },
     onError: (e: any) => {
       toast({ title: t("common.error"), description: e.message, variant: "destructive" });
@@ -186,6 +216,8 @@ export default function ScanQR() {
     setSelectedMethod(method);
     if (method === "sms" && otpToken) {
       sendSmsMutation.mutate(otpToken);
+    } else if (method === "email" && otpToken) {
+      sendEmailMutation.mutate(otpToken);
     } else {
       setOtpStep("enter-otp");
     }
@@ -235,7 +267,7 @@ export default function ScanQR() {
                     variant="outline"
                     className="h-auto p-4 flex items-center gap-4 justify-start"
                     onClick={() => handleMethodSelect("totp")}
-                    disabled={sendSmsMutation.isPending}
+                  disabled={sendSmsMutation.isPending || sendEmailMutation.isPending}
                   >
                     <Smartphone className="h-8 w-8 text-primary" />
                     <div className="text-left">
@@ -249,12 +281,26 @@ export default function ScanQR() {
                     variant="outline"
                     className="h-auto p-4 flex items-center gap-4 justify-start"
                     onClick={() => handleMethodSelect("sms")}
-                    disabled={sendSmsMutation.isPending}
+                    disabled={sendSmsMutation.isPending || sendEmailMutation.isPending}
                   >
                     <MessageSquare className="h-8 w-8 text-primary" />
                     <div className="text-left">
                       <p className="font-medium">{t("otp.smsOtp")}</p>
                       <p className="text-sm text-muted-foreground">{t("otp.smsOtpDesc")}</p>
+                    </div>
+                  </Button>
+                )}
+                {otpMethods.email && (
+                  <Button
+                    variant="outline"
+                    className="h-auto p-4 flex items-center gap-4 justify-start"
+                    onClick={() => handleMethodSelect("email")}
+                    disabled={sendSmsMutation.isPending || sendEmailMutation.isPending}
+                  >
+                    <Mail className="h-8 w-8 text-primary" />
+                    <div className="text-left">
+                      <p className="font-medium">{t("otp.emailOtp")}</p>
+                      <p className="text-sm text-muted-foreground">{t("otp.emailOtpDesc")}</p>
                     </div>
                   </Button>
                 )}
@@ -272,6 +318,8 @@ export default function ScanQR() {
                   <p className="text-sm text-muted-foreground">
                     {selectedMethod === "sms"
                       ? `${t("otp.codeSentTo")} ****${phoneHint}`
+                      : selectedMethod === "email"
+                      ? `${t("otp.codeSentToEmail")} ${emailHint}`
                       : t("otp.openAuthApp")}
                   </p>
                 </div>
