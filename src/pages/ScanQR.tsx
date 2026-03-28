@@ -216,6 +216,8 @@ export default function ScanQR() {
     setSelectedMethod(method);
     if (method === "sms" && otpToken) {
       sendSmsMutation.mutate(otpToken);
+    } else if (method === "email" && otpToken) {
+      sendEmailMutation.mutate(otpToken);
     } else {
       setOtpStep("enter-otp");
     }
@@ -265,7 +267,7 @@ export default function ScanQR() {
                     variant="outline"
                     className="h-auto p-4 flex items-center gap-4 justify-start"
                     onClick={() => handleMethodSelect("totp")}
-                    disabled={sendSmsMutation.isPending}
+                  disabled={sendSmsMutation.isPending || sendEmailMutation.isPending}
                   >
                     <Smartphone className="h-8 w-8 text-primary" />
                     <div className="text-left">
@@ -279,12 +281,26 @@ export default function ScanQR() {
                     variant="outline"
                     className="h-auto p-4 flex items-center gap-4 justify-start"
                     onClick={() => handleMethodSelect("sms")}
-                    disabled={sendSmsMutation.isPending}
+                    disabled={sendSmsMutation.isPending || sendEmailMutation.isPending}
                   >
                     <MessageSquare className="h-8 w-8 text-primary" />
                     <div className="text-left">
                       <p className="font-medium">{t("otp.smsOtp")}</p>
                       <p className="text-sm text-muted-foreground">{t("otp.smsOtpDesc")}</p>
+                    </div>
+                  </Button>
+                )}
+                {otpMethods.email && (
+                  <Button
+                    variant="outline"
+                    className="h-auto p-4 flex items-center gap-4 justify-start"
+                    onClick={() => handleMethodSelect("email")}
+                    disabled={sendSmsMutation.isPending || sendEmailMutation.isPending}
+                  >
+                    <Mail className="h-8 w-8 text-primary" />
+                    <div className="text-left">
+                      <p className="font-medium">{t("otp.emailOtp")}</p>
+                      <p className="text-sm text-muted-foreground">{t("otp.emailOtpDesc")}</p>
                     </div>
                   </Button>
                 )}
@@ -302,6 +318,8 @@ export default function ScanQR() {
                   <p className="text-sm text-muted-foreground">
                     {selectedMethod === "sms"
                       ? `${t("otp.codeSentTo")} ****${phoneHint}`
+                      : selectedMethod === "email"
+                      ? `${t("otp.codeSentToEmail")} ${emailHint}`
                       : t("otp.openAuthApp")}
                   </p>
                 </div>
