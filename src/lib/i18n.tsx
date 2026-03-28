@@ -400,6 +400,10 @@ const translations = {
     "otp.enterVerificationCode": "Enter the 6-digit code from your app to verify setup:",
     "otp.totpEnabled": "Authenticator app enabled!",
     "otp.totpDisabled": "Authenticator app disabled",
+    "otp.totalStudents": "Total Students",
+    "otp.totpSetup": "2FA Enabled",
+    "otp.noTotp": "No 2FA",
+    "otp.adoptionRate": "2FA Adoption Rate",
   },
   sw: {
     // Auth
@@ -798,6 +802,10 @@ const translations = {
     "otp.enterVerificationCode": "Weka msimbo wa tarakimu 6 kutoka programu yako kuthibitisha:",
     "otp.totpEnabled": "Programu ya uthibitishaji imewezeshwa!",
     "otp.totpDisabled": "Programu ya uthibitishaji imezimwa",
+    "otp.totalStudents": "Wanafunzi Wote",
+    "otp.totpSetup": "2FA Imewezeshwa",
+    "otp.noTotp": "Hakuna 2FA",
+    "otp.adoptionRate": "Kiwango cha 2FA",
   },
 } as const;
 
