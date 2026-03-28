@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import TotpSetup from "@/components/TotpSetup";
 import { useI18n } from "@/lib/i18n";
 import { useTheme } from "@/lib/theme";
 import { supabase } from "@/integrations/supabase/client";
@@ -196,6 +197,9 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Two-Factor Authentication */}
+      <TotpSetup />
 
       {/* Change Password */}
       <Card>
