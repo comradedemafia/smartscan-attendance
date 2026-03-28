@@ -447,6 +447,38 @@ Deno.serve(async (req) => {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
 
+    } else if (action === "verify-setup") {
+      // Verify TOTP code during setup to confirm it works
+      const { code } = body;
+      if (!code || typeof code !== "string" || code.length !== 6 || !/^\d{6}$/.test(code)) {
+        return new Response(JSON.stringify({ error: "Invalid code format" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: profile } = await adminClient
+        .from("profiles")
+        .select("totp_secret")
+        .eq("id", user.id)
+        .single();
+
+      if (!profile?.totp_secret) {
+        return new Response(JSON.stringify({ error: "TOTP not set up" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const valid = await verifyTOTP(profile.totp_secret, code);
+      if (!valid) {
+        return new Response(JSON.stringify({ error: "INVALID_OTP" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+
     } else if (action === "disable-totp") {
       await adminClient
         .from("profiles")
