@@ -398,6 +398,8 @@ const translations = {
     "otp.disableTotp": "Disable Authenticator",
     "otp.totpNotSetup": "Authenticator Not Set Up",
     "otp.totpNotSetupDesc": "Set up an authenticator app for secure attendance verification",
+    "otp.totpRequiredDesc": "You need to set up an Authenticator App in Settings before you can record attendance.",
+    "otp.goToSettings": "Go to Settings",
     "otp.setupTotp": "Set Up Authenticator",
     "otp.scanQrWithApp": "Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)",
     "otp.manualEntry": "Or enter this secret manually:",
