@@ -192,8 +192,9 @@ Deno.serve(async (req) => {
 
       const hasTotp = !!profile?.totp_secret;
       const hasPhone = !!profile?.phone;
+      const hasEmail = !!user.email;
 
-      // Generate a random OTP for SMS method
+      // Generate a random OTP for SMS/email method
       const otpCode = generateRandomOTP();
 
       // Create OTP record (expires in 5 minutes)
@@ -222,6 +223,7 @@ Deno.serve(async (req) => {
         methods: {
           totp: hasTotp,
           sms: hasPhone,
+          email: hasEmail,
         },
       }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -362,8 +364,8 @@ Deno.serve(async (req) => {
         }
 
         valid = await verifyTOTP(profile.totp_secret, code);
-      } else if (method === "sms") {
-        // Verify SMS OTP code
+      } else if (method === "sms" || method === "email") {
+        // Verify SMS/Email OTP code
         valid = otpRecord.otp_code === code;
       } else {
         return new Response(JSON.stringify({ error: "Invalid method" }), {
