@@ -17,7 +17,7 @@ const qrPayloadSchema = z.object({
   secret: z.string().min(1).max(200),
 });
 
-type OtpStep = "scan" | "enter-otp";
+type OtpStep = "scan" | "enter-otp" | "no-totp";
 
 export default function ScanQR() {
   const { user } = useAuth();
@@ -50,8 +50,7 @@ export default function ScanQR() {
       if (data.methods.totp) {
         setOtpStep("enter-otp");
       } else {
-        toast({ title: t("otp.noMethodSetup"), variant: "destructive" });
-        setResult("error");
+        setOtpStep("no-totp");
       }
     },
     onError: (e: any) => {
