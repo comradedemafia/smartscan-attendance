@@ -806,6 +806,8 @@ const translations = {
     "otp.disableTotp": "Zima Uthibitishaji",
     "otp.totpNotSetup": "Uthibitishaji Haujawekwa",
     "otp.totpNotSetupDesc": "Weka programu ya uthibitishaji kwa usalama wa mahudhurio",
+    "otp.totpRequiredDesc": "Unahitaji kuweka Programu ya Uthibitishaji kwenye Mipangilio kabla ya kurekodi mahudhurio.",
+    "otp.goToSettings": "Nenda Mipangilio",
     "otp.setupTotp": "Weka Uthibitishaji",
     "otp.scanQrWithApp": "Scan QR code hii kwa programu yako ya uthibitishaji (Google Authenticator, Authy, n.k.)",
     "otp.manualEntry": "Au weka siri hii mwenyewe:",
