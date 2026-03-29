@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, Users, CalendarCheck, Percent, FileDown, User, Building2, BookOpen, GraduationCap } from "lucide-react";
+import { BarChart3, Users, CalendarCheck, Percent, FileDown, FileSpreadsheet, User, Building2, BookOpen, GraduationCap } from "lucide-react";
+import { exportToPDF, exportToExcel } from "@/lib/exportReports";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -287,13 +288,80 @@ export default function Reports() {
 
   const chartConfig = { attendance: { label: t("attendance.attended"), color: "hsl(var(--primary))" } };
 
+  const handleExport = (format: "pdf" | "excel") => {
+    const fn = format === "pdf" ? exportToPDF : exportToExcel;
+
+    if (activeTab === "department" && deptReport) {
+      fn({
+        title: t("reports.byDepartment"),
+        subtitle: departments.find((d) => d.id === selectedDepartment)?.name,
+        columns: [
+          { header: t("courses.code"), key: "code" },
+          { header: t("courses.name"), key: "name" },
+          { header: t("reports.totalSessions"), key: "totalSessions" },
+          { header: t("courses.students"), key: "totalStudents" },
+          { header: t("reports.averageRate"), key: "avgRate" },
+        ],
+        rows: deptReport.courses.map((c: any) => ({ ...c, avgRate: `${c.avgRate}%` })),
+      });
+    } else if (activeTab === "course" && reportData?.students) {
+      const courseName = courses?.find((c) => c.id === selectedCourse);
+      fn({
+        title: t("reports.byCourse"),
+        subtitle: courseName ? `${courseName.code} — ${courseName.name}` : undefined,
+        columns: [
+          { header: t("reports.studentName"), key: "name" },
+          { header: t("reports.universityId"), key: "universityId" },
+          { header: t("reports.gender"), key: "gender" },
+          { header: t("reports.sessionsAttended"), key: "sessions" },
+          { header: t("reports.percentage"), key: "percentage" },
+        ],
+        rows: reportData.students.map((s) => ({
+          ...s, sessions: `${s.attended}/${s.total}`, percentage: `${s.percentage}%`,
+        })),
+      });
+    } else if (activeTab === "student" && studentReport) {
+      fn({
+        title: t("reports.studentReport"),
+        subtitle: `${studentReport.profile?.full_name} (${studentReport.profile?.university_id})`,
+        columns: [
+          { header: t("courses.code"), key: "courseCode" },
+          { header: t("courses.name"), key: "courseName" },
+          { header: t("reports.sessionsAttended"), key: "sessions" },
+          { header: t("reports.percentage"), key: "percentage" },
+        ],
+        rows: studentReport.courses.map((c: any) => ({
+          ...c, sessions: `${c.attended}/${c.totalSessions}`, percentage: `${c.percentage}%`,
+        })),
+      });
+    } else if (activeTab === "all" && allCoursesReport) {
+      fn({
+        title: t("reports.exportAll"),
+        columns: [
+          { header: t("courses.code"), key: "code" },
+          { header: t("courses.name"), key: "name" },
+          { header: t("auth.lecturer"), key: "lecturerName" },
+          { header: t("reports.totalSessions"), key: "totalSessions" },
+          { header: t("courses.students"), key: "totalStudents" },
+          { header: t("reports.averageRate"), key: "avgRate" },
+        ],
+        rows: allCoursesReport.map((c) => ({ ...c, avgRate: `${c.avgRate}%` })),
+      });
+    }
+  };
+
   return (
     <div className="space-y-6 print-report">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-bold tracking-tight font-['Space_Grotesk']">{t("reports.title")}</h1>
-        <Button variant="outline" className="no-print" onClick={() => window.print()}>
-          <FileDown className="h-4 w-4 mr-2" />{t("reports.exportPdf")}
-        </Button>
+        <div className="flex gap-2 no-print">
+          <Button variant="outline" size="sm" onClick={() => handleExport("pdf")}>
+            <FileDown className="h-4 w-4 mr-2" />{t("reports.exportPdf")}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => handleExport("excel")}>
+            <FileSpreadsheet className="h-4 w-4 mr-2" />{t("reports.exportExcel")}
+          </Button>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="no-print">
