@@ -6,6 +6,7 @@ import { useI18n } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Bell, Calendar, QrCode, Check, Trash2, AlertTriangle, Info } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 

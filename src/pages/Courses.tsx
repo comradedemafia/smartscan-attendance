@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useToast } from "@/hooks/use-toast";
 import { BookOpen, Plus, Trash2, Edit, Users, LogIn, LogOut, UserCog, Building2, ChevronDown, ChevronRight, GraduationCap } from "lucide-react";
 
@@ -205,7 +206,7 @@ export default function Courses() {
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditCourse(course)}>
                 <Edit className="h-3.5 w-3.5" />
               </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteCourseMutation.mutate(course.id)}>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteCourseId(course.id)}>
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
             </div>

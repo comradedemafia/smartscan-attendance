@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Plus, Trash2, Search, Users, Upload } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 export default function CourseStudents() {
   const { courseId } = useParams<{ courseId: string }>();
@@ -24,6 +25,7 @@ export default function CourseStudents() {
   const [studentSearch, setStudentSearch] = useState("");
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const { data: course } = useQuery({
     queryKey: ["course", courseId],
@@ -210,7 +212,7 @@ export default function CourseStudents() {
                             <p className="text-xs text-muted-foreground">{s.university_id}</p>
                           </div>
                           {isEnrolled ? (
-                            <Button size="sm" variant="destructive" onClick={() => removeMutation.mutate(enrollmentByUserId[s.id])} disabled={removeMutation.isPending}>
+                            <Button size="sm" variant="destructive" onClick={() => setConfirmDeleteId(enrollmentByUserId[s.id])} disabled={removeMutation.isPending}>
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           ) : (
@@ -293,7 +295,7 @@ export default function CourseStudents() {
                       </TableCell>
                       {canManage && (
                         <TableCell>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => removeMutation.mutate(e.id)} disabled={removeMutation.isPending}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setConfirmDeleteId(e.id)} disabled={removeMutation.isPending}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </TableCell>
@@ -306,6 +308,17 @@ export default function CourseStudents() {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={!!confirmDeleteId}
+        onOpenChange={(open) => !open && setConfirmDeleteId(null)}
+        title={t("common.confirmDeleteTitle")}
+        description={t("common.confirmRemoveStudent")}
+        onConfirm={() => {
+          if (confirmDeleteId) removeMutation.mutate(confirmDeleteId);
+          setConfirmDeleteId(null);
+        }}
+      />
     </div>
   );
 }
