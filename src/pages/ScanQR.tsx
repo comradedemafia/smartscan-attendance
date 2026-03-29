@@ -8,9 +8,8 @@ import { useI18n } from "@/lib/i18n";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { QrCode, CheckCircle2, XCircle, Camera, Shield, Smartphone, ShieldAlert, Settings } from "lucide-react";
+import { QrCode, CheckCircle2, XCircle, Camera, Shield, ShieldAlert, Settings, KeyRound } from "lucide-react";
 import { Html5Qrcode } from "html5-qrcode";
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { z } from "zod";
 
 const qrPayloadSchema = z.object({
@@ -18,7 +17,7 @@ const qrPayloadSchema = z.object({
   secret: z.string().min(1).max(200),
 });
 
-type OtpStep = "scan" | "enter-otp" | "no-totp";
+type ScanStep = "scan" | "verified" | "no-totp";
 
 export default function ScanQR() {
   const { user } = useAuth();
@@ -31,12 +30,10 @@ export default function ScanQR() {
   const containerRef = useRef<HTMLDivElement>(null);
   const processedRef = useRef(false);
 
-  // 2FA State (TOTP only)
-  const [otpStep, setOtpStep] = useState<OtpStep>("scan");
-  const [otpToken, setOtpToken] = useState<string | null>(null);
-  const [otpCode, setOtpCode] = useState("");
+  const [scanStep, setScanStep] = useState<ScanStep>("scan");
+  const [generatedCode, setGeneratedCode] = useState<string | null>(null);
 
-  // Step 1: Initiate OTP after QR scan
+  // Initiate after QR scan - auto-verifies if TOTP is set up
   const initiateMutation = useMutation({
     mutationFn: async (parsed: { session_id: string; secret: string }) => {
       const { data, error } = await supabase.functions.invoke("attendance-otp", {
@@ -47,11 +44,15 @@ export default function ScanQR() {
       return data;
     },
     onSuccess: (data) => {
-      setOtpToken(data.token);
-      if (data.methods.totp) {
-        setOtpStep("enter-otp");
+      if (data.auto_verified) {
+        // TOTP was generated server-side and attendance recorded
+        setGeneratedCode(data.totp_code);
+        setScanStep("verified");
+        setResult("success");
+        toast({ title: t("qr.success"), description: t("otp.verified") });
       } else {
-        setOtpStep("no-totp");
+        // No TOTP set up
+        setScanStep("no-totp");
       }
     },
     onError: (e: any) => {
@@ -68,34 +69,6 @@ export default function ScanQR() {
     },
   });
 
-  // Step 2: Verify TOTP
-  const verifyMutation = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke("attendance-otp", {
-        body: { action: "verify", token: otpToken, code: otpCode, method: "totp" },
-      });
-      if (error) throw new Error(error.message || "Network error");
-      if (data?.error) throw new Error(data.error);
-      return data;
-    },
-    onSuccess: () => {
-      setResult("success");
-      setOtpStep("scan");
-      toast({ title: t("qr.success"), description: t("otp.verified") });
-    },
-    onError: (e: any) => {
-      if (e.message === "INVALID_OTP") {
-        toast({ title: t("otp.invalidCode"), variant: "destructive" });
-      } else if (e.message === "OTP_EXPIRED") {
-        toast({ title: t("otp.otpExpired"), variant: "destructive" });
-        setOtpStep("scan");
-        setResult("expired");
-      } else {
-        toast({ title: t("common.error"), description: e.message, variant: "destructive" });
-      }
-    },
-  });
-
   const stopScanner = useCallback(async () => {
     if (scannerRef.current) {
       try { await scannerRef.current.stop(); } catch {}
@@ -106,9 +79,8 @@ export default function ScanQR() {
 
   const startScanner = useCallback(async () => {
     setResult(null);
-    setOtpStep("scan");
-    setOtpToken(null);
-    setOtpCode("");
+    setScanStep("scan");
+    setGeneratedCode(null);
     processedRef.current = false;
     setScanning(true);
 
@@ -148,12 +120,6 @@ export default function ScanQR() {
     };
   }, []);
 
-  const handleVerifyOtp = () => {
-    if (otpCode.length === 6) {
-      verifyMutation.mutate();
-    }
-  };
-
   return (
     <div className="space-y-6 max-w-md mx-auto">
       <h1 className="text-2xl font-bold tracking-tight font-['Space_Grotesk']">{t("qr.scan")}</h1>
@@ -167,7 +133,7 @@ export default function ScanQR() {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Scanner viewport */}
-          {otpStep === "scan" && (
+          {scanStep === "scan" && (
             <div
               id="qr-reader"
               ref={containerRef}
@@ -176,7 +142,7 @@ export default function ScanQR() {
           )}
 
           {/* No TOTP setup message */}
-          {otpStep === "no-totp" && (
+          {scanStep === "no-totp" && (
             <div className="space-y-4">
               <div className="flex items-center gap-3 p-4 rounded-lg bg-destructive/10 text-destructive">
                 <ShieldAlert className="h-6 w-6" />
@@ -194,98 +160,89 @@ export default function ScanQR() {
               <Button
                 variant="ghost"
                 className="w-full"
-                onClick={() => setOtpStep("scan")}
+                onClick={() => setScanStep("scan")}
               >
                 {t("common.cancel")}
               </Button>
             </div>
           )}
 
-          {/* Enter TOTP code */}
-          {otpStep === "enter-otp" && (
+          {/* Auto-verified popup with generated code */}
+          {scanStep === "verified" && generatedCode && (
             <div className="space-y-4">
               <div className="flex items-center gap-3 p-4 rounded-lg bg-primary/10 text-primary">
-                <Shield className="h-6 w-6" />
+                <CheckCircle2 className="h-6 w-6" />
                 <div>
-                  <p className="font-medium">{t("otp.verificationRequired")}</p>
-                  <p className="text-sm text-muted-foreground">{t("otp.openAuthApp")}</p>
+                  <p className="font-medium">{t("qr.success")}</p>
+                  <p className="text-sm text-muted-foreground">{t("otp.verified")}</p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 p-3 rounded-lg bg-muted">
-                <Smartphone className="h-5 w-5 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">{t("otp.appOtpDesc")}</p>
-              </div>
-
-              <div className="flex justify-center">
-                <InputOTP maxLength={6} value={otpCode} onChange={setOtpCode}>
-                  <InputOTPGroup>
-                    <InputOTPSlot index={0} />
-                    <InputOTPSlot index={1} />
-                    <InputOTPSlot index={2} />
-                    <InputOTPSlot index={3} />
-                    <InputOTPSlot index={4} />
-                    <InputOTPSlot index={5} />
-                  </InputOTPGroup>
-                </InputOTP>
+              {/* Code display like authenticator app */}
+              <div className="rounded-xl border-2 border-primary/20 bg-card p-6 space-y-3">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <KeyRound className="h-4 w-4" />
+                  <span className="text-xs font-medium uppercase tracking-wider">{t("otp.verificationCode")}</span>
+                </div>
+                <div className="flex justify-center">
+                  <div className="flex gap-2">
+                    {generatedCode.split("").map((digit, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center justify-center w-11 h-14 rounded-lg bg-primary/10 border border-primary/20 text-2xl font-bold text-primary font-mono"
+                      >
+                        {digit}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center justify-center gap-1.5">
+                  <Shield className="h-3.5 w-3.5 text-primary" />
+                  <p className="text-xs text-muted-foreground text-center">{t("otp.autoVerified")}</p>
+                </div>
               </div>
 
               <Button
                 className="w-full"
                 size="lg"
-                onClick={handleVerifyOtp}
-                disabled={otpCode.length !== 6 || verifyMutation.isPending}
-              >
-                {verifyMutation.isPending ? t("common.loading") : t("otp.verify")}
-              </Button>
-
-              <Button
-                variant="ghost"
-                className="w-full"
                 onClick={() => {
-                  setOtpStep("scan");
-                  setOtpCode("");
-                  setOtpToken(null);
+                  setScanStep("scan");
+                  setResult(null);
+                  setGeneratedCode(null);
                 }}
               >
-                {t("common.cancel")}
+                {t("common.done")}
               </Button>
             </div>
           )}
 
-          {/* Result feedback */}
-          {result === "success" && (
-            <div className="flex items-center gap-3 p-4 rounded-lg bg-primary/10 text-primary">
-              <CheckCircle2 className="h-6 w-6" />
-              <p className="font-medium">{t("qr.success")}</p>
-            </div>
-          )}
-          {result === "duplicate" && (
+          {/* Result feedback (for errors) */}
+          {result === "duplicate" && scanStep === "scan" && (
             <div className="flex items-center gap-3 p-4 rounded-lg bg-amber-500/10 text-amber-600">
               <XCircle className="h-6 w-6" />
               <p className="font-medium">{t("qr.alreadyScanned")}</p>
             </div>
           )}
-          {result === "expired" && (
+          {result === "expired" && scanStep === "scan" && (
             <div className="flex items-center gap-3 p-4 rounded-lg bg-destructive/10 text-destructive">
               <XCircle className="h-6 w-6" />
               <p className="font-medium">{t("qr.expired")}</p>
             </div>
           )}
-          {result === "error" && (
+          {result === "error" && scanStep === "scan" && (
             <div className="flex items-center gap-3 p-4 rounded-lg bg-destructive/10 text-destructive">
               <XCircle className="h-6 w-6" />
               <p className="font-medium">{t("common.error")}</p>
             </div>
           )}
 
-          {otpStep === "scan" && !scanning && (
+          {scanStep === "scan" && !scanning && (
             <Button className="w-full" size="lg" onClick={startScanner}>
               <Camera className="h-4 w-4 mr-2" />
               {result ? "Scan Again" : t("qr.scan")}
             </Button>
           )}
-          {otpStep === "scan" && scanning && (
+          {scanStep === "scan" && scanning && (
             <Button className="w-full" variant="outline" onClick={stopScanner}>
               {t("common.cancel")}
             </Button>
