@@ -51,7 +51,6 @@ async function generateTOTP(secret: string, timeStep = 30, digits = 6): Promise<
 }
 
 async function verifyTOTP(secret: string, token: string): Promise<boolean> {
-  // Check current and adjacent time steps (±1) for clock skew
   for (const offset of [0, -1, 1]) {
     const timeStep = 30;
     const counter = Math.floor(Date.now() / 1000 / timeStep) + offset;
@@ -75,12 +74,6 @@ async function verifyTOTP(secret: string, token: string): Promise<boolean> {
     if (code.toString().padStart(6, "0") === token) return true;
   }
   return false;
-}
-
-function generateRandomOTP(): string {
-  const arr = new Uint32Array(1);
-  crypto.getRandomValues(arr);
-  return (arr[0] % 1000000).toString().padStart(6, "0");
 }
 
 Deno.serve(async (req) => {
@@ -114,8 +107,8 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const action = body?.action;
 
+    // ─── INITIATE: After QR scan, validate QR and check TOTP status ───
     if (action === "initiate") {
-      // Called after QR scan validation. Creates OTP record.
       const { session_id, secret } = body;
       if (!session_id || !secret) {
         return new Response(JSON.stringify({ error: "Missing fields" }), {
@@ -123,7 +116,6 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Validate QR (same logic as verify-attendance)
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (!uuidRegex.test(session_id)) {
         return new Response(JSON.stringify({ error: "Invalid session ID" }), {
@@ -186,208 +178,34 @@ Deno.serve(async (req) => {
       // Check if student has TOTP set up
       const { data: profile } = await adminClient
         .from("profiles")
-        .select("totp_secret, phone")
+        .select("totp_secret")
         .eq("id", user.id)
         .single();
 
       const hasTotp = !!profile?.totp_secret;
 
       if (hasTotp) {
-        // Auto-generate TOTP code server-side and record attendance directly
-        const totpCode = await generateTOTP(profile.totp_secret!);
-
-        // Record attendance immediately
-        const { error: insertError } = await adminClient
-          .from("attendance_records")
-          .insert({
-            session_id: session_id,
-            user_id: user.id,
-            status: "present",
-          });
-
-        if (insertError) {
-          console.error("Attendance insert error:", insertError);
-          return new Response(JSON.stringify({ error: "Failed to record attendance" }), {
-            status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-
+        // Return that TOTP entry is needed — do NOT auto-record
         return new Response(JSON.stringify({
-          auto_verified: true,
-          totp_code: totpCode,
-          success: true,
+          needs_totp: true,
+          session_id,
         }), {
           status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      // No TOTP set up
+      // No TOTP set up — tell student to go set it up
       return new Response(JSON.stringify({
-        auto_verified: false,
-        methods: { totp: false },
+        needs_totp: false,
+        no_totp: true,
       }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
 
-    } else if (action === "send-sms") {
-      // Send SMS OTP (requires Twilio - placeholder for now)
-      const { token } = body;
-      if (!token) {
-        return new Response(JSON.stringify({ error: "Missing token" }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const { data: otpRecord } = await adminClient
-        .from("attendance_otp")
-        .select("*")
-        .eq("id", token)
-        .eq("user_id", user.id)
-        .eq("used", false)
-        .single();
-
-      if (!otpRecord || new Date(otpRecord.expires_at) < new Date()) {
-        return new Response(JSON.stringify({ error: "OTP expired or invalid" }), {
-          status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      // Update method to SMS
-      await adminClient
-        .from("attendance_otp")
-        .update({ method: "sms" })
-        .eq("id", token);
-
-      // Get user phone
-      const { data: profile } = await adminClient
-        .from("profiles")
-        .select("phone")
-        .eq("id", user.id)
-        .single();
-
-      if (!profile?.phone) {
-        return new Response(JSON.stringify({ error: "No phone number" }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      // TODO: Send SMS via Twilio when connected
-      // For now, we'll log the OTP (in production, this would be sent via SMS)
-      console.log(`[SMS OTP] User ${user.id} - Code: ${otpRecord.otp_code} - Phone: ${profile.phone}`);
-
-      // Check if Twilio is configured
-      const twilioKey = Deno.env.get("TWILIO_API_KEY");
-      const lovableKey = Deno.env.get("LOVABLE_API_KEY");
-
-      if (twilioKey && lovableKey) {
-        try {
-          const GATEWAY_URL = "https://connector-gateway.lovable.dev/twilio";
-          const response = await fetch(`${GATEWAY_URL}/Messages.json`, {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${lovableKey}`,
-              "X-Connection-Api-Key": twilioKey,
-              "Content-Type": "application/x-www-form-urlencoded",
-            },
-            body: new URLSearchParams({
-              To: profile.phone,
-              From: Deno.env.get("TWILIO_PHONE_NUMBER") || "+15005550006",
-              Body: `Your attendance OTP code is: ${otpRecord.otp_code}. Valid for 5 minutes.`,
-            }),
-          });
-
-          if (!response.ok) {
-            console.error("Twilio SMS failed:", await response.text());
-          }
-        } catch (e) {
-          console.error("Twilio error:", e);
-        }
-      }
-
-      return new Response(JSON.stringify({
-        success: true,
-        message: "OTP sent",
-        phone_hint: profile.phone.slice(-4),
-      }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-
-    } else if (action === "send-email") {
-      // Send Email OTP
-      const { token } = body;
-      if (!token) {
-        return new Response(JSON.stringify({ error: "Missing token" }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const { data: otpRecord } = await adminClient
-        .from("attendance_otp")
-        .select("*")
-        .eq("id", token)
-        .eq("user_id", user.id)
-        .eq("used", false)
-        .single();
-
-      if (!otpRecord || new Date(otpRecord.expires_at) < new Date()) {
-        return new Response(JSON.stringify({ error: "OTP expired or invalid" }), {
-          status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      // Update method to email
-      await adminClient
-        .from("attendance_otp")
-        .update({ method: "email" })
-        .eq("id", token);
-
-      // Get user email
-      const userEmail = user.email;
-      if (!userEmail) {
-        return new Response(JSON.stringify({ error: "No email address" }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      // Send OTP via email using Supabase Auth admin
-      try {
-        // Use Supabase's inbuilt email sending via auth.admin
-        const res = await fetch(`${supabaseUrl}/auth/v1/admin/generate_link`, {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${serviceRoleKey}`,
-            "apikey": serviceRoleKey,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            type: "magiclink",
-            email: userEmail,
-          }),
-        });
-        // We don't actually use the magic link - we just want to confirm email exists
-        // Instead, send a custom email via a simpler approach
-      } catch (e) {
-        console.error("Email link error:", e);
-      }
-
-      // For now, log the OTP code (email sending will use transactional email when configured)
-      console.log(`[EMAIL OTP] User ${user.id} - Code: ${otpRecord.otp_code} - Email: ${userEmail}`);
-
-      // Mask email for display
-      const parts = userEmail.split("@");
-      const emailHint = parts[0].slice(0, 2) + "***@" + parts[1];
-
-      return new Response(JSON.stringify({
-        success: true,
-        message: "OTP sent to email",
-        email_hint: emailHint,
-      }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-
-    } else if (action === "verify") {
-      const { token, code, method } = body;
-      if (!token || !code || !method) {
+    // ─── VERIFY-SCAN-TOTP: Student enters TOTP code to record attendance ───
+    } else if (action === "verify-scan-totp") {
+      const { session_id, code } = body;
+      if (!session_id || !code) {
         return new Response(JSON.stringify({ error: "Missing fields" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -399,70 +217,58 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Get OTP record
-      const { data: otpRecord } = await adminClient
-        .from("attendance_otp")
-        .select("*")
-        .eq("id", token)
-        .eq("user_id", user.id)
-        .eq("used", false)
+      // Re-validate session is still active
+      const { data: session } = await adminClient
+        .from("sessions")
+        .select("id, status, course_id")
+        .eq("id", session_id)
         .single();
 
-      if (!otpRecord) {
-        return new Response(JSON.stringify({ error: "OTP not found" }), {
-          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      if (new Date(otpRecord.expires_at) < new Date()) {
-        return new Response(JSON.stringify({ error: "OTP_EXPIRED" }), {
+      if (!session || session.status !== "active") {
+        return new Response(JSON.stringify({ error: "Session not active" }), {
           status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      let valid = false;
+      // Check duplicate
+      const { data: existing } = await adminClient
+        .from("attendance_records")
+        .select("id")
+        .eq("session_id", session_id)
+        .eq("user_id", user.id)
+        .maybeSingle();
 
-      if (method === "totp") {
-        // Verify TOTP from authenticator app
-        const { data: profile } = await adminClient
-          .from("profiles")
-          .select("totp_secret")
-          .eq("id", user.id)
-          .single();
+      if (existing) {
+        return new Response(JSON.stringify({ error: "DUPLICATE" }), {
+          status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
-        if (!profile?.totp_secret) {
-          return new Response(JSON.stringify({ error: "TOTP not set up" }), {
-            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
+      // Get TOTP secret
+      const { data: profile } = await adminClient
+        .from("profiles")
+        .select("totp_secret")
+        .eq("id", user.id)
+        .single();
 
-        valid = await verifyTOTP(profile.totp_secret, code);
-      } else if (method === "sms" || method === "email") {
-        // Verify SMS/Email OTP code
-        valid = otpRecord.otp_code === code;
-      } else {
-        return new Response(JSON.stringify({ error: "Invalid method" }), {
+      if (!profile?.totp_secret) {
+        return new Response(JSON.stringify({ error: "TOTP not set up" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
+      const valid = await verifyTOTP(profile.totp_secret, code);
       if (!valid) {
         return new Response(JSON.stringify({ error: "INVALID_OTP" }), {
           status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      // Mark OTP as used
-      await adminClient
-        .from("attendance_otp")
-        .update({ used: true, method })
-        .eq("id", token);
-
       // Record attendance
       const { error: insertError } = await adminClient
         .from("attendance_records")
         .insert({
-          session_id: otpRecord.session_id,
+          session_id,
           user_id: user.id,
           status: "present",
         });
@@ -478,8 +284,30 @@ Deno.serve(async (req) => {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
 
+    // ─── GET-TOTP-CODE: Return current TOTP code for display in Settings ───
+    } else if (action === "get-totp-code") {
+      const { data: profile } = await adminClient
+        .from("profiles")
+        .select("totp_secret")
+        .eq("id", user.id)
+        .single();
+
+      if (!profile?.totp_secret) {
+        return new Response(JSON.stringify({ error: "TOTP not set up" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const code = await generateTOTP(profile.totp_secret);
+      const timeStep = 30;
+      const secondsRemaining = timeStep - (Math.floor(Date.now() / 1000) % timeStep);
+
+      return new Response(JSON.stringify({ code, seconds_remaining: secondsRemaining }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+
+    // ─── SETUP-TOTP: Generate TOTP secret ───
     } else if (action === "setup-totp") {
-      // Generate TOTP secret for user
       const bytes = new Uint8Array(20);
       crypto.getRandomValues(bytes);
       const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
@@ -495,7 +323,6 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Save to profile
       const { error } = await adminClient
         .from("profiles")
         .update({ totp_secret: secret })
@@ -507,23 +334,12 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Get user email for TOTP URI
-      const { data: profile } = await adminClient
-        .from("profiles")
-        .select("email, full_name")
-        .eq("id", user.id)
-        .single();
-
-      const issuer = "AttendanceSystem";
-      const account = profile?.email || profile?.full_name || user.id;
-      const uri = `otpauth://totp/${issuer}:${encodeURIComponent(account)}?secret=${secret}&issuer=${issuer}&digits=6&period=30`;
-
-      return new Response(JSON.stringify({ secret, uri }), {
+      return new Response(JSON.stringify({ secret, success: true }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
 
+    // ─── VERIFY-SETUP: Verify first TOTP code to confirm setup works ───
     } else if (action === "verify-setup") {
-      // Verify TOTP code during setup to confirm it works
       const { code } = body;
       if (!code || typeof code !== "string" || code.length !== 6 || !/^\d{6}$/.test(code)) {
         return new Response(JSON.stringify({ error: "Invalid code format" }), {
@@ -554,6 +370,7 @@ Deno.serve(async (req) => {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
 
+    // ─── DISABLE-TOTP ───
     } else if (action === "disable-totp") {
       await adminClient
         .from("profiles")
