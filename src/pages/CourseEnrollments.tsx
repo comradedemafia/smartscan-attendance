@@ -88,8 +88,8 @@ export default function CourseEnrollments() {
     enabled: !!selectedCourseId,
   });
 
-  const { data: availableStudents = [], isLoading: loadingStudents } = useQuery({
-    queryKey: ["enroll-available-students", selectedCourseId],
+  const { data: allStudents = [], isLoading: loadingStudents } = useQuery({
+    queryKey: ["enroll-all-students", selectedCourseId],
     queryFn: async () => {
       if (!selectedCourseId) return [];
       const { data: studentRoles, error: rolesErr } = await supabase
@@ -99,15 +99,12 @@ export default function CourseEnrollments() {
       if (rolesErr) throw rolesErr;
 
       const studentIds = studentRoles.map((r) => r.user_id);
-      const enrolledIds = enrollments.map((e) => e.user_id);
-      const notEnrolledIds = studentIds.filter((id) => !enrolledIds.includes(id));
-
-      if (notEnrolledIds.length === 0) return [];
+      if (studentIds.length === 0) return [];
 
       const { data: profiles, error: profErr } = await supabase
         .from("profiles")
         .select("id, full_name, university_id, email")
-        .in("id", notEnrolledIds);
+        .in("id", studentIds);
       if (profErr) throw profErr;
       return profiles;
     },
@@ -193,7 +190,10 @@ export default function CourseEnrollments() {
     },
   });
 
-  const filteredStudents = availableStudents.filter(
+  const enrolledUserIds = new Set(enrollments.map((e: any) => e.user_id));
+  const enrollmentByUserId = Object.fromEntries(enrollments.map((e: any) => [e.user_id, e.id]));
+
+  const filteredStudents = allStudents.filter(
     (s) =>
       s.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       s.university_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -346,26 +346,41 @@ export default function CourseEnrollments() {
                 ) : filteredStudents.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-4">{t("enroll.noStudentsAvailable")}</p>
                 ) : (
-                  filteredStudents.map((student) => (
-                    <div
-                      key={student.id}
-                      className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{student.full_name}</p>
-                        <p className="text-xs text-muted-foreground">{student.university_id}</p>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={enrollMutation.isPending}
-                        onClick={() => enrollMutation.mutate(student.id)}
+                  filteredStudents.map((student) => {
+                    const isEnrolled = enrolledUserIds.has(student.id);
+                    return (
+                      <div
+                        key={student.id}
+                        className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50"
                       >
-                        <UserPlus className="h-3.5 w-3.5 mr-1" />
-                        {t("enroll.add")}
-                      </Button>
-                    </div>
-                  ))
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{student.full_name}</p>
+                          <p className="text-xs text-muted-foreground">{student.university_id}</p>
+                        </div>
+                        {isEnrolled ? (
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            disabled={unenrollMutation.isPending}
+                            onClick={() => unenrollMutation.mutate(enrollmentByUserId[student.id])}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-1" />
+                            {t("common.delete")}
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={enrollMutation.isPending}
+                            onClick={() => enrollMutation.mutate(student.id)}
+                          >
+                            <UserPlus className="h-3.5 w-3.5 mr-1" />
+                            {t("enroll.add")}
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </DialogContent>
