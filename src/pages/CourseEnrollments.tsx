@@ -127,7 +127,10 @@ export default function CourseEnrollments() {
       toast({ title: t("common.success"), description: t("courses.studentAdded") });
     },
     onError: (e: any) => {
-      toast({ title: t("common.error"), description: e.message, variant: "destructive" });
+      const msg = e.message?.includes("duplicate key") || e.message?.includes("unique constraint")
+        ? t("courses.alreadyEnrolled")
+        : e.message;
+      toast({ title: t("common.error"), description: msg, variant: "destructive" });
     },
   });
 

@@ -91,7 +91,10 @@ export default function CourseStudents() {
       setStudentSearch("");
     },
     onError: (e: any) => {
-      toast({ title: t("common.error"), description: e.message, variant: "destructive" });
+      const msg = e.message?.includes("duplicate key") || e.message?.includes("unique constraint")
+        ? t("courses.alreadyEnrolled")
+        : e.message;
+      toast({ title: t("common.error"), description: msg, variant: "destructive" });
     },
   });
 
