@@ -191,40 +191,40 @@ Deno.serve(async (req) => {
         .single();
 
       const hasTotp = !!profile?.totp_secret;
-      const hasPhone = !!profile?.phone;
-      const hasEmail = !!user.email;
 
-      // Generate a random OTP for SMS/email method
-      const otpCode = generateRandomOTP();
+      if (hasTotp) {
+        // Auto-generate TOTP code server-side and record attendance directly
+        const totpCode = await generateTOTP(profile.totp_secret!);
 
-      // Create OTP record (expires in 5 minutes)
-      const { data: otpRecord, error: otpError } = await adminClient
-        .from("attendance_otp")
-        .insert({
-          user_id: user.id,
-          session_id: session_id,
-          otp_code: otpCode,
-          method: "pending",
-          expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-        })
-        .select("id")
-        .single();
+        // Record attendance immediately
+        const { error: insertError } = await adminClient
+          .from("attendance_records")
+          .insert({
+            session_id: session_id,
+            user_id: user.id,
+            status: "present",
+          });
 
-      if (otpError) {
-        console.error("OTP create error:", otpError);
-        return new Response(JSON.stringify({ error: "Failed to create OTP" }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        if (insertError) {
+          console.error("Attendance insert error:", insertError);
+          return new Response(JSON.stringify({ error: "Failed to record attendance" }), {
+            status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        return new Response(JSON.stringify({
+          auto_verified: true,
+          totp_code: totpCode,
+          success: true,
+        }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
+      // No TOTP set up
       return new Response(JSON.stringify({
-        otp_required: true,
-        token: otpRecord.id,
-        methods: {
-          totp: hasTotp,
-          sms: hasPhone,
-          email: hasEmail,
-        },
+        auto_verified: false,
+        methods: { totp: false },
       }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
