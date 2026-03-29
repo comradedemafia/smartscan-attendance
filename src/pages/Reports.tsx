@@ -288,6 +288,68 @@ export default function Reports() {
 
   const chartConfig = { attendance: { label: t("attendance.attended"), color: "hsl(var(--primary))" } };
 
+  const handleExport = (format: "pdf" | "excel") => {
+    const fn = format === "pdf" ? exportToPDF : exportToExcel;
+
+    if (activeTab === "department" && deptReport) {
+      fn({
+        title: t("reports.byDepartment"),
+        subtitle: departments.find((d) => d.id === selectedDepartment)?.name,
+        columns: [
+          { header: t("courses.code"), key: "code" },
+          { header: t("courses.name"), key: "name" },
+          { header: t("reports.totalSessions"), key: "totalSessions" },
+          { header: t("courses.students"), key: "totalStudents" },
+          { header: t("reports.averageRate"), key: "avgRate" },
+        ],
+        rows: deptReport.courses.map((c: any) => ({ ...c, avgRate: `${c.avgRate}%` })),
+      });
+    } else if (activeTab === "course" && reportData?.students) {
+      const courseName = courses?.find((c) => c.id === selectedCourse);
+      fn({
+        title: t("reports.byCourse"),
+        subtitle: courseName ? `${courseName.code} — ${courseName.name}` : undefined,
+        columns: [
+          { header: t("reports.studentName"), key: "name" },
+          { header: t("reports.universityId"), key: "universityId" },
+          { header: t("reports.gender"), key: "gender" },
+          { header: t("reports.sessionsAttended"), key: "sessions" },
+          { header: t("reports.percentage"), key: "percentage" },
+        ],
+        rows: reportData.students.map((s) => ({
+          ...s, sessions: `${s.attended}/${s.total}`, percentage: `${s.percentage}%`,
+        })),
+      });
+    } else if (activeTab === "student" && studentReport) {
+      fn({
+        title: t("reports.studentReport"),
+        subtitle: `${studentReport.profile?.full_name} (${studentReport.profile?.university_id})`,
+        columns: [
+          { header: t("courses.code"), key: "courseCode" },
+          { header: t("courses.name"), key: "courseName" },
+          { header: t("reports.sessionsAttended"), key: "sessions" },
+          { header: t("reports.percentage"), key: "percentage" },
+        ],
+        rows: studentReport.courses.map((c: any) => ({
+          ...c, sessions: `${c.attended}/${c.totalSessions}`, percentage: `${c.percentage}%`,
+        })),
+      });
+    } else if (activeTab === "all" && allCoursesReport) {
+      fn({
+        title: t("reports.exportAll"),
+        columns: [
+          { header: t("courses.code"), key: "code" },
+          { header: t("courses.name"), key: "name" },
+          { header: t("auth.lecturer"), key: "lecturerName" },
+          { header: t("reports.totalSessions"), key: "totalSessions" },
+          { header: t("courses.students"), key: "totalStudents" },
+          { header: t("reports.averageRate"), key: "avgRate" },
+        ],
+        rows: allCoursesReport.map((c) => ({ ...c, avgRate: `${c.avgRate}%` })),
+      });
+    }
+  };
+
   return (
     <div className="space-y-6 print-report">
       <div className="flex items-center justify-between flex-wrap gap-3">
