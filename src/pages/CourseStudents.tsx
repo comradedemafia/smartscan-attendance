@@ -67,11 +67,13 @@ export default function CourseStudents() {
       const { data, error } = await supabase
         .rpc("search_profiles_for_enrollment", { search_term: studentSearch });
       if (error) throw error;
-      const enrolledIds = new Set(enrollments.map((e) => e.user_id));
-      return (data || []).filter((p: any) => !enrolledIds.has(p.id));
+      return data || [];
     },
     enabled: studentSearch.length >= 2,
   });
+
+  const enrolledUserIds = new Set(enrollments.map((e) => e.user_id));
+  const enrollmentByUserId = Object.fromEntries(enrollments.map((e: any) => [e.user_id, e.id]));
 
   const addMutation = useMutation({
     mutationFn: async (userId: string) => {
@@ -199,17 +201,26 @@ export default function CourseStudents() {
                 <Input placeholder={t("courses.searchStudent")} value={studentSearch} onChange={(e) => setStudentSearch(e.target.value)} />
                 {searchResults.length > 0 && (
                   <div className="max-h-60 overflow-y-auto space-y-1">
-                    {searchResults.map((s: any) => (
-                      <div key={s.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted">
-                        <div>
-                          <p className="font-medium text-sm">{s.full_name}</p>
-                          <p className="text-xs text-muted-foreground">{s.university_id}</p>
+                    {searchResults.map((s: any) => {
+                      const isEnrolled = enrolledUserIds.has(s.id);
+                      return (
+                        <div key={s.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted">
+                          <div>
+                            <p className="font-medium text-sm">{s.full_name}</p>
+                            <p className="text-xs text-muted-foreground">{s.university_id}</p>
+                          </div>
+                          {isEnrolled ? (
+                            <Button size="sm" variant="destructive" onClick={() => removeMutation.mutate(enrollmentByUserId[s.id])} disabled={removeMutation.isPending}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          ) : (
+                            <Button size="sm" onClick={() => addMutation.mutate(s.id)} disabled={addMutation.isPending}>
+                              <Plus className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                         </div>
-                        <Button size="sm" onClick={() => addMutation.mutate(s.id)} disabled={addMutation.isPending}>
-                          <Plus className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
                 {studentSearch.length >= 2 && searchResults.length === 0 && (
