@@ -245,6 +245,16 @@ const translations = {
     "common.next": "Next",
     "common.actions": "Actions",
     "common.remove": "Remove",
+    "common.confirmDeleteTitle": "Confirm Deletion",
+    "common.confirmDeleteDesc": "Are you sure? This action cannot be undone.",
+    "common.confirmRemoveStudent": "Are you sure you want to remove this student from the module?",
+    "common.confirmDeleteCourse": "Are you sure you want to delete this module? All related data will be removed.",
+    "common.confirmDeleteSession": "Are you sure you want to delete this session?",
+    "common.confirmDeleteDept": "Are you sure you want to delete this department?",
+    "common.confirmLeaveModule": "Are you sure you want to leave this module?",
+    "common.confirmClearNotifications": "Are you sure you want to clear all notifications?",
+    "common.confirmDeleteNotification": "Are you sure you want to delete this notification?",
+    "common.confirmRemoveLecturerCourse": "Are you sure you want to remove this lecturer from this module?",
 
     // Auth extra
     "auth.department": "Department",
@@ -669,6 +679,16 @@ const translations = {
     "common.next": "Endelea",
     "common.actions": "Vitendo",
     "common.remove": "Ondoa",
+    "common.confirmDeleteTitle": "Thibitisha Kufuta",
+    "common.confirmDeleteDesc": "Una uhakika? Kitendo hiki hakiwezi kutenduliwa.",
+    "common.confirmRemoveStudent": "Una uhakika unataka kumondoa mwanafunzi huyu kwenye moduli?",
+    "common.confirmDeleteCourse": "Una uhakika unataka kufuta moduli hii? Data zote zinazohusiana zitaondolewa.",
+    "common.confirmDeleteSession": "Una uhakika unataka kufuta kipindi hiki?",
+    "common.confirmDeleteDept": "Una uhakika unataka kufuta idara hii?",
+    "common.confirmLeaveModule": "Una uhakika unataka kuondoka kwenye moduli hii?",
+    "common.confirmClearNotifications": "Una uhakika unataka kufuta arifa zote?",
+    "common.confirmDeleteNotification": "Una uhakika unataka kufuta arifa hii?",
+    "common.confirmRemoveLecturerCourse": "Una uhakika unataka kumondoa mhadhiri kwenye moduli hii?",
 
     // Auth extra
     "auth.department": "Idara",
