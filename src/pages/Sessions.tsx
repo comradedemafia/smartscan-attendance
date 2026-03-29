@@ -532,8 +532,6 @@ export default function Sessions() {
           ))}
         </div>
       )}
-    </div>
-
       <ConfirmDialog
         open={!!deleteSessionId}
         onOpenChange={(open) => !open && setDeleteSessionId(null)}

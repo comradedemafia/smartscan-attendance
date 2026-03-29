@@ -372,8 +372,6 @@ export default function StudentDepartment() {
           </CardContent>
         </Card>
       )}
-    </div>
-
       <ConfirmDialog
         open={!!confirmLeaveId}
         onOpenChange={(open) => !open && setConfirmLeaveId(null)}
