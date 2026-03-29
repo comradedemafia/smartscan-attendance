@@ -81,6 +81,7 @@ const translations = {
     "courses.searchStudent": "Search by name or ID...",
     "courses.studentAdded": "Student added successfully",
     "courses.studentRemoved": "Student removed",
+    "courses.alreadyEnrolled": "This student is already enrolled in this module",
 
     // Sessions
     "sessions.title": "Sessions",
@@ -515,6 +516,7 @@ const translations = {
     "courses.searchStudent": "Tafuta kwa jina au namba...",
     "courses.studentAdded": "Mwanafunzi ameongezwa",
     "courses.studentRemoved": "Mwanafunzi ameondolewa",
+    "courses.alreadyEnrolled": "Mwanafunzi huyu tayari ameshaandikishwa kwenye moduli hii",
 
     // Sessions
     "sessions.title": "Vipindi",
