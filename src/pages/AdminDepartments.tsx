@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Building2, Users, BookOpen, Plus, ChevronDown, ChevronRight, AlertCircle, Edit, Trash2, UserPlus, GraduationCap } from "lucide-react";
@@ -47,6 +48,9 @@ export default function AdminDepartments() {
   const [courseDesc, setCourseDesc] = useState("");
   const [courseDeptId, setCourseDeptId] = useState("");
   const [courseLevelId, setCourseLevelId] = useState("");
+  const [confirmDeleteDeptId, setConfirmDeleteDeptId] = useState<string | null>(null);
+  const [confirmDeleteCourseId, setConfirmDeleteCourseId] = useState<string | null>(null);
+  const [confirmRemoveLecturer, setConfirmRemoveLecturer] = useState<{ courseId: string; lecturerId: string } | null>(null);
 
   // Register lecturer dialog
   const [openRegisterDialog, setOpenRegisterDialog] = useState(false);
@@ -522,7 +526,7 @@ export default function AdminDepartments() {
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); openEditDept(dept); }}>
                       <Edit className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={(e) => { e.stopPropagation(); deleteDeptMutation.mutate(dept.id); }}>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={(e) => { e.stopPropagation(); setConfirmDeleteDeptId(dept.id); }}>
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                     {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -580,7 +584,7 @@ export default function AdminDepartments() {
                                         </div>
                                         <div className="flex items-center gap-1">
                                           <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditCourse(c)}><Edit className="h-3 w-3" /></Button>
-                                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => deleteCourseMutation.mutate(c.id)}><Trash2 className="h-3 w-3" /></Button>
+                                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => setConfirmDeleteCourseId(c.id)}><Trash2 className="h-3 w-3" /></Button>
                                         </div>
                                       </div>
                                     ))}
@@ -655,7 +659,7 @@ export default function AdminDepartments() {
                                                 <AlertCircle className="h-3.5 w-3.5" />{stats.missed} {t("dept.missed")}
                                               </div>
                                             )}
-                                            <Button size="sm" variant="ghost" className="h-6 text-xs text-destructive hover:text-destructive px-2" onClick={() => removeMutation.mutate({ courseId: course.id, lecturerId: lecturer.lecturer_id })}>
+                                            <Button size="sm" variant="ghost" className="h-6 text-xs text-destructive hover:text-destructive px-2" onClick={() => setConfirmRemoveLecturer({ courseId: course.id, lecturerId: lecturer.lecturer_id })}>
                                               {t("common.remove")}
                                             </Button>
                                           </div>
@@ -685,6 +689,37 @@ export default function AdminDepartments() {
           </Card>
         )}
       </div>
+      <ConfirmDialog
+        open={!!confirmDeleteDeptId}
+        onOpenChange={(open) => !open && setConfirmDeleteDeptId(null)}
+        title={t("common.confirmDeleteTitle")}
+        description={t("common.confirmDeleteDept")}
+        onConfirm={() => {
+          if (confirmDeleteDeptId) deleteDeptMutation.mutate(confirmDeleteDeptId);
+          setConfirmDeleteDeptId(null);
+        }}
+      />
+      <ConfirmDialog
+        open={!!confirmDeleteCourseId}
+        onOpenChange={(open) => !open && setConfirmDeleteCourseId(null)}
+        title={t("common.confirmDeleteTitle")}
+        description={t("common.confirmDeleteCourse")}
+        onConfirm={() => {
+          if (confirmDeleteCourseId) deleteCourseMutation.mutate(confirmDeleteCourseId);
+          setConfirmDeleteCourseId(null);
+        }}
+      />
+      <ConfirmDialog
+        open={!!confirmRemoveLecturer}
+        onOpenChange={(open) => !open && setConfirmRemoveLecturer(null)}
+        title={t("common.confirmDeleteTitle")}
+        description={t("common.confirmRemoveLecturerCourse")}
+        onConfirm={() => {
+          if (confirmRemoveLecturer) removeMutation.mutate(confirmRemoveLecturer);
+          setConfirmRemoveLecturer(null);
+        }}
+        confirmLabel={t("common.remove")}
+      />
     </div>
   );
 }

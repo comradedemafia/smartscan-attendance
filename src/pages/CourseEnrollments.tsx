@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useToast } from "@/hooks/use-toast";
 import { UserPlus, Trash2, BookOpen, Users, Search, UsersRound } from "lucide-react";
 
@@ -23,6 +24,7 @@ export default function CourseEnrollments() {
   const [selectedCourseId, setSelectedCourseId] = useState<string>("");
   const [enrollDialogOpen, setEnrollDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   if (role !== "admin") {
     return (
@@ -316,9 +318,8 @@ export default function CourseEnrollments() {
                       variant="ghost"
                       size="icon"
                       className="text-destructive shrink-0"
-                      onClick={() => unenrollMutation.mutate(enrollment.id)}
+                      onClick={() => setConfirmDeleteId(enrollment.id)}
                     >
-                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </CardContent>
                 </Card>
@@ -362,7 +363,7 @@ export default function CourseEnrollments() {
                             size="sm"
                             variant="destructive"
                             disabled={unenrollMutation.isPending}
-                            onClick={() => unenrollMutation.mutate(enrollmentByUserId[student.id])}
+                            onClick={() => setConfirmDeleteId(enrollmentByUserId[student.id])}
                           >
                             <Trash2 className="h-3.5 w-3.5 mr-1" />
                             {t("common.delete")}
@@ -387,6 +388,17 @@ export default function CourseEnrollments() {
           </Dialog>
         </>
       )}
+
+      <ConfirmDialog
+        open={!!confirmDeleteId}
+        onOpenChange={(open) => !open && setConfirmDeleteId(null)}
+        title={t("common.confirmDeleteTitle")}
+        description={t("common.confirmRemoveStudent")}
+        onConfirm={() => {
+          if (confirmDeleteId) unenrollMutation.mutate(confirmDeleteId);
+          setConfirmDeleteId(null);
+        }}
+      />
     </div>
   );
 }

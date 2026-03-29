@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useToast } from "@/hooks/use-toast";
 import { Calendar, Plus, QrCode, LayoutGrid, List, ChevronLeft, ChevronRight, Edit, Trash2, Building2, ChevronDown, Users, GraduationCap } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -32,6 +33,7 @@ export default function Sessions() {
   const [venueName, setVenueName] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("30");
   const [selectedLevelId, setSelectedLevelId] = useState("");
+  const [deleteSessionId, setDeleteSessionId] = useState<string | null>(null);
 
 
   const [viewMode, setViewMode] = useState<"list" | "week">("week");
@@ -453,7 +455,7 @@ export default function Sessions() {
                               <button className="p-0.5 rounded bg-background/80" onClick={(e) => { e.stopPropagation(); openEdit(session); }}>
                                 <Edit className="h-3 w-3" />
                               </button>
-                              <button className="p-0.5 rounded bg-background/80 text-destructive" onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(session.id); }}>
+                              <button className="p-0.5 rounded bg-background/80 text-destructive" onClick={(e) => { e.stopPropagation(); setDeleteSessionId(session.id); }}>
                                 <Trash2 className="h-3 w-3" />
                               </button>
                             </div>
@@ -505,7 +507,7 @@ export default function Sessions() {
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(session)}>
                           <Edit className="h-3.5 w-3.5" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteMutation.mutate(session.id)}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteSessionId(session.id)}>
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
@@ -530,6 +532,16 @@ export default function Sessions() {
           ))}
         </div>
       )}
+      <ConfirmDialog
+        open={!!deleteSessionId}
+        onOpenChange={(open) => !open && setDeleteSessionId(null)}
+        title={t("common.confirmDeleteTitle")}
+        description={t("common.confirmDeleteSession")}
+        onConfirm={() => {
+          if (deleteSessionId) deleteMutation.mutate(deleteSessionId);
+          setDeleteSessionId(null);
+        }}
+      />
     </div>
   );
 }
