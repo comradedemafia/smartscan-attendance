@@ -19,6 +19,7 @@ export default function StudentDepartment() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [selectedLevelId, setSelectedLevelId] = useState<string | "all">("all");
+  const [confirmLeaveId, setConfirmLeaveId] = useState<string | null>(null);
 
   // Get student profile with department info
   const { data: studentProfile } = useQuery({
@@ -285,7 +286,7 @@ export default function StudentDepartment() {
                               size="sm"
                               variant="ghost"
                               className="text-xs text-destructive"
-                              onClick={() => unenrollMutation.mutate(course.id)}
+                              onClick={() => setConfirmLeaveId(course.id)}
                               disabled={unenrollMutation.isPending}
                             >
                               <LogOut className="h-3.5 w-3.5 mr-1" />
@@ -345,7 +346,7 @@ export default function StudentDepartment() {
                           <Button size="sm" variant="outline" className="text-xs flex-1" onClick={() => navigate("/sessions")}>
                             <Calendar className="h-3.5 w-3.5 mr-1" />{t("dept.sessions")}
                           </Button>
-                          <Button size="sm" variant="ghost" className="text-xs text-destructive" onClick={() => unenrollMutation.mutate(course.id)} disabled={unenrollMutation.isPending}>
+                          <Button size="sm" variant="ghost" className="text-xs text-destructive" onClick={() => setConfirmLeaveId(course.id)} disabled={unenrollMutation.isPending}>
                             <LogOut className="h-3.5 w-3.5 mr-1" />{t("dept.leave")}
                           </Button>
                         </>
@@ -371,6 +372,19 @@ export default function StudentDepartment() {
           </CardContent>
         </Card>
       )}
+    </div>
+
+      <ConfirmDialog
+        open={!!confirmLeaveId}
+        onOpenChange={(open) => !open && setConfirmLeaveId(null)}
+        title={t("common.confirmDeleteTitle")}
+        description={t("common.confirmLeaveModule")}
+        onConfirm={() => {
+          if (confirmLeaveId) unenrollMutation.mutate(confirmLeaveId);
+          setConfirmLeaveId(null);
+        }}
+        confirmLabel={t("dept.leave")}
+      />
     </div>
   );
 }

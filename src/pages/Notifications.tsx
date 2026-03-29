@@ -14,6 +14,8 @@ export default function Notifications() {
   const { user } = useAuth();
   const { t } = useI18n();
   const queryClient = useQueryClient();
+  const [confirmClearAll, setConfirmClearAll] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const { data: notifications = [], isLoading } = useQuery({
     queryKey: ["all-notifications", user?.id],
@@ -112,7 +114,7 @@ export default function Notifications() {
               variant="outline"
               size="sm"
               className="text-xs text-destructive"
-              onClick={() => clearAllMutation.mutate()}
+              onClick={() => setConfirmClearAll(true)}
               disabled={clearAllMutation.isPending}
             >
               <Trash2 className="h-3.5 w-3.5 mr-1" />
@@ -158,7 +160,7 @@ export default function Notifications() {
                   variant="ghost"
                   size="icon"
                   className="shrink-0 h-8 w-8 text-muted-foreground hover:text-destructive"
-                  onClick={() => deleteMutation.mutate(n.id)}
+                  onClick={() => setConfirmDeleteId(n.id)}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
@@ -167,6 +169,27 @@ export default function Notifications() {
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmClearAll}
+        onOpenChange={setConfirmClearAll}
+        title={t("common.confirmDeleteTitle")}
+        description={t("common.confirmClearNotifications")}
+        onConfirm={() => {
+          clearAllMutation.mutate();
+          setConfirmClearAll(false);
+        }}
+      />
+      <ConfirmDialog
+        open={!!confirmDeleteId}
+        onOpenChange={(open) => !open && setConfirmDeleteId(null)}
+        title={t("common.confirmDeleteTitle")}
+        description={t("common.confirmDeleteNotification")}
+        onConfirm={() => {
+          if (confirmDeleteId) deleteMutation.mutate(confirmDeleteId);
+          setConfirmDeleteId(null);
+        }}
+      />
     </div>
   );
 }

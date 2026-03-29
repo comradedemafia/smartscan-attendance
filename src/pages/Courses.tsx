@@ -25,6 +25,7 @@ export default function Courses() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [deleteCourseId, setDeleteCourseId] = useState<string | null>(null);
   const [editingCourse, setEditingCourse] = useState<any>(null);
   const [courseCode, setCourseCode] = useState("");
   const [courseName, setCourseName] = useState("");
@@ -454,6 +455,17 @@ export default function Courses() {
       ) : (
         renderGroupedByLevel()
       )}
+
+      <ConfirmDialog
+        open={!!deleteCourseId}
+        onOpenChange={(open) => !open && setDeleteCourseId(null)}
+        title={t("common.confirmDeleteTitle")}
+        description={t("common.confirmDeleteCourse")}
+        onConfirm={() => {
+          if (deleteCourseId) deleteCourseMutation.mutate(deleteCourseId);
+          setDeleteCourseId(null);
+        }}
+      />
     </div>
   );
 }

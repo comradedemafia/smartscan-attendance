@@ -33,6 +33,7 @@ export default function Sessions() {
   const [venueName, setVenueName] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("30");
   const [selectedLevelId, setSelectedLevelId] = useState("");
+  const [deleteSessionId, setDeleteSessionId] = useState<string | null>(null);
 
 
   const [viewMode, setViewMode] = useState<"list" | "week">("week");
@@ -531,6 +532,18 @@ export default function Sessions() {
           ))}
         </div>
       )}
+    </div>
+
+      <ConfirmDialog
+        open={!!deleteSessionId}
+        onOpenChange={(open) => !open && setDeleteSessionId(null)}
+        title={t("common.confirmDeleteTitle")}
+        description={t("common.confirmDeleteSession")}
+        onConfirm={() => {
+          if (deleteSessionId) deleteMutation.mutate(deleteSessionId);
+          setDeleteSessionId(null);
+        }}
+      />
     </div>
   );
 }
