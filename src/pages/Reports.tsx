@@ -292,9 +292,14 @@ export default function Reports() {
     <div className="space-y-6 print-report">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-bold tracking-tight font-['Space_Grotesk']">{t("reports.title")}</h1>
-        <Button variant="outline" className="no-print" onClick={() => window.print()}>
-          <FileDown className="h-4 w-4 mr-2" />{t("reports.exportPdf")}
-        </Button>
+        <div className="flex gap-2 no-print">
+          <Button variant="outline" size="sm" onClick={() => handleExport("pdf")}>
+            <FileDown className="h-4 w-4 mr-2" />{t("reports.exportPdf")}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => handleExport("excel")}>
+            <FileSpreadsheet className="h-4 w-4 mr-2" />{t("reports.exportExcel")}
+          </Button>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="no-print">
