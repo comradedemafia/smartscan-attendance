@@ -120,39 +120,70 @@ export default function TotpSetup() {
             </Button>
           </div>
         ) : setupData ? (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">{t("otp.scanQrWithApp")}</p>
-            <div className="flex justify-center p-4 bg-white rounded-lg">
-              <QRCodeSVG value={setupData.uri} size={200} />
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">{t("otp.manualEntry")}</p>
-              <code className="block p-2 bg-muted rounded text-xs break-all select-all">
-                {setupData.secret}
-              </code>
-            </div>
-            <div className="space-y-2">
-              <p className="text-sm font-medium">{t("otp.enterVerificationCode")}</p>
-              <div className="flex justify-center">
-                <InputOTP maxLength={6} value={verifyCode} onChange={setVerifyCode}>
-                  <InputOTPGroup>
-                    <InputOTPSlot index={0} />
-                    <InputOTPSlot index={1} />
-                    <InputOTPSlot index={2} />
-                    <InputOTPSlot index={3} />
-                    <InputOTPSlot index={4} />
-                    <InputOTPSlot index={5} />
-                  </InputOTPGroup>
-                </InputOTP>
+          <div className="space-y-5">
+            {/* Step 1: Download App */}
+            <div className="flex gap-3 items-start p-3 rounded-lg border bg-muted/50">
+              <div className="flex items-center justify-center h-7 w-7 rounded-full bg-primary text-primary-foreground text-xs font-bold shrink-0 mt-0.5">1</div>
+              <div className="space-y-1.5">
+                <p className="font-medium text-sm">{t("otp.step1Title")}</p>
+                <p className="text-xs text-muted-foreground">{t("otp.step1Desc")}</p>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <a href="https://play.google.com/store/apps/details?id=com.google.android.apps.authenticator2" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+                    <Smartphone className="h-3 w-3" /> Google Authenticator
+                  </a>
+                  <a href="https://play.google.com/store/apps/details?id=com.authy.authy" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+                    <Smartphone className="h-3 w-3" /> Authy
+                  </a>
+                </div>
               </div>
-              <Button
-                className="w-full"
-                onClick={() => verifySetupMutation.mutate()}
-                disabled={verifyCode.length !== 6 || verifySetupMutation.isPending}
-              >
-                {verifySetupMutation.isPending ? t("common.loading") : t("otp.verify")}
-              </Button>
             </div>
+
+            {/* Step 2: Scan QR */}
+            <div className="flex gap-3 items-start p-3 rounded-lg border bg-muted/50">
+              <div className="flex items-center justify-center h-7 w-7 rounded-full bg-primary text-primary-foreground text-xs font-bold shrink-0 mt-0.5">2</div>
+              <div className="space-y-2 flex-1">
+                <p className="font-medium text-sm">{t("otp.step2Title")}</p>
+                <p className="text-xs text-muted-foreground">{t("otp.step2Desc")}</p>
+                <div className="flex justify-center p-4 bg-white rounded-lg">
+                  <QRCodeSVG value={setupData.uri} size={180} />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">{t("otp.manualEntry")}</p>
+                  <code className="block p-2 bg-muted rounded text-xs break-all select-all">
+                    {setupData.secret}
+                  </code>
+                </div>
+              </div>
+            </div>
+
+            {/* Step 3: Enter Code */}
+            <div className="flex gap-3 items-start p-3 rounded-lg border bg-muted/50">
+              <div className="flex items-center justify-center h-7 w-7 rounded-full bg-primary text-primary-foreground text-xs font-bold shrink-0 mt-0.5">3</div>
+              <div className="space-y-3 flex-1">
+                <p className="font-medium text-sm">{t("otp.step3Title")}</p>
+                <p className="text-xs text-muted-foreground">{t("otp.step3Desc")}</p>
+                <div className="flex justify-center">
+                  <InputOTP maxLength={6} value={verifyCode} onChange={setVerifyCode}>
+                    <InputOTPGroup>
+                      <InputOTPSlot index={0} />
+                      <InputOTPSlot index={1} />
+                      <InputOTPSlot index={2} />
+                      <InputOTPSlot index={3} />
+                      <InputOTPSlot index={4} />
+                      <InputOTPSlot index={5} />
+                    </InputOTPGroup>
+                  </InputOTP>
+                </div>
+                <Button
+                  className="w-full"
+                  onClick={() => verifySetupMutation.mutate()}
+                  disabled={verifyCode.length !== 6 || verifySetupMutation.isPending}
+                >
+                  {verifySetupMutation.isPending ? t("common.loading") : t("otp.verify")}
+                </Button>
+              </div>
+            </div>
+
             <Button variant="ghost" className="w-full" onClick={() => setSetupData(null)}>
               {t("common.cancel")}
             </Button>
