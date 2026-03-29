@@ -420,6 +420,11 @@ const translations = {
     "otp.adoptionRate": "2FA Adoption Rate",
     "otp.verificationCode": "Verification Code",
     "otp.autoVerified": "Automatically verified via Authenticator",
+    "otp.codeCopied": "Code copied!",
+    "otp.copyCode": "Copy Code",
+    "otp.totpActiveCodeDesc": "Use this code when scanning QR for attendance",
+    "otp.enterCodeFromSettings": "Go to Settings → Authenticator to copy your current code",
+    "otp.attendanceRecorded": "Your attendance has been recorded successfully",
     "common.done": "Done",
   },
   sw: {
@@ -839,6 +844,11 @@ const translations = {
     "otp.adoptionRate": "Kiwango cha 2FA",
     "otp.verificationCode": "Msimbo wa Uthibitishaji",
     "otp.autoVerified": "Imethibitishwa kiotomatiki kupitia Authenticator",
+    "otp.codeCopied": "Msimbo umenakiliwa!",
+    "otp.copyCode": "Nakili Msimbo",
+    "otp.totpActiveCodeDesc": "Tumia msimbo huu unaposcan QR kwa mahudhurio",
+    "otp.enterCodeFromSettings": "Nenda Mipangilio → Uthibitishaji ili kunakili msimbo wako",
+    "otp.attendanceRecorded": "Mahudhurio yako yamerekodiwa kikamilifu",
     "common.done": "Tayari",
   },
 } as const;
