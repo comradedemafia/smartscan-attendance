@@ -417,6 +417,9 @@ const translations = {
     "otp.totpSetup": "2FA Enabled",
     "otp.noTotp": "No 2FA",
     "otp.adoptionRate": "2FA Adoption Rate",
+    "otp.verificationCode": "Verification Code",
+    "otp.autoVerified": "Automatically verified via Authenticator",
+    "common.done": "Done",
   },
   sw: {
     // Auth
@@ -832,6 +835,9 @@ const translations = {
     "otp.totpSetup": "2FA Imewezeshwa",
     "otp.noTotp": "Hakuna 2FA",
     "otp.adoptionRate": "Kiwango cha 2FA",
+    "otp.verificationCode": "Msimbo wa Uthibitishaji",
+    "otp.autoVerified": "Imethibitishwa kiotomatiki kupitia Authenticator",
+    "common.done": "Tayari",
   },
 } as const;
 
