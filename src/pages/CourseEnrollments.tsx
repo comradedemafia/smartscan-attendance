@@ -320,8 +320,6 @@ export default function CourseEnrollments() {
                       className="text-destructive shrink-0"
                       onClick={() => setConfirmDeleteId(enrollment.id)}
                     >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
                     </Button>
                   </CardContent>
                 </Card>
