@@ -25,6 +25,7 @@ import NotFound from "@/pages/NotFound";
 import StudentDepartment from "@/pages/StudentDepartment";
 import AdminDepartments from "@/pages/AdminDepartments";
 import Notifications from "@/pages/Notifications";
+import Excuses from "@/pages/Excuses";
 
 const queryClient = new QueryClient();
 
@@ -76,6 +77,7 @@ const App = () => (
                   <Route path="/my-department" element={<StudentDepartment />} />
                   <Route path="/departments" element={<AdminDepartments />} />
                   <Route path="/notifications" element={<Notifications />} />
+                  <Route path="/excuses" element={<Excuses />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>

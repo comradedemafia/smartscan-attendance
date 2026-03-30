@@ -465,6 +465,37 @@ const translations = {
     "analytics.enrolledTotal": "enrolled",
     "analytics.remaining": "remaining",
     "analytics.liveAttendance": "Live Attendance",
+    // Excuses
+    "excuse.title": "Excuses / Permissions",
+    "excuse.request": "Request Permission",
+    "excuse.selectSession": "Select Session",
+    "excuse.reason": "Reason",
+    "excuse.reasonPlaceholder": "Explain why you cannot attend...",
+    "excuse.submit": "Submit Request",
+    "excuse.submitted": "Permission request submitted",
+    "excuse.approved": "Approved",
+    "excuse.rejected": "Rejected",
+    "excuse.pending": "Pending",
+    "excuse.noExcuses": "No permission requests yet",
+    "excuse.approve": "Approve",
+    "excuse.reject": "Reject",
+
+    // Absentee Alerts
+    "alert.consecutiveMissed": "You have missed {count} consecutive sessions for {course}",
+    "alert.belowThreshold": "Your attendance for {course} is at {pct}%, below the required 75%",
+    "alert.checkAbsentees": "Check Absentee Students",
+    "alert.checkAbsenteesDesc": "Send alerts to students with low attendance or consecutive absences",
+    "alert.alertsSent": "Absentee alerts sent to affected students",
+    "alert.runCheck": "Run Check",
+
+    // Offline
+    "offline.online": "Online",
+    "offline.offline": "Offline",
+    "offline.savedLocally": "Scan saved locally",
+    "offline.willSyncLater": "Your scan will be submitted automatically when you reconnect",
+    "offline.syncNow": "Sync Now",
+    "offline.syncSuccess": "Offline scans synced!",
+    "offline.pendingScans": "Pending scans",
   },
   sw: {
     // Auth
@@ -928,6 +959,38 @@ const translations = {
     "analytics.enrolledTotal": "walioandikishwa",
     "analytics.remaining": "waliobaki",
     "analytics.liveAttendance": "Mahudhurio ya Moja kwa Moja",
+
+    // Excuses
+    "excuse.title": "Ruhusa / Maombi",
+    "excuse.request": "Omba Ruhusa",
+    "excuse.selectSession": "Chagua Kipindi",
+    "excuse.reason": "Sababu",
+    "excuse.reasonPlaceholder": "Eleza kwa nini huwezi kuhudhuria...",
+    "excuse.submit": "Wasilisha Ombi",
+    "excuse.submitted": "Ombi la ruhusa limewasilishwa",
+    "excuse.approved": "Imekubaliwa",
+    "excuse.rejected": "Imekataliwa",
+    "excuse.pending": "Inasubiri",
+    "excuse.noExcuses": "Hakuna maombi ya ruhusa bado",
+    "excuse.approve": "Kubali",
+    "excuse.reject": "Kataa",
+
+    // Absentee Alerts
+    "alert.consecutiveMissed": "Umekosa vipindi {count} mfululizo kwa {course}",
+    "alert.belowThreshold": "Mahudhurio yako ya {course} ni {pct}%, chini ya kiwango cha 75% kinachohitajika",
+    "alert.checkAbsentees": "Angalia Wanafunzi Wasiokuwepo",
+    "alert.checkAbsenteesDesc": "Tuma arifa kwa wanafunzi wenye mahudhurio duni au kutokuhudhuria mfululizo",
+    "alert.alertsSent": "Arifa za mahudhurio zimetumwa kwa wanafunzi walioathirika",
+    "alert.runCheck": "Angalia",
+
+    // Offline
+    "offline.online": "Mtandaoni",
+    "offline.offline": "Nje ya Mtandao",
+    "offline.savedLocally": "Scan imehifadhiwa kwenye simu",
+    "offline.willSyncLater": "Scan yako itatumwa moja kwa moja utakapounganishwa tena",
+    "offline.syncNow": "Sync Sasa",
+    "offline.syncSuccess": "Scan za nje ya mtandao zimesyncishwa!",
+    "offline.pendingScans": "Scan zinazosubiri",
   },
 } as const;
 
