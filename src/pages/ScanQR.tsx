@@ -138,43 +138,25 @@ export default function ScanQR() {
   const handleQrScanned = useCallback(async (parsed: { session_id: string; secret: string }) => {
     setPendingSecret(parsed.secret);
     setPendingSessionId(parsed.session_id);
-    setScanStep("getting-location");
 
-    try {
-      const loc = await getUserLocation();
-      setUserLocation(loc);
-
-      // If offline, save to queue
-      if (!navigator.onLine) {
-        addToOfflineQueue({
-          session_id: parsed.session_id,
-          secret: parsed.secret,
-          latitude: loc.latitude,
-          longitude: loc.longitude,
-          timestamp: new Date().toISOString(),
-        });
-        setOfflineCount(getOfflineQueue().length);
-        setScanStep("offline-saved");
-        toast({ title: t("offline.savedLocally") });
-        return;
-      }
-
-      initiateMutation.mutate({
+    // If offline, save to queue
+    if (!navigator.onLine) {
+      addToOfflineQueue({
         session_id: parsed.session_id,
         secret: parsed.secret,
-        latitude: loc.latitude,
-        longitude: loc.longitude,
+        timestamp: new Date().toISOString(),
       });
-    } catch (err: any) {
-      if (err.message === "GPS_DENIED") {
-        toast({ title: t("gps.permissionDenied"), description: t("gps.permissionDeniedDesc"), variant: "destructive" });
-      } else {
-        toast({ title: t("gps.errorGetting"), variant: "destructive" });
-      }
-      setScanStep("scan");
-      setResult("error");
+      setOfflineCount(getOfflineQueue().length);
+      setScanStep("offline-saved");
+      toast({ title: t("offline.savedLocally") });
+      return;
     }
-  }, [getUserLocation, initiateMutation, toast, t]);
+
+    initiateMutation.mutate({
+      session_id: parsed.session_id,
+      secret: parsed.secret,
+    });
+  }, [initiateMutation, toast, t]);
 
   const startScanner = useCallback(async () => {
     setResult(null);
