@@ -464,6 +464,7 @@ const translations = {
     "analytics.atRisk": "At-Risk Students (below 75%)",
     "analytics.enrolledTotal": "enrolled",
     "analytics.remaining": "remaining",
+    "analytics.liveAttendance": "Live Attendance",
     // Excuses
     "excuse.title": "Excuses / Permissions",
     "excuse.request": "Request Permission",
