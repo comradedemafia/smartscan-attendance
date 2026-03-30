@@ -452,6 +452,19 @@ const translations = {
     "gps.clearLocation": "Clear Location",
     "gps.radius": "Radius (meters)",
     "gps.locationRequired": "GPS location for geofencing",
+
+    // Analytics
+    "analytics.title": "Attendance Analytics",
+    "analytics.overallRate": "Overall Attendance Rate",
+    "analytics.slots": "attendance slots",
+    "analytics.weeklyTrend": "Weekly Trend",
+    "analytics.rate": "Attendance Rate",
+    "analytics.perModule": "Attendance by Module",
+    "analytics.sessions": "sessions",
+    "analytics.atRisk": "At-Risk Students (below 75%)",
+    "analytics.enrolledTotal": "enrolled",
+    "analytics.remaining": "remaining",
+    "analytics.liveAttendance": "Live Attendance",
   },
   sw: {
     // Auth
