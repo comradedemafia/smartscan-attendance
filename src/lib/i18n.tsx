@@ -464,7 +464,24 @@ const translations = {
     "analytics.atRisk": "At-Risk Students (below 75%)",
     "analytics.enrolledTotal": "enrolled",
     "analytics.remaining": "remaining",
-    "analytics.liveAttendance": "Live Attendance",
+    // Excuses
+    "excuse.title": "Excuses / Permissions",
+    "excuse.request": "Request Permission",
+    "excuse.selectSession": "Select Session",
+    "excuse.reason": "Reason",
+    "excuse.reasonPlaceholder": "Explain why you cannot attend...",
+    "excuse.submit": "Submit Request",
+    "excuse.submitted": "Permission request submitted",
+    "excuse.approved": "Approved",
+    "excuse.rejected": "Rejected",
+    "excuse.pending": "Pending",
+    "excuse.noExcuses": "No permission requests yet",
+    "excuse.approve": "Approve",
+    "excuse.reject": "Reject",
+
+    // Absentee Alerts
+    "alert.consecutiveMissed": "You have missed {count} consecutive sessions for {course}",
+    "alert.belowThreshold": "Your attendance for {course} is at {pct}%, below the required 75%",
   },
   sw: {
     // Auth
