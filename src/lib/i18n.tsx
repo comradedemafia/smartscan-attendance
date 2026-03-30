@@ -483,6 +483,10 @@ const translations = {
     // Absentee Alerts
     "alert.consecutiveMissed": "You have missed {count} consecutive sessions for {course}",
     "alert.belowThreshold": "Your attendance for {course} is at {pct}%, below the required 75%",
+    "alert.checkAbsentees": "Check Absentee Students",
+    "alert.checkAbsenteesDesc": "Send alerts to students with low attendance or consecutive absences",
+    "alert.alertsSent": "Absentee alerts sent to affected students",
+    "alert.runCheck": "Run Check",
 
     // Offline
     "offline.online": "Online",
