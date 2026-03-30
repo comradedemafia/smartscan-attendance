@@ -157,6 +157,14 @@ export default function Reports() {
       const { data: enrollments } = await supabase.from("course_enrollments")
         .select("user_id").eq("course_id", selectedCourse);
 
+      // Fetch approved excuses for these sessions
+      const { data: excuses } = await supabase.from("excuses")
+        .select("session_id, user_id, status")
+        .in("session_id", sessionIds)
+        .eq("status", "approved");
+
+      const excuseSet = new Set((excuses || []).map((e) => `${e.user_id}_${e.session_id}`));
+
       const studentIds = [...new Set([
         ...(enrollments || []).map((e) => e.user_id),
         ...(records || []).map((r) => r.user_id),
@@ -169,11 +177,12 @@ export default function Reports() {
 
       const studentAttendance = studentIds.map((uid) => {
         const attended = (records || []).filter((r) => r.user_id === uid).length;
+        const excused = sessions.filter((s) => excuseSet.has(`${uid}_${s.id}`)).length;
         const profile = profileMap[uid];
         return {
           userId: uid, name: profile?.full_name || "Unknown",
           universityId: profile?.university_id || "—", gender: profile?.gender || "—",
-          attended, total: sessions.length,
+          attended, excused, total: sessions.length,
           percentage: sessions.length > 0 ? Math.round((attended / sessions.length) * 100) : 0,
         };
       });
@@ -314,10 +323,11 @@ export default function Reports() {
           { header: t("reports.universityId"), key: "universityId" },
           { header: t("reports.gender"), key: "gender" },
           { header: t("reports.sessionsAttended"), key: "sessions" },
+          { header: t("reports.excused"), key: "excused" },
           { header: t("reports.percentage"), key: "percentage" },
         ],
         rows: reportData.students.map((s) => ({
-          ...s, sessions: `${s.attended}/${s.total}`, percentage: `${s.percentage}%`,
+          ...s, sessions: `${s.attended}/${s.total}`, excused: s.excused || 0, percentage: `${s.percentage}%`,
         })),
       });
     } else if (activeTab === "student" && studentReport) {
@@ -675,6 +685,7 @@ export default function Reports() {
                             <TableHead>{t("reports.universityId")}</TableHead>
                             <TableHead>{t("reports.gender")}</TableHead>
                             <TableHead className="text-center">{t("reports.sessionsAttended")}</TableHead>
+                            <TableHead className="text-center">{t("reports.excused")}</TableHead>
                             <TableHead className="text-center">{t("reports.percentage")}</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -689,6 +700,11 @@ export default function Reports() {
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-center">{s.attended}/{s.total}</TableCell>
+                              <TableCell className="text-center">
+                                {s.excused > 0 ? (
+                                  <Badge variant="secondary">{s.excused}</Badge>
+                                ) : "—"}
+                              </TableCell>
                               <TableCell className="text-center">
                                 <Badge variant={s.percentage >= 75 ? "default" : s.percentage >= 50 ? "secondary" : "destructive"}>
                                   {s.percentage}%
