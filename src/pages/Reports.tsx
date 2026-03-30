@@ -323,10 +323,11 @@ export default function Reports() {
           { header: t("reports.universityId"), key: "universityId" },
           { header: t("reports.gender"), key: "gender" },
           { header: t("reports.sessionsAttended"), key: "sessions" },
+          { header: t("reports.excused"), key: "excused" },
           { header: t("reports.percentage"), key: "percentage" },
         ],
         rows: reportData.students.map((s) => ({
-          ...s, sessions: `${s.attended}/${s.total}`, percentage: `${s.percentage}%`,
+          ...s, sessions: `${s.attended}/${s.total}`, excused: s.excused || 0, percentage: `${s.percentage}%`,
         })),
       });
     } else if (activeTab === "student" && studentReport) {
