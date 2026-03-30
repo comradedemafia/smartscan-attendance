@@ -157,6 +157,14 @@ export default function Reports() {
       const { data: enrollments } = await supabase.from("course_enrollments")
         .select("user_id").eq("course_id", selectedCourse);
 
+      // Fetch approved excuses for these sessions
+      const { data: excuses } = await supabase.from("excuses")
+        .select("session_id, user_id, status")
+        .in("session_id", sessionIds)
+        .eq("status", "approved");
+
+      const excuseSet = new Set((excuses || []).map((e) => `${e.user_id}_${e.session_id}`));
+
       const studentIds = [...new Set([
         ...(enrollments || []).map((e) => e.user_id),
         ...(records || []).map((r) => r.user_id),
@@ -169,11 +177,12 @@ export default function Reports() {
 
       const studentAttendance = studentIds.map((uid) => {
         const attended = (records || []).filter((r) => r.user_id === uid).length;
+        const excused = sessions.filter((s) => excuseSet.has(`${uid}_${s.id}`)).length;
         const profile = profileMap[uid];
         return {
           userId: uid, name: profile?.full_name || "Unknown",
           universityId: profile?.university_id || "—", gender: profile?.gender || "—",
-          attended, total: sessions.length,
+          attended, excused, total: sessions.length,
           percentage: sessions.length > 0 ? Math.round((attended / sessions.length) * 100) : 0,
         };
       });
