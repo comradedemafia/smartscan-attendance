@@ -165,13 +165,20 @@ export default function Reports() {
 
       const excuseSet = new Set((excuses || []).map((e) => `${e.user_id}_${e.session_id}`));
 
-      const studentIds = [...new Set([
+      const allUserIds = [...new Set([
         ...(enrollments || []).map((e) => e.user_id),
         ...(records || []).map((r) => r.user_id),
       ])];
 
-      const { data: profiles } = await supabase.from("profiles")
-        .select("id, full_name, university_id, gender").in("id", studentIds);
+      // Filter to only students (exclude lecturers and admins)
+      const { data: studentRoles } = await supabase.from("user_roles")
+        .select("user_id").in("user_id", allUserIds).eq("role", "student");
+      const studentIds = (studentRoles || []).map((r) => r.user_id);
+
+      const { data: profiles } = studentIds.length > 0
+        ? await supabase.from("profiles")
+          .select("id, full_name, university_id, gender").in("id", studentIds)
+        : { data: [] };
 
       const profileMap = Object.fromEntries((profiles || []).map((p) => [p.id, p]));
 
