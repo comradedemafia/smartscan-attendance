@@ -25,6 +25,7 @@ import NotFound from "@/pages/NotFound";
 import StudentDepartment from "@/pages/StudentDepartment";
 import AdminDepartments from "@/pages/AdminDepartments";
 import Notifications from "@/pages/Notifications";
+import Excuses from "@/pages/Excuses";
 
 const queryClient = new QueryClient();
 
