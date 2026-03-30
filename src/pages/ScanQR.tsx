@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { useToast } from "@/hooks/use-toast";
-import { QrCode, CheckCircle2, XCircle, Camera, ShieldAlert, Settings, KeyRound, MapPin, Loader2, WifiOff, Wifi, Upload } from "lucide-react";
+import { QrCode, CheckCircle2, XCircle, Camera, ShieldAlert, Settings, KeyRound, Loader2, WifiOff, Wifi, Upload } from "lucide-react";
 import { Html5Qrcode } from "html5-qrcode";
 import { Badge } from "@/components/ui/badge";
 import { z } from "zod";
