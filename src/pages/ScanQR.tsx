@@ -61,23 +61,6 @@ export default function ScanQR() {
   const [pendingSecret, setPendingSecret] = useState<string | null>(null);
   const [otpCode, setOtpCode] = useState("");
 
-  // Get user's GPS location
-  const getUserLocation = useCallback((): Promise<{ latitude: number; longitude: number }> => {
-    return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject(new Error("GPS_NOT_SUPPORTED"));
-        return;
-      }
-      navigator.geolocation.getCurrentPosition(
-        (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-        (err) => {
-          if (err.code === err.PERMISSION_DENIED) reject(new Error("GPS_DENIED"));
-          else reject(new Error("GPS_ERROR"));
-        },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-      );
-    });
-  }, []);
 
   // After QR scan — get location then validate
   const initiateMutation = useMutation({
