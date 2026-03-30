@@ -368,6 +368,10 @@ export default function Sessions() {
                               toast({ title: t("gps.locationCleared") });
                               return;
                             }
+                            if (!navigator.geolocation) {
+                              toast({ title: t("gps.notSupported"), description: t("gps.enterManually"), variant: "destructive" });
+                              return;
+                            }
                             setGettingLocation(true);
                             navigator.geolocation.getCurrentPosition(
                               (pos) => {
@@ -376,9 +380,9 @@ export default function Sessions() {
                                 setGettingLocation(false);
                                 toast({ title: t("gps.locationSet") });
                               },
-                              () => {
+                              (err) => {
                                 setGettingLocation(false);
-                                toast({ title: t("gps.errorGetting"), variant: "destructive" });
+                                toast({ title: t("gps.errorGetting"), description: t("gps.enterManually"), variant: "destructive" });
                               },
                               { enableHighAccuracy: true, timeout: 15000 }
                             );
@@ -388,7 +392,30 @@ export default function Sessions() {
                           {gettingLocation ? t("common.loading") : sessionLat ? t("gps.clearLocation") : t("gps.useMyLocation")}
                         </Button>
                       </div>
-                      {sessionLat && (
+                      {/* Manual coordinate inputs as fallback */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Latitude</Label>
+                          <Input
+                            type="number"
+                            step="any"
+                            placeholder="-6.7924"
+                            value={sessionLat}
+                            onChange={(e) => setSessionLat(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Longitude</Label>
+                          <Input
+                            type="number"
+                            step="any"
+                            placeholder="39.2083"
+                            value={sessionLng}
+                            onChange={(e) => setSessionLng(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      {sessionLat && sessionLng && (
                         <p className="text-xs text-muted-foreground">
                           📍 {parseFloat(sessionLat).toFixed(5)}, {parseFloat(sessionLng).toFixed(5)}
                         </p>
