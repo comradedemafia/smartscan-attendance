@@ -978,6 +978,10 @@ const translations = {
     // Absentee Alerts
     "alert.consecutiveMissed": "Umekosa vipindi {count} mfululizo kwa {course}",
     "alert.belowThreshold": "Mahudhurio yako ya {course} ni {pct}%, chini ya kiwango cha 75% kinachohitajika",
+    "alert.checkAbsentees": "Angalia Wanafunzi Wasiokuwepo",
+    "alert.checkAbsenteesDesc": "Tuma arifa kwa wanafunzi wenye mahudhurio duni au kutokuhudhuria mfululizo",
+    "alert.alertsSent": "Arifa za mahudhurio zimetumwa kwa wanafunzi walioathirika",
+    "alert.runCheck": "Angalia",
 
     // Offline
     "offline.online": "Mtandaoni",
