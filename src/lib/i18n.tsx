@@ -154,6 +154,7 @@ const translations = {
     "reports.totalSessions": "Total Sessions",
     "reports.totalAttendance": "Total Attendance Records",
     "reports.averageRate": "Average Attendance Rate",
+    "reports.excused": "Excused",
     "reports.courseReport": "Module Report",
     "reports.selectCourse": "Select a module",
     "reports.selectDepartment": "Select a department",
