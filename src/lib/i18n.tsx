@@ -887,6 +887,21 @@ const translations = {
     "otp.enterCodeFromSettings": "Nenda Mipangilio → Uthibitishaji ili kunakili msimbo wako",
     "otp.attendanceRecorded": "Mahudhurio yako yamerekodiwa kikamilifu",
     "common.done": "Tayari",
+
+    // GPS
+    "gps.permissionDenied": "Ruhusa ya Eneo Imekataliwa",
+    "gps.permissionDeniedDesc": "Tafadhali ruhusu ufikiaji wa eneo kwenye kivinjari chako ili kurekodi mahudhurio",
+    "gps.errorGetting": "Hatuwezi kupata eneo lako. Jaribu tena.",
+    "gps.gettingLocation": "Tunapata Eneo Lako...",
+    "gps.pleaseWait": "Tafadhali subiri tunapohakiki eneo lako",
+    "gps.locationVerified": "Eneo limethibitishwa ✓",
+    "gps.outsideRadiusDesc": "Lazima uwe ndani ya eneo la darasa ili kurekodi mahudhurio",
+    "gps.useMyLocation": "Tumia Eneo Langu",
+    "gps.locationSet": "Eneo limewekwa!",
+    "gps.locationCleared": "Eneo limeondolewa",
+    "gps.clearLocation": "Ondoa Eneo",
+    "gps.radius": "Radius (mita)",
+    "gps.locationRequired": "Eneo la GPS kwa geofencing",
   },
 } as const;
 
