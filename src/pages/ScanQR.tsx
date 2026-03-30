@@ -213,6 +213,29 @@ export default function ScanQR() {
     setOtpCode("");
     setUserLocation(null);
     processedRef.current = false;
+
+    // Request location permission FIRST before opening camera
+    try {
+      await getUserLocation();
+    } catch (err: any) {
+      if (err.message === "GPS_DENIED") {
+        toast({
+          title: t("gps.permissionDenied"),
+          description: t("gps.permissionDeniedDesc"),
+          variant: "destructive",
+        });
+        return;
+      } else if (err.message === "GPS_NOT_SUPPORTED") {
+        toast({
+          title: t("gps.errorGetting"),
+          description: "GPS is not supported on this device",
+          variant: "destructive",
+        });
+        return;
+      }
+      // For other GPS errors, still allow scanning (location will be retried after scan)
+    }
+
     setScanning(true);
 
     try {
@@ -241,7 +264,7 @@ export default function ScanQR() {
       toast({ title: t("common.error"), description: "Camera access denied", variant: "destructive" });
       setScanning(false);
     }
-  }, [stopScanner, handleQrScanned, toast, t]);
+  }, [stopScanner, handleQrScanned, toast, t, getUserLocation]);
 
   // Online/offline detection
   useEffect(() => {
