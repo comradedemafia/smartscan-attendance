@@ -23,8 +23,6 @@ type ScanStep = "scan" | "enter-otp" | "verified" | "no-totp" | "offline-saved";
 interface OfflineScan {
   session_id: string;
   secret: string;
-  latitude: number;
-  longitude: number;
   timestamp: string;
 }
 
