@@ -452,6 +452,19 @@ const translations = {
     "gps.clearLocation": "Clear Location",
     "gps.radius": "Radius (meters)",
     "gps.locationRequired": "GPS location for geofencing",
+
+    // Analytics
+    "analytics.title": "Attendance Analytics",
+    "analytics.overallRate": "Overall Attendance Rate",
+    "analytics.slots": "attendance slots",
+    "analytics.weeklyTrend": "Weekly Trend",
+    "analytics.rate": "Attendance Rate",
+    "analytics.perModule": "Attendance by Module",
+    "analytics.sessions": "sessions",
+    "analytics.atRisk": "At-Risk Students (below 75%)",
+    "analytics.enrolledTotal": "enrolled",
+    "analytics.remaining": "remaining",
+    "analytics.liveAttendance": "Live Attendance",
   },
   sw: {
     // Auth
@@ -902,6 +915,19 @@ const translations = {
     "gps.clearLocation": "Ondoa Eneo",
     "gps.radius": "Radius (mita)",
     "gps.locationRequired": "Eneo la GPS kwa geofencing",
+
+    // Analytics
+    "analytics.title": "Takwimu za Mahudhurio",
+    "analytics.overallRate": "Kiwango cha Mahudhurio kwa Ujumla",
+    "analytics.slots": "nafasi za mahudhurio",
+    "analytics.weeklyTrend": "Mwenendo wa Wiki",
+    "analytics.rate": "Kiwango cha Mahudhurio",
+    "analytics.perModule": "Mahudhurio kwa Moduli",
+    "analytics.sessions": "vipindi",
+    "analytics.atRisk": "Wanafunzi Hatarini (chini ya 75%)",
+    "analytics.enrolledTotal": "walioandikishwa",
+    "analytics.remaining": "waliobaki",
+    "analytics.liveAttendance": "Mahudhurio ya Moja kwa Moja",
   },
 } as const;
 
