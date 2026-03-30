@@ -243,7 +243,11 @@ export default function Reports() {
     enabled: !!user && (role === "lecturer" || role === "admin") && activeTab === "student",
     queryFn: async () => {
       if (role === "admin") {
-        const { data } = await supabase.from("profiles").select("id, full_name, university_id").order("full_name");
+        // Only show students, not lecturers or admins
+        const { data: studentRoleIds } = await supabase.from("user_roles").select("user_id").eq("role", "student");
+        const sIds = (studentRoleIds || []).map((r) => r.user_id);
+        if (!sIds.length) return [];
+        const { data } = await supabase.from("profiles").select("id, full_name, university_id").in("id", sIds).order("full_name");
         return data || [];
       }
       const { data: myCourses } = await supabase.from("courses").select("id").eq("created_by", user!.id);
