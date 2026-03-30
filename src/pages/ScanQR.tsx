@@ -285,18 +285,6 @@ export default function ScanQR() {
             />
           )}
 
-          {/* Getting location step */}
-          {scanStep === "getting-location" && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-3 p-4 rounded-lg bg-primary/10 text-primary">
-                <Loader2 className="h-6 w-6 animate-spin" />
-                <div>
-                  <p className="font-medium">{t("gps.gettingLocation")}</p>
-                  <p className="text-sm text-muted-foreground">{t("gps.pleaseWait")}</p>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* OTP Entry step */}
           {scanStep === "enter-otp" && (
