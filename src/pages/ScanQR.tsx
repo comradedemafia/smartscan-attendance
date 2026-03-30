@@ -172,6 +172,22 @@ export default function ScanQR() {
     try {
       const loc = await getUserLocation();
       setUserLocation(loc);
+
+      // If offline, save to queue
+      if (!navigator.onLine) {
+        addToOfflineQueue({
+          session_id: parsed.session_id,
+          secret: parsed.secret,
+          latitude: loc.latitude,
+          longitude: loc.longitude,
+          timestamp: new Date().toISOString(),
+        });
+        setOfflineCount(getOfflineQueue().length);
+        setScanStep("offline-saved");
+        toast({ title: t("offline.savedLocally") });
+        return;
+      }
+
       initiateMutation.mutate({
         session_id: parsed.session_id,
         secret: parsed.secret,
