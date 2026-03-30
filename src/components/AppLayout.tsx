@@ -6,6 +6,9 @@ import { useTheme } from "@/lib/theme";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import {
   LayoutDashboard,
   BookOpen,
@@ -29,12 +32,27 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 export default function AppLayout() {
-  const { role, profile, signOut } = useAuth();
+  const { user, role, profile, signOut } = useAuth();
   const { t, language, setLanguage } = useI18n();
   const { theme, setTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Pending excuse count for lecturers/admins
+  const { data: pendingExcuseCount = 0 } = useQuery({
+    queryKey: ["pending-excuse-count", user?.id, role],
+    enabled: !!user && (role === "lecturer" || role === "admin"),
+    refetchInterval: 30000,
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("excuses")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending");
+      if (error) return 0;
+      return count || 0;
+    },
+  });
 
   const handleSignOut = async () => {
     await signOut();
@@ -87,6 +105,7 @@ export default function AppLayout() {
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
           {filteredNav.map((item) => {
             const isActive = location.pathname === item.to;
+            const showBadge = item.to === "/excuses" && pendingExcuseCount > 0 && role !== "student";
             return (
               <Link
                 key={item.to}
@@ -101,6 +120,11 @@ export default function AppLayout() {
               >
                 <item.icon className="h-5 w-5" />
                 {item.label}
+                {showBadge && (
+                  <Badge variant="destructive" className="ml-auto h-5 min-w-[20px] px-1.5 text-[10px] flex items-center justify-center">
+                    {pendingExcuseCount}
+                  </Badge>
+                )}
               </Link>
             );
           })}
