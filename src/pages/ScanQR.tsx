@@ -289,12 +289,6 @@ export default function ScanQR() {
           {/* OTP Entry step */}
           {scanStep === "enter-otp" && (
             <div className="space-y-5">
-              {userLocation && (
-                <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/10 text-primary text-sm">
-                  <MapPin className="h-4 w-4" />
-                  <span>{t("gps.locationVerified")}</span>
-                </div>
-              )}
               <div className="flex items-center gap-3 p-4 rounded-lg bg-primary/10 text-primary">
                 <KeyRound className="h-6 w-6" />
                 <div>
