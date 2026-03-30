@@ -243,13 +243,40 @@ export default function ScanQR() {
     }
   }, [stopScanner, handleQrScanned, toast, t]);
 
+  // Online/offline detection
   useEffect(() => {
+    const goOnline = () => { setIsOnline(true); };
+    const goOffline = () => { setIsOnline(false); };
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
     return () => {
-      if (scannerRef.current) {
-        try { scannerRef.current.stop(); } catch {}
-      }
+      window.removeEventListener("online", goOnline);
+      window.removeEventListener("offline", goOffline);
     };
   }, []);
+
+  // Sync offline queue when back online
+  const [syncing, setSyncing] = useState(false);
+  const syncOfflineQueue = useCallback(async () => {
+    const queue = getOfflineQueue();
+    if (!queue.length) return;
+    setSyncing(true);
+    let synced = 0;
+    for (const scan of queue) {
+      try {
+        const { data, error } = await supabase.functions.invoke("attendance-otp", {
+          body: { action: "initiate", ...scan },
+        });
+        if (!error && !data?.error) synced++;
+      } catch {}
+    }
+    clearOfflineQueue();
+    setOfflineCount(0);
+    setSyncing(false);
+    if (synced > 0) {
+      toast({ title: t("offline.syncSuccess"), description: `${synced}/${queue.length}` });
+    }
+  }, [toast, t]);
 
   const resetToScan = () => {
     setScanStep("scan");
@@ -262,7 +289,31 @@ export default function ScanQR() {
 
   return (
     <div className="space-y-6 max-w-md mx-auto">
-      <h1 className="text-2xl font-bold tracking-tight font-['Space_Grotesk']">{t("qr.scan")}</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold tracking-tight font-['Space_Grotesk']">{t("qr.scan")}</h1>
+        <Badge variant={isOnline ? "default" : "destructive"} className="flex items-center gap-1">
+          {isOnline ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+          {isOnline ? t("offline.online") : t("offline.offline")}
+        </Badge>
+      </div>
+
+      {/* Offline queue banner */}
+      {offlineCount > 0 && (
+        <Card className="border-amber-500/50 bg-amber-500/5">
+          <CardContent className="p-3 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm">
+              <WifiOff className="h-4 w-4 text-amber-500" />
+              <span>{t("offline.pendingScans")}: {offlineCount}</span>
+            </div>
+            {isOnline && (
+              <Button size="sm" onClick={syncOfflineQueue} disabled={syncing}>
+                <Upload className="h-3 w-3 mr-1" />
+                {syncing ? t("common.loading") : t("offline.syncNow")}
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
