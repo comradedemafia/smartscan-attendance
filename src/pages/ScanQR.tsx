@@ -183,7 +183,7 @@ export default function ScanQR() {
 
           try {
             const raw = JSON.parse(decodedText);
-            const parsed = qrPayloadSchema.parse(raw);
+            const parsed = qrPayloadSchema.parse(raw) as { session_id: string; secret: string };
             stopScanner();
             handleQrScanned(parsed);
           } catch {
