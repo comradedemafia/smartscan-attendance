@@ -291,13 +291,34 @@ export default function SessionQR() {
         </CardContent>
       </Card>
 
-      {/* Live attendee list */}
+      {/* Live attendee list with realtime feed */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-lg flex items-center gap-2">
             <Users className="h-5 w-5" />
-            {t("attendance.title")} ({attendees.length})
+            {t("analytics.liveAttendance")}
           </CardTitle>
+          {/* Progress bar and counts */}
+          {enrolledTotal > 0 && (
+            <div className="space-y-2 mt-2">
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <UserCheck className="h-4 w-4 text-primary" />
+                  <span className="font-medium">{attendees.length}</span>
+                  <span className="text-muted-foreground">/ {enrolledTotal} {t("analytics.enrolledTotal")}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <UserX className="h-4 w-4 text-destructive" />
+                  <span className="text-destructive font-medium">{enrolledTotal - attendees.length}</span>
+                  <span className="text-muted-foreground">{t("analytics.remaining")}</span>
+                </div>
+              </div>
+              <Progress value={enrolledTotal > 0 ? (attendees.length / enrolledTotal) * 100 : 0} className="h-3" />
+              <p className="text-xs text-muted-foreground text-center">
+                {enrolledTotal > 0 ? Math.round((attendees.length / enrolledTotal) * 100) : 0}% {t("analytics.rate")}
+              </p>
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           {attendees.length === 0 ? (
@@ -305,9 +326,9 @@ export default function SessionQR() {
               No students have scanned yet
             </p>
           ) : (
-            <div className="divide-y divide-border">
+            <div className="divide-y divide-border max-h-[400px] overflow-y-auto">
               {attendees.map((a: any, i: number) => (
-                <div key={a.id} className="flex items-center justify-between py-3">
+                <div key={a.id} className="flex items-center justify-between py-3 animate-in fade-in slide-in-from-left-2 duration-500">
                   <div className="flex items-center gap-3">
                     <span className="text-xs font-mono text-muted-foreground w-6">{i + 1}.</span>
                     <CheckCircle2 className="h-4 w-4 text-primary" />
