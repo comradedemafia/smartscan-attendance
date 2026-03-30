@@ -32,12 +32,27 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 export default function AppLayout() {
-  const { role, profile, signOut } = useAuth();
+  const { user, role, profile, signOut } = useAuth();
   const { t, language, setLanguage } = useI18n();
   const { theme, setTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Pending excuse count for lecturers/admins
+  const { data: pendingExcuseCount = 0 } = useQuery({
+    queryKey: ["pending-excuse-count", user?.id, role],
+    enabled: !!user && (role === "lecturer" || role === "admin"),
+    refetchInterval: 30000,
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("excuses")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending");
+      if (error) return 0;
+      return count || 0;
+    },
+  });
 
   const handleSignOut = async () => {
     await signOut();
