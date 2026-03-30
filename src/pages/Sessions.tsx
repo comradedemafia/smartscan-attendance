@@ -348,6 +348,66 @@ export default function Sessions() {
                       <Label>{t("sessions.venue")}</Label>
                       <Input value={venueName} onChange={(e) => setVenueName(e.target.value)} placeholder="Room 101" />
                     </div>
+                    {/* GPS Location for Geofencing */}
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-1">
+                        <MapPin className="h-3.5 w-3.5" />
+                        {t("gps.locationRequired")}
+                      </Label>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant={sessionLat ? "default" : "outline"}
+                          size="sm"
+                          className="flex-1"
+                          disabled={gettingLocation}
+                          onClick={() => {
+                            if (sessionLat) {
+                              setSessionLat("");
+                              setSessionLng("");
+                              toast({ title: t("gps.locationCleared") });
+                              return;
+                            }
+                            setGettingLocation(true);
+                            navigator.geolocation.getCurrentPosition(
+                              (pos) => {
+                                setSessionLat(String(pos.coords.latitude));
+                                setSessionLng(String(pos.coords.longitude));
+                                setGettingLocation(false);
+                                toast({ title: t("gps.locationSet") });
+                              },
+                              () => {
+                                setGettingLocation(false);
+                                toast({ title: t("gps.errorGetting"), variant: "destructive" });
+                              },
+                              { enableHighAccuracy: true, timeout: 15000 }
+                            );
+                          }}
+                        >
+                          <MapPin className="h-4 w-4 mr-1" />
+                          {gettingLocation ? t("common.loading") : sessionLat ? t("gps.clearLocation") : t("gps.useMyLocation")}
+                        </Button>
+                      </div>
+                      {sessionLat && (
+                        <p className="text-xs text-muted-foreground">
+                          📍 {parseFloat(sessionLat).toFixed(5)}, {parseFloat(sessionLng).toFixed(5)}
+                        </p>
+                      )}
+                    </div>
+                    {sessionLat && (
+                      <div className="space-y-2">
+                        <Label>{t("gps.radius")}</Label>
+                        <Select value={sessionRadius} onValueChange={setSessionRadius}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="50">50m</SelectItem>
+                            <SelectItem value="100">100m</SelectItem>
+                            <SelectItem value="200">200m</SelectItem>
+                            <SelectItem value="500">500m</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                     <div className="space-y-2">
                       <Label>{t("sessions.duration")}</Label>
                       <Select value={durationMinutes} onValueChange={setDurationMinutes}>
