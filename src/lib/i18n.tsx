@@ -945,6 +945,25 @@ const translations = {
     "analytics.enrolledTotal": "walioandikishwa",
     "analytics.remaining": "waliobaki",
     "analytics.liveAttendance": "Mahudhurio ya Moja kwa Moja",
+
+    // Excuses
+    "excuse.title": "Ruhusa / Maombi",
+    "excuse.request": "Omba Ruhusa",
+    "excuse.selectSession": "Chagua Kipindi",
+    "excuse.reason": "Sababu",
+    "excuse.reasonPlaceholder": "Eleza kwa nini huwezi kuhudhuria...",
+    "excuse.submit": "Wasilisha Ombi",
+    "excuse.submitted": "Ombi la ruhusa limewasilishwa",
+    "excuse.approved": "Imekubaliwa",
+    "excuse.rejected": "Imekataliwa",
+    "excuse.pending": "Inasubiri",
+    "excuse.noExcuses": "Hakuna maombi ya ruhusa bado",
+    "excuse.approve": "Kubali",
+    "excuse.reject": "Kataa",
+
+    // Absentee Alerts
+    "alert.consecutiveMissed": "Umekosa vipindi {count} mfululizo kwa {course}",
+    "alert.belowThreshold": "Mahudhurio yako ya {course} ni {pct}%, chini ya kiwango cha 75% kinachohitajika",
   },
 } as const;
 
