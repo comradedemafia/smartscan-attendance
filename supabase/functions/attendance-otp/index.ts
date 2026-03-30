@@ -76,6 +76,40 @@ async function verifyTOTP(secret: string, token: string): Promise<boolean> {
   return false;
 }
 
+// Calculate distance between two GPS points using Haversine formula (returns meters)
+function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371000; // Earth radius in meters
+  const toRad = (deg: number) => deg * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+// Validate student location against session location
+function validateLocation(
+  session: { latitude: number | null; longitude: number | null; location_radius_meters: number | null },
+  studentLat: number | null | undefined,
+  studentLon: number | null | undefined
+): { valid: boolean; distance?: number } {
+  // If session has no GPS set, skip validation (allow)
+  if (!session.latitude || !session.longitude) {
+    return { valid: true };
+  }
+
+  // If student didn't send location but session requires it
+  if (studentLat == null || studentLon == null) {
+    return { valid: false };
+  }
+
+  const radius = session.location_radius_meters || 100;
+  const distance = haversineDistance(session.latitude, session.longitude, studentLat, studentLon);
+
+  return { valid: distance <= radius, distance };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -107,9 +141,9 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const action = body?.action;
 
-    // ─── INITIATE: After QR scan, validate QR and check TOTP status ───
+    // ─── INITIATE: After QR scan, validate QR, GPS, and check TOTP status ───
     if (action === "initiate") {
-      const { session_id, secret } = body;
+      const { session_id, secret, latitude, longitude } = body;
       if (!session_id || !secret) {
         return new Response(JSON.stringify({ error: "Missing fields" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -125,7 +159,7 @@ Deno.serve(async (req) => {
 
       const { data: session } = await adminClient
         .from("sessions")
-        .select("id, qr_code_secret, qr_expires_at, status, course_id")
+        .select("id, qr_code_secret, qr_expires_at, status, course_id, latitude, longitude, location_radius_meters")
         .eq("id", session_id)
         .single();
 
@@ -144,6 +178,14 @@ Deno.serve(async (req) => {
       if (session.status !== "active" || !session.qr_expires_at || new Date(session.qr_expires_at) < new Date()) {
         return new Response(JSON.stringify({ error: "QR_EXPIRED" }), {
           status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // GPS Geofencing validation
+      const locationCheck = validateLocation(session, latitude, longitude);
+      if (!locationCheck.valid) {
+        return new Response(JSON.stringify({ error: "OUTSIDE_RADIUS", distance: locationCheck.distance }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
@@ -185,7 +227,6 @@ Deno.serve(async (req) => {
       const hasTotp = !!profile?.totp_secret;
 
       if (hasTotp) {
-        // Return that TOTP entry is needed — do NOT auto-record
         return new Response(JSON.stringify({
           needs_totp: true,
           session_id,
@@ -194,7 +235,7 @@ Deno.serve(async (req) => {
         });
       }
 
-      // No TOTP set up — tell student to go set it up
+      // No TOTP set up
       return new Response(JSON.stringify({
         needs_totp: false,
         no_totp: true,
@@ -204,7 +245,7 @@ Deno.serve(async (req) => {
 
     // ─── VERIFY-SCAN-TOTP: Student enters TOTP code to record attendance ───
     } else if (action === "verify-scan-totp") {
-      const { session_id, code } = body;
+      const { session_id, code, latitude, longitude } = body;
       if (!session_id || !code) {
         return new Response(JSON.stringify({ error: "Missing fields" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -220,13 +261,21 @@ Deno.serve(async (req) => {
       // Re-validate session is still active
       const { data: session } = await adminClient
         .from("sessions")
-        .select("id, status, course_id")
+        .select("id, status, course_id, latitude, longitude, location_radius_meters")
         .eq("id", session_id)
         .single();
 
       if (!session || session.status !== "active") {
         return new Response(JSON.stringify({ error: "Session not active" }), {
           status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Re-validate GPS location
+      const locationCheck = validateLocation(session, latitude, longitude);
+      if (!locationCheck.valid) {
+        return new Response(JSON.stringify({ error: "OUTSIDE_RADIUS", distance: locationCheck.distance }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
@@ -264,13 +313,15 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Record attendance
+      // Record attendance with GPS coordinates
       const { error: insertError } = await adminClient
         .from("attendance_records")
         .insert({
           session_id,
           user_id: user.id,
           status: "present",
+          latitude: latitude || null,
+          longitude: longitude || null,
         });
 
       if (insertError) {
