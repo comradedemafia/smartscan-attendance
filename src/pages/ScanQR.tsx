@@ -49,7 +49,7 @@ export default function ScanQR() {
   const { t } = useI18n();
   const { toast } = useToast();
   const [scanning, setScanning] = useState(false);
-  const [result, setResult] = useState<"success" | "duplicate" | "expired" | "error" | "outside-radius" | null>(null);
+  const [result, setResult] = useState<"success" | "duplicate" | "expired" | "error" | null>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const processedRef = useRef(false);
