@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { useToast } from "@/hooks/use-toast";
-import { QrCode, CheckCircle2, XCircle, Camera, ShieldAlert, Settings, KeyRound, MapPin, Loader2, WifiOff, Wifi, Upload } from "lucide-react";
+import { QrCode, CheckCircle2, XCircle, Camera, ShieldAlert, Settings, KeyRound, WifiOff, Wifi, Upload } from "lucide-react";
 import { Html5Qrcode } from "html5-qrcode";
 import { Badge } from "@/components/ui/badge";
 import { z } from "zod";
@@ -18,13 +18,11 @@ const qrPayloadSchema = z.object({
   secret: z.string().min(1).max(200),
 });
 
-type ScanStep = "scan" | "getting-location" | "enter-otp" | "verified" | "no-totp" | "offline-saved";
+type ScanStep = "scan" | "enter-otp" | "verified" | "no-totp" | "offline-saved";
 
 interface OfflineScan {
   session_id: string;
   secret: string;
-  latitude: number;
-  longitude: number;
   timestamp: string;
 }
 
@@ -51,7 +49,7 @@ export default function ScanQR() {
   const { t } = useI18n();
   const { toast } = useToast();
   const [scanning, setScanning] = useState(false);
-  const [result, setResult] = useState<"success" | "duplicate" | "expired" | "error" | "outside-radius" | null>(null);
+  const [result, setResult] = useState<"success" | "duplicate" | "expired" | "error" | null>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const processedRef = useRef(false);
@@ -62,29 +60,11 @@ export default function ScanQR() {
   const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
   const [pendingSecret, setPendingSecret] = useState<string | null>(null);
   const [otpCode, setOtpCode] = useState("");
-  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
-  // Get user's GPS location
-  const getUserLocation = useCallback((): Promise<{ latitude: number; longitude: number }> => {
-    return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject(new Error("GPS_NOT_SUPPORTED"));
-        return;
-      }
-      navigator.geolocation.getCurrentPosition(
-        (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-        (err) => {
-          if (err.code === err.PERMISSION_DENIED) reject(new Error("GPS_DENIED"));
-          else reject(new Error("GPS_ERROR"));
-        },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-      );
-    });
-  }, []);
 
-  // After QR scan — get location then validate
+  // After QR scan — validate
   const initiateMutation = useMutation({
-    mutationFn: async (parsed: { session_id: string; secret: string; latitude: number; longitude: number }) => {
+    mutationFn: async (parsed: { session_id: string; secret: string }) => {
       const { data, error } = await supabase.functions.invoke("attendance-otp", {
         body: { action: "initiate", ...parsed },
       });
@@ -108,9 +88,6 @@ export default function ScanQR() {
       } else if (e.message === "QR_EXPIRED") {
         setResult("expired");
         toast({ title: t("qr.expired"), variant: "destructive" });
-      } else if (e.message === "OUTSIDE_RADIUS") {
-        setResult("outside-radius");
-        toast({ title: t("qr.locationError"), variant: "destructive" });
       } else {
         setResult("error");
         toast({ title: t("common.error"), description: e.message, variant: "destructive" });
@@ -126,8 +103,6 @@ export default function ScanQR() {
           action: "verify-scan-totp",
           session_id: pendingSessionId,
           code: otpCode,
-          latitude: userLocation?.latitude,
-          longitude: userLocation?.longitude,
         },
       });
       if (error) throw new Error(error.message || "Network error");
@@ -146,10 +121,6 @@ export default function ScanQR() {
         setResult("duplicate");
         setScanStep("scan");
         toast({ title: t("qr.alreadyScanned"), variant: "destructive" });
-      } else if (e.message === "OUTSIDE_RADIUS") {
-        setResult("outside-radius");
-        setScanStep("scan");
-        toast({ title: t("qr.locationError"), variant: "destructive" });
       } else {
         toast({ title: t("common.error"), description: e.message, variant: "destructive" });
       }
@@ -167,43 +138,25 @@ export default function ScanQR() {
   const handleQrScanned = useCallback(async (parsed: { session_id: string; secret: string }) => {
     setPendingSecret(parsed.secret);
     setPendingSessionId(parsed.session_id);
-    setScanStep("getting-location");
 
-    try {
-      const loc = await getUserLocation();
-      setUserLocation(loc);
-
-      // If offline, save to queue
-      if (!navigator.onLine) {
-        addToOfflineQueue({
-          session_id: parsed.session_id,
-          secret: parsed.secret,
-          latitude: loc.latitude,
-          longitude: loc.longitude,
-          timestamp: new Date().toISOString(),
-        });
-        setOfflineCount(getOfflineQueue().length);
-        setScanStep("offline-saved");
-        toast({ title: t("offline.savedLocally") });
-        return;
-      }
-
-      initiateMutation.mutate({
+    // If offline, save to queue
+    if (!navigator.onLine) {
+      addToOfflineQueue({
         session_id: parsed.session_id,
         secret: parsed.secret,
-        latitude: loc.latitude,
-        longitude: loc.longitude,
+        timestamp: new Date().toISOString(),
       });
-    } catch (err: any) {
-      if (err.message === "GPS_DENIED") {
-        toast({ title: t("gps.permissionDenied"), description: t("gps.permissionDeniedDesc"), variant: "destructive" });
-      } else {
-        toast({ title: t("gps.errorGetting"), variant: "destructive" });
-      }
-      setScanStep("scan");
-      setResult("error");
+      setOfflineCount(getOfflineQueue().length);
+      setScanStep("offline-saved");
+      toast({ title: t("offline.savedLocally") });
+      return;
     }
-  }, [getUserLocation, initiateMutation, toast, t]);
+
+    initiateMutation.mutate({
+      session_id: parsed.session_id,
+      secret: parsed.secret,
+    });
+  }, [initiateMutation, toast, t]);
 
   const startScanner = useCallback(async () => {
     setResult(null);
@@ -211,30 +164,7 @@ export default function ScanQR() {
     setPendingSessionId(null);
     setPendingSecret(null);
     setOtpCode("");
-    setUserLocation(null);
     processedRef.current = false;
-
-    // Request location permission FIRST before opening camera
-    try {
-      await getUserLocation();
-    } catch (err: any) {
-      if (err.message === "GPS_DENIED") {
-        toast({
-          title: t("gps.permissionDenied"),
-          description: t("gps.permissionDeniedDesc"),
-          variant: "destructive",
-        });
-        return;
-      } else if (err.message === "GPS_NOT_SUPPORTED") {
-        toast({
-          title: t("gps.errorGetting"),
-          description: "GPS is not supported on this device",
-          variant: "destructive",
-        });
-        return;
-      }
-      // For other GPS errors, still allow scanning (location will be retried after scan)
-    }
 
     setScanning(true);
 
@@ -264,7 +194,7 @@ export default function ScanQR() {
       toast({ title: t("common.error"), description: "Camera access denied", variant: "destructive" });
       setScanning(false);
     }
-  }, [stopScanner, handleQrScanned, toast, t, getUserLocation]);
+  }, [stopScanner, handleQrScanned, toast, t]);
 
   // Online/offline detection
   useEffect(() => {
@@ -307,7 +237,7 @@ export default function ScanQR() {
     setPendingSessionId(null);
     setPendingSecret(null);
     setOtpCode("");
-    setUserLocation(null);
+    
   };
 
   return (
@@ -355,28 +285,10 @@ export default function ScanQR() {
             />
           )}
 
-          {/* Getting location step */}
-          {scanStep === "getting-location" && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-3 p-4 rounded-lg bg-primary/10 text-primary">
-                <Loader2 className="h-6 w-6 animate-spin" />
-                <div>
-                  <p className="font-medium">{t("gps.gettingLocation")}</p>
-                  <p className="text-sm text-muted-foreground">{t("gps.pleaseWait")}</p>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* OTP Entry step */}
           {scanStep === "enter-otp" && (
             <div className="space-y-5">
-              {userLocation && (
-                <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/10 text-primary text-sm">
-                  <MapPin className="h-4 w-4" />
-                  <span>{t("gps.locationVerified")}</span>
-                </div>
-              )}
               <div className="flex items-center gap-3 p-4 rounded-lg bg-primary/10 text-primary">
                 <KeyRound className="h-6 w-6" />
                 <div>
@@ -468,15 +380,6 @@ export default function ScanQR() {
           )}
 
           {/* Error feedback */}
-          {result === "outside-radius" && scanStep === "scan" && (
-            <div className="flex items-center gap-3 p-4 rounded-lg bg-destructive/10 text-destructive">
-              <MapPin className="h-6 w-6" />
-              <div>
-                <p className="font-medium">{t("qr.locationError")}</p>
-                <p className="text-sm">{t("gps.outsideRadiusDesc")}</p>
-              </div>
-            </div>
-          )}
           {result === "duplicate" && scanStep === "scan" && (
             <div className="flex items-center gap-3 p-4 rounded-lg bg-amber-500/10 text-amber-600">
               <XCircle className="h-6 w-6" />

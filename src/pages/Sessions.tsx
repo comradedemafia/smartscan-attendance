@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, Plus, QrCode, LayoutGrid, List, ChevronLeft, ChevronRight, Edit, Trash2, Building2, ChevronDown, Users, GraduationCap, MapPin } from "lucide-react";
+import { Calendar, Plus, QrCode, LayoutGrid, List, ChevronLeft, ChevronRight, Edit, Trash2, Building2, ChevronDown, Users, GraduationCap } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay } from "date-fns";
 
@@ -33,10 +33,6 @@ export default function Sessions() {
   const [venueName, setVenueName] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("30");
   const [selectedLevelId, setSelectedLevelId] = useState("");
-  const [sessionLat, setSessionLat] = useState("");
-  const [sessionLng, setSessionLng] = useState("");
-  const [sessionRadius, setSessionRadius] = useState("100");
-  const [gettingLocation, setGettingLocation] = useState(false);
   const [deleteSessionId, setDeleteSessionId] = useState<string | null>(null);
 
 
@@ -169,9 +165,6 @@ export default function Sessions() {
       const { error } = await supabase.from("sessions").insert({
         title, course_id: courseId, venue_name: venueName || null,
         duration_minutes: parseInt(durationMinutes), created_by: user!.id, status: "scheduled",
-        latitude: sessionLat ? parseFloat(sessionLat) : null,
-        longitude: sessionLng ? parseFloat(sessionLng) : null,
-        location_radius_meters: parseInt(sessionRadius) || 100,
       });
       if (error) throw error;
     },
@@ -200,9 +193,6 @@ export default function Sessions() {
     mutationFn: async () => {
       const { error } = await supabase.from("sessions").update({
         title, course_id: courseId, venue_name: venueName || null, duration_minutes: parseInt(durationMinutes),
-        latitude: sessionLat ? parseFloat(sessionLat) : null,
-        longitude: sessionLng ? parseFloat(sessionLng) : null,
-        location_radius_meters: parseInt(sessionRadius) || 100,
       }).eq("id", editingSession.id);
       if (error) throw error;
     },
@@ -227,8 +217,8 @@ export default function Sessions() {
   });
 
 
-  const resetSessionForm = () => { setOpen(false); setEditingSession(null); setTitle(""); setCourseId(""); setVenueName(""); setDurationMinutes("30"); setSelectedLevelId(""); setSessionLat(""); setSessionLng(""); setSessionRadius("100"); };
-  const openEdit = (session: any) => { setEditingSession(session); setTitle(session.title); setCourseId(session.course_id); setVenueName(session.venue_name || ""); setDurationMinutes(String(session.duration_minutes)); const course = courses.find((c: any) => c.id === session.course_id); setSelectedLevelId(course?.level_id || ""); setSessionLat(session.latitude ? String(session.latitude) : ""); setSessionLng(session.longitude ? String(session.longitude) : ""); setSessionRadius(String(session.location_radius_meters || 100)); setOpen(true); };
+  const resetSessionForm = () => { setOpen(false); setEditingSession(null); setTitle(""); setCourseId(""); setVenueName(""); setDurationMinutes("30"); setSelectedLevelId(""); };
+  const openEdit = (session: any) => { setEditingSession(session); setTitle(session.title); setCourseId(session.course_id); setVenueName(session.venue_name || ""); setDurationMinutes(String(session.duration_minutes)); const course = courses.find((c: any) => c.id === session.course_id); setSelectedLevelId(course?.level_id || ""); setOpen(true); };
   const handleSessionSubmit = (e: React.FormEvent) => { e.preventDefault(); if (!title.trim() || !courseId) return; editingSession ? updateMutation.mutate() : createMutation.mutate(); };
   const canEditSession = (session: any) => role === "admin" || (role === "lecturer" && session.created_by === user?.id);
   const statusColor = (status: string) => { switch (status) { case "active": return "default"; case "completed": return "secondary"; default: return "outline"; } };
@@ -348,93 +338,6 @@ export default function Sessions() {
                       <Label>{t("sessions.venue")}</Label>
                       <Input value={venueName} onChange={(e) => setVenueName(e.target.value)} placeholder="Room 101" />
                     </div>
-                    {/* GPS Location for Geofencing */}
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-1">
-                        <MapPin className="h-3.5 w-3.5" />
-                        {t("gps.locationRequired")}
-                      </Label>
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          variant={sessionLat ? "default" : "outline"}
-                          size="sm"
-                          className="flex-1"
-                          disabled={gettingLocation}
-                          onClick={() => {
-                            if (sessionLat) {
-                              setSessionLat("");
-                              setSessionLng("");
-                              toast({ title: t("gps.locationCleared") });
-                              return;
-                            }
-                            if (!navigator.geolocation) {
-                              toast({ title: t("gps.notSupported"), description: t("gps.enterManually"), variant: "destructive" });
-                              return;
-                            }
-                            setGettingLocation(true);
-                            navigator.geolocation.getCurrentPosition(
-                              (pos) => {
-                                setSessionLat(String(pos.coords.latitude));
-                                setSessionLng(String(pos.coords.longitude));
-                                setGettingLocation(false);
-                                toast({ title: t("gps.locationSet") });
-                              },
-                              (err) => {
-                                setGettingLocation(false);
-                                toast({ title: t("gps.errorGetting"), description: t("gps.enterManually"), variant: "destructive" });
-                              },
-                              { enableHighAccuracy: true, timeout: 15000 }
-                            );
-                          }}
-                        >
-                          <MapPin className="h-4 w-4 mr-1" />
-                          {gettingLocation ? t("common.loading") : sessionLat ? t("gps.clearLocation") : t("gps.useMyLocation")}
-                        </Button>
-                      </div>
-                      {/* Manual coordinate inputs as fallback */}
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <Label className="text-xs text-muted-foreground">Latitude</Label>
-                          <Input
-                            type="number"
-                            step="any"
-                            placeholder="-6.7924"
-                            value={sessionLat}
-                            onChange={(e) => setSessionLat(e.target.value)}
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-xs text-muted-foreground">Longitude</Label>
-                          <Input
-                            type="number"
-                            step="any"
-                            placeholder="39.2083"
-                            value={sessionLng}
-                            onChange={(e) => setSessionLng(e.target.value)}
-                          />
-                        </div>
-                      </div>
-                      {sessionLat && sessionLng && (
-                        <p className="text-xs text-muted-foreground">
-                          📍 {parseFloat(sessionLat).toFixed(5)}, {parseFloat(sessionLng).toFixed(5)}
-                        </p>
-                      )}
-                    </div>
-                    {sessionLat && (
-                      <div className="space-y-2">
-                        <Label>{t("gps.radius")}</Label>
-                        <Select value={sessionRadius} onValueChange={setSessionRadius}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="50">50m</SelectItem>
-                            <SelectItem value="100">100m</SelectItem>
-                            <SelectItem value="200">200m</SelectItem>
-                            <SelectItem value="500">500m</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
                     <div className="space-y-2">
                       <Label>{t("sessions.duration")}</Label>
                       <Select value={durationMinutes} onValueChange={setDurationMinutes}>
