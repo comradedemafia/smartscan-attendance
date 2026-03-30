@@ -940,6 +940,8 @@ const translations = {
     "gps.permissionDenied": "Ruhusa ya Eneo Imekataliwa",
     "gps.permissionDeniedDesc": "Tafadhali ruhusu ufikiaji wa eneo kwenye kivinjari chako ili kurekodi mahudhurio",
     "gps.errorGetting": "Hatuwezi kupata eneo lako. Jaribu tena.",
+    "gps.notSupported": "GPS haipo kwenye kivinjari hiki",
+    "gps.enterManually": "Unaweza kuingiza coordinates mwenyewe hapa chini",
     "gps.gettingLocation": "Tunapata Eneo Lako...",
     "gps.pleaseWait": "Tafadhali subiri tunapohakiki eneo lako",
     "gps.locationVerified": "Eneo limethibitishwa ✓",
