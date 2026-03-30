@@ -443,6 +443,8 @@ const translations = {
     "gps.permissionDenied": "Location Permission Denied",
     "gps.permissionDeniedDesc": "Please allow location access in your browser to record attendance",
     "gps.errorGetting": "Could not get your location. Please try again.",
+    "gps.notSupported": "GPS not supported in this browser",
+    "gps.enterManually": "You can enter coordinates manually below",
     "gps.gettingLocation": "Getting Your Location...",
     "gps.pleaseWait": "Please wait while we verify your location",
     "gps.locationVerified": "Location verified ✓",
