@@ -237,7 +237,7 @@ export default function ScanQR() {
     setPendingSessionId(null);
     setPendingSecret(null);
     setOtpCode("");
-    setUserLocation(null);
+    
   };
 
   return (
