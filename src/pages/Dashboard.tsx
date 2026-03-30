@@ -572,7 +572,6 @@ export default function Dashboard() {
       {(isAdmin || isLecturer) && courses.length > 0 && sessions.length > 0 && (
         <AnalyticsDashboard courses={courses} sessions={sessions} />
       )}
-      </div>
     </div>
   );
 }
