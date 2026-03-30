@@ -77,6 +77,7 @@ const App = () => (
                   <Route path="/my-department" element={<StudentDepartment />} />
                   <Route path="/departments" element={<AdminDepartments />} />
                   <Route path="/notifications" element={<Notifications />} />
+                  <Route path="/excuses" element={<Excuses />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>
