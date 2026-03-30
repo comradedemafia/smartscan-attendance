@@ -169,6 +169,9 @@ export default function Sessions() {
       const { error } = await supabase.from("sessions").insert({
         title, course_id: courseId, venue_name: venueName || null,
         duration_minutes: parseInt(durationMinutes), created_by: user!.id, status: "scheduled",
+        latitude: sessionLat ? parseFloat(sessionLat) : null,
+        longitude: sessionLng ? parseFloat(sessionLng) : null,
+        location_radius_meters: parseInt(sessionRadius) || 100,
       });
       if (error) throw error;
     },
