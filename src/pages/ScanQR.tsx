@@ -62,9 +62,9 @@ export default function ScanQR() {
   const [otpCode, setOtpCode] = useState("");
 
 
-  // After QR scan — get location then validate
+  // After QR scan — validate
   const initiateMutation = useMutation({
-    mutationFn: async (parsed: { session_id: string; secret: string; latitude: number; longitude: number }) => {
+    mutationFn: async (parsed: { session_id: string; secret: string }) => {
       const { data, error } = await supabase.functions.invoke("attendance-otp", {
         body: { action: "initiate", ...parsed },
       });
