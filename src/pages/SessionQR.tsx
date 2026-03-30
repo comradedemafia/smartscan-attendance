@@ -67,6 +67,34 @@ export default function SessionQR() {
     refetchInterval: 3000,
   });
 
+  // Fetch total enrolled students for this session's course
+  const { data: enrolledCount = 0 } = useQuery({
+    queryKey: ["session-enrolled-count", session?.course_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("course_enrollments")
+        .select("id", { count: "exact", head: true })
+        .eq("course_id", session!.course_id);
+      if (error) throw error;
+      return data?.length ?? 0;
+    },
+    enabled: !!session?.course_id,
+  });
+
+  // Use count query properly
+  const { data: enrolledTotal = 0 } = useQuery({
+    queryKey: ["session-enrolled-total", session?.course_id],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("course_enrollments")
+        .select("*", { count: "exact", head: true })
+        .eq("course_id", session!.course_id);
+      if (error) throw error;
+      return count ?? 0;
+    },
+    enabled: !!session?.course_id,
+  });
+
   // Generate / activate QR
   const activateMutation = useMutation({
     mutationFn: async () => {
