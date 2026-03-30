@@ -974,6 +974,15 @@ const translations = {
     // Absentee Alerts
     "alert.consecutiveMissed": "Umekosa vipindi {count} mfululizo kwa {course}",
     "alert.belowThreshold": "Mahudhurio yako ya {course} ni {pct}%, chini ya kiwango cha 75% kinachohitajika",
+
+    // Offline
+    "offline.online": "Mtandaoni",
+    "offline.offline": "Nje ya Mtandao",
+    "offline.savedLocally": "Scan imehifadhiwa kwenye simu",
+    "offline.willSyncLater": "Scan yako itatumwa moja kwa moja utakapounganishwa tena",
+    "offline.syncNow": "Sync Sasa",
+    "offline.syncSuccess": "Scan za nje ya mtandao zimesyncishwa!",
+    "offline.pendingScans": "Scan zinazosubiri",
   },
 } as const;
 
