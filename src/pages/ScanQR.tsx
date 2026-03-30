@@ -18,7 +18,7 @@ const qrPayloadSchema = z.object({
   secret: z.string().min(1).max(200),
 });
 
-type ScanStep = "scan" | "getting-location" | "enter-otp" | "verified" | "no-totp" | "offline-saved";
+type ScanStep = "scan" | "enter-otp" | "verified" | "no-totp" | "offline-saved";
 
 interface OfflineScan {
   session_id: string;
