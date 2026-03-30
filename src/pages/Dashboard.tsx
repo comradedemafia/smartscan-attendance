@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { BookOpen, Calendar, Users, TrendingUp, Clock, Building2, Plus, GraduationCap, ChevronDown, ChevronRight, CalendarPlus, ArrowRight, Shield, ShieldCheck, ShieldOff } from "lucide-react";
+import { BookOpen, Calendar, Users, TrendingUp, Clock, Building2, Plus, GraduationCap, ChevronDown, ChevronRight, CalendarPlus, ArrowRight, Shield, ShieldCheck, ShieldOff, AlertTriangle } from "lucide-react";
 import SendNotification from "@/components/SendNotification";
 import AnalyticsDashboard from "@/components/AnalyticsDashboard";
 import { supabase } from "@/integrations/supabase/client";
