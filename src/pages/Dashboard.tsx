@@ -567,6 +567,12 @@ export default function Dashboard() {
           <CardContent><p className="text-muted-foreground text-sm">—</p></CardContent>
         </Card>
       </div>
+
+      {/* Analytics Dashboard */}
+      {(isAdmin || isLecturer) && courses.length > 0 && sessions.length > 0 && (
+        <AnalyticsDashboard courses={courses} sessions={sessions} />
+      )}
+      </div>
     </div>
   );
 }
