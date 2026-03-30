@@ -684,6 +684,7 @@ export default function Reports() {
                             <TableHead>{t("reports.universityId")}</TableHead>
                             <TableHead>{t("reports.gender")}</TableHead>
                             <TableHead className="text-center">{t("reports.sessionsAttended")}</TableHead>
+                            <TableHead className="text-center">{t("reports.excused")}</TableHead>
                             <TableHead className="text-center">{t("reports.percentage")}</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -698,6 +699,11 @@ export default function Reports() {
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-center">{s.attended}/{s.total}</TableCell>
+                              <TableCell className="text-center">
+                                {s.excused > 0 ? (
+                                  <Badge variant="outline" className="text-amber-600 border-amber-400">{s.excused}</Badge>
+                                ) : "—"}
+                              </TableCell>
                               <TableCell className="text-center">
                                 <Badge variant={s.percentage >= 75 ? "default" : s.percentage >= 50 ? "secondary" : "destructive"}>
                                   {s.percentage}%
