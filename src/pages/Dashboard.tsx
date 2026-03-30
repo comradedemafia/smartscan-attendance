@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { BookOpen, Calendar, Users, TrendingUp, Clock, Building2, Plus, GraduationCap, ChevronDown, ChevronRight, CalendarPlus, ArrowRight, Shield, ShieldCheck, ShieldOff } from "lucide-react";
 import SendNotification from "@/components/SendNotification";
+import AnalyticsDashboard from "@/components/AnalyticsDashboard";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
