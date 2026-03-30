@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Clock, Users, CheckCircle2, StopCircle, TimerReset } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { ArrowLeft, Clock, Users, CheckCircle2, StopCircle, TimerReset, UserCheck, UserX } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
 export default function SessionQR() {
