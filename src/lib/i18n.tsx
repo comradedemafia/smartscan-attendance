@@ -437,6 +437,21 @@ const translations = {
     "otp.enterCodeFromSettings": "Go to Settings → Authenticator to copy your current code",
     "otp.attendanceRecorded": "Your attendance has been recorded successfully",
     "common.done": "Done",
+
+    // GPS
+    "gps.permissionDenied": "Location Permission Denied",
+    "gps.permissionDeniedDesc": "Please allow location access in your browser to record attendance",
+    "gps.errorGetting": "Could not get your location. Please try again.",
+    "gps.gettingLocation": "Getting Your Location...",
+    "gps.pleaseWait": "Please wait while we verify your location",
+    "gps.locationVerified": "Location verified ✓",
+    "gps.outsideRadiusDesc": "You must be within the classroom area to record attendance",
+    "gps.useMyLocation": "Use My Location",
+    "gps.locationSet": "Location set!",
+    "gps.locationCleared": "Location cleared",
+    "gps.clearLocation": "Clear Location",
+    "gps.radius": "Radius (meters)",
+    "gps.locationRequired": "GPS location for geofencing",
   },
   sw: {
     // Auth
@@ -872,6 +887,21 @@ const translations = {
     "otp.enterCodeFromSettings": "Nenda Mipangilio → Uthibitishaji ili kunakili msimbo wako",
     "otp.attendanceRecorded": "Mahudhurio yako yamerekodiwa kikamilifu",
     "common.done": "Tayari",
+
+    // GPS
+    "gps.permissionDenied": "Ruhusa ya Eneo Imekataliwa",
+    "gps.permissionDeniedDesc": "Tafadhali ruhusu ufikiaji wa eneo kwenye kivinjari chako ili kurekodi mahudhurio",
+    "gps.errorGetting": "Hatuwezi kupata eneo lako. Jaribu tena.",
+    "gps.gettingLocation": "Tunapata Eneo Lako...",
+    "gps.pleaseWait": "Tafadhali subiri tunapohakiki eneo lako",
+    "gps.locationVerified": "Eneo limethibitishwa ✓",
+    "gps.outsideRadiusDesc": "Lazima uwe ndani ya eneo la darasa ili kurekodi mahudhurio",
+    "gps.useMyLocation": "Tumia Eneo Langu",
+    "gps.locationSet": "Eneo limewekwa!",
+    "gps.locationCleared": "Eneo limeondolewa",
+    "gps.clearLocation": "Ondoa Eneo",
+    "gps.radius": "Radius (mita)",
+    "gps.locationRequired": "Eneo la GPS kwa geofencing",
   },
 } as const;
 
