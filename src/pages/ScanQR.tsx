@@ -60,7 +60,6 @@ export default function ScanQR() {
   const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
   const [pendingSecret, setPendingSecret] = useState<string | null>(null);
   const [otpCode, setOtpCode] = useState("");
-  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
   // Get user's GPS location
   const getUserLocation = useCallback((): Promise<{ latitude: number; longitude: number }> => {
