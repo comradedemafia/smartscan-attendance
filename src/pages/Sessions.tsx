@@ -200,6 +200,9 @@ export default function Sessions() {
     mutationFn: async () => {
       const { error } = await supabase.from("sessions").update({
         title, course_id: courseId, venue_name: venueName || null, duration_minutes: parseInt(durationMinutes),
+        latitude: sessionLat ? parseFloat(sessionLat) : null,
+        longitude: sessionLng ? parseFloat(sessionLng) : null,
+        location_radius_meters: parseInt(sessionRadius) || 100,
       }).eq("id", editingSession.id);
       if (error) throw error;
     },
