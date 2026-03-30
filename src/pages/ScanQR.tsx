@@ -103,8 +103,6 @@ export default function ScanQR() {
           action: "verify-scan-totp",
           session_id: pendingSessionId,
           code: otpCode,
-          latitude: userLocation?.latitude,
-          longitude: userLocation?.longitude,
         },
       });
       if (error) throw new Error(error.message || "Network error");
