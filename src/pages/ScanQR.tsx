@@ -121,10 +121,6 @@ export default function ScanQR() {
         setResult("duplicate");
         setScanStep("scan");
         toast({ title: t("qr.alreadyScanned"), variant: "destructive" });
-      } else if (e.message === "OUTSIDE_RADIUS") {
-        setResult("outside-radius");
-        setScanStep("scan");
-        toast({ title: t("qr.locationError"), variant: "destructive" });
       } else {
         toast({ title: t("common.error"), description: e.message, variant: "destructive" });
       }
