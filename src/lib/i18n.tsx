@@ -483,6 +483,15 @@ const translations = {
     // Absentee Alerts
     "alert.consecutiveMissed": "You have missed {count} consecutive sessions for {course}",
     "alert.belowThreshold": "Your attendance for {course} is at {pct}%, below the required 75%",
+
+    // Offline
+    "offline.online": "Online",
+    "offline.offline": "Offline",
+    "offline.savedLocally": "Scan saved locally",
+    "offline.willSyncLater": "Your scan will be submitted automatically when you reconnect",
+    "offline.syncNow": "Sync Now",
+    "offline.syncSuccess": "Offline scans synced!",
+    "offline.pendingScans": "Pending scans",
   },
   sw: {
     // Auth

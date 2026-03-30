@@ -412,6 +412,22 @@ export default function ScanQR() {
             </div>
           )}
 
+          {/* Offline saved */}
+          {scanStep === "offline-saved" && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-4 rounded-lg bg-amber-500/10 text-amber-600">
+                <WifiOff className="h-6 w-6" />
+                <div>
+                  <p className="font-medium">{t("offline.savedLocally")}</p>
+                  <p className="text-sm text-muted-foreground">{t("offline.willSyncLater")}</p>
+                </div>
+              </div>
+              <Button className="w-full" size="lg" onClick={resetToScan}>
+                {t("common.done")}
+              </Button>
+            </div>
+          )}
+
           {/* Success */}
           {scanStep === "verified" && (
             <div className="space-y-4">
