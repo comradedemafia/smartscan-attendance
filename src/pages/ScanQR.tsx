@@ -380,15 +380,6 @@ export default function ScanQR() {
           )}
 
           {/* Error feedback */}
-          {result === "outside-radius" && scanStep === "scan" && (
-            <div className="flex items-center gap-3 p-4 rounded-lg bg-destructive/10 text-destructive">
-              <MapPin className="h-6 w-6" />
-              <div>
-                <p className="font-medium">{t("qr.locationError")}</p>
-                <p className="text-sm">{t("gps.outsideRadiusDesc")}</p>
-              </div>
-            </div>
-          )}
           {result === "duplicate" && scanStep === "scan" && (
             <div className="flex items-center gap-3 p-4 rounded-lg bg-amber-500/10 text-amber-600">
               <XCircle className="h-6 w-6" />
