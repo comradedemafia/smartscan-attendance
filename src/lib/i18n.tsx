@@ -437,6 +437,21 @@ const translations = {
     "otp.enterCodeFromSettings": "Go to Settings → Authenticator to copy your current code",
     "otp.attendanceRecorded": "Your attendance has been recorded successfully",
     "common.done": "Done",
+
+    // GPS
+    "gps.permissionDenied": "Location Permission Denied",
+    "gps.permissionDeniedDesc": "Please allow location access in your browser to record attendance",
+    "gps.errorGetting": "Could not get your location. Please try again.",
+    "gps.gettingLocation": "Getting Your Location...",
+    "gps.pleaseWait": "Please wait while we verify your location",
+    "gps.locationVerified": "Location verified ✓",
+    "gps.outsideRadiusDesc": "You must be within the classroom area to record attendance",
+    "gps.useMyLocation": "Use My Location",
+    "gps.locationSet": "Location set!",
+    "gps.locationCleared": "Location cleared",
+    "gps.clearLocation": "Clear Location",
+    "gps.radius": "Radius (meters)",
+    "gps.locationRequired": "GPS location for geofencing",
   },
   sw: {
     // Auth
