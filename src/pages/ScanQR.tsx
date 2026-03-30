@@ -88,9 +88,6 @@ export default function ScanQR() {
       } else if (e.message === "QR_EXPIRED") {
         setResult("expired");
         toast({ title: t("qr.expired"), variant: "destructive" });
-      } else if (e.message === "OUTSIDE_RADIUS") {
-        setResult("outside-radius");
-        toast({ title: t("qr.locationError"), variant: "destructive" });
       } else {
         setResult("error");
         toast({ title: t("common.error"), description: e.message, variant: "destructive" });
