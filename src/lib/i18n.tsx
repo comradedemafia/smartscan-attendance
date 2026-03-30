@@ -915,6 +915,19 @@ const translations = {
     "gps.clearLocation": "Ondoa Eneo",
     "gps.radius": "Radius (mita)",
     "gps.locationRequired": "Eneo la GPS kwa geofencing",
+
+    // Analytics
+    "analytics.title": "Takwimu za Mahudhurio",
+    "analytics.overallRate": "Kiwango cha Mahudhurio kwa Ujumla",
+    "analytics.slots": "nafasi za mahudhurio",
+    "analytics.weeklyTrend": "Mwenendo wa Wiki",
+    "analytics.rate": "Kiwango cha Mahudhurio",
+    "analytics.perModule": "Mahudhurio kwa Moduli",
+    "analytics.sessions": "vipindi",
+    "analytics.atRisk": "Wanafunzi Hatarini (chini ya 75%)",
+    "analytics.enrolledTotal": "walioandikishwa",
+    "analytics.remaining": "waliobaki",
+    "analytics.liveAttendance": "Mahudhurio ya Moja kwa Moja",
   },
 } as const;
 
