@@ -649,6 +649,7 @@ const translations = {
     "reports.totalSessions": "Vipindi Vyote",
     "reports.totalAttendance": "Rekodi Zote za Mahudhurio",
     "reports.averageRate": "Kiwango cha Wastani",
+    "reports.excused": "Ruhusa",
     "reports.courseReport": "Ripoti ya Moduli",
     "reports.selectCourse": "Chagua moduli",
     "reports.selectDepartment": "Chagua idara",
