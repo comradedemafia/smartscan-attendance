@@ -701,7 +701,7 @@ export default function Reports() {
                               <TableCell className="text-center">{s.attended}/{s.total}</TableCell>
                               <TableCell className="text-center">
                                 {s.excused > 0 ? (
-                                  <Badge variant="outline" className="text-amber-600 border-amber-400">{s.excused}</Badge>
+                                  <Badge variant="secondary">{s.excused}</Badge>
                                 ) : "—"}
                               </TableCell>
                               <TableCell className="text-center">
