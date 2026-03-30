@@ -227,8 +227,8 @@ export default function Sessions() {
   });
 
 
-  const resetSessionForm = () => { setOpen(false); setEditingSession(null); setTitle(""); setCourseId(""); setVenueName(""); setDurationMinutes("30"); setSelectedLevelId(""); };
-  const openEdit = (session: any) => { setEditingSession(session); setTitle(session.title); setCourseId(session.course_id); setVenueName(session.venue_name || ""); setDurationMinutes(String(session.duration_minutes)); const course = courses.find((c: any) => c.id === session.course_id); setSelectedLevelId(course?.level_id || ""); setOpen(true); };
+  const resetSessionForm = () => { setOpen(false); setEditingSession(null); setTitle(""); setCourseId(""); setVenueName(""); setDurationMinutes("30"); setSelectedLevelId(""); setSessionLat(""); setSessionLng(""); setSessionRadius("100"); };
+  const openEdit = (session: any) => { setEditingSession(session); setTitle(session.title); setCourseId(session.course_id); setVenueName(session.venue_name || ""); setDurationMinutes(String(session.duration_minutes)); const course = courses.find((c: any) => c.id === session.course_id); setSelectedLevelId(course?.level_id || ""); setSessionLat(session.latitude ? String(session.latitude) : ""); setSessionLng(session.longitude ? String(session.longitude) : ""); setSessionRadius(String(session.location_radius_meters || 100)); setOpen(true); };
   const handleSessionSubmit = (e: React.FormEvent) => { e.preventDefault(); if (!title.trim() || !courseId) return; editingSession ? updateMutation.mutate() : createMutation.mutate(); };
   const canEditSession = (session: any) => role === "admin" || (role === "lecturer" && session.created_by === user?.id);
   const statusColor = (status: string) => { switch (status) { case "active": return "default"; case "completed": return "secondary"; default: return "outline"; } };
