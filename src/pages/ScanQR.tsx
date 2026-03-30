@@ -18,7 +18,33 @@ const qrPayloadSchema = z.object({
   secret: z.string().min(1).max(200),
 });
 
-type ScanStep = "scan" | "getting-location" | "enter-otp" | "verified" | "no-totp";
+type ScanStep = "scan" | "getting-location" | "enter-otp" | "verified" | "no-totp" | "offline-saved";
+
+interface OfflineScan {
+  session_id: string;
+  secret: string;
+  latitude: number;
+  longitude: number;
+  timestamp: string;
+}
+
+const OFFLINE_QUEUE_KEY = "offline_scan_queue";
+
+function getOfflineQueue(): OfflineScan[] {
+  try {
+    return JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || "[]");
+  } catch { return []; }
+}
+
+function addToOfflineQueue(scan: OfflineScan) {
+  const queue = getOfflineQueue();
+  queue.push(scan);
+  localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+}
+
+function clearOfflineQueue() {
+  localStorage.removeItem(OFFLINE_QUEUE_KEY);
+}
 
 export default function ScanQR() {
   const { user } = useAuth();
@@ -29,6 +55,8 @@ export default function ScanQR() {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const processedRef = useRef(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [offlineCount, setOfflineCount] = useState(getOfflineQueue().length);
 
   const [scanStep, setScanStep] = useState<ScanStep>("scan");
   const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
