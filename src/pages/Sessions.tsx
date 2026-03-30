@@ -33,10 +33,6 @@ export default function Sessions() {
   const [venueName, setVenueName] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("30");
   const [selectedLevelId, setSelectedLevelId] = useState("");
-  const [sessionLat, setSessionLat] = useState("");
-  const [sessionLng, setSessionLng] = useState("");
-  const [sessionRadius, setSessionRadius] = useState("100");
-  const [gettingLocation, setGettingLocation] = useState(false);
   const [deleteSessionId, setDeleteSessionId] = useState<string | null>(null);
 
 
