@@ -105,6 +105,7 @@ export default function AppLayout() {
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
           {filteredNav.map((item) => {
             const isActive = location.pathname === item.to;
+            const showBadge = item.to === "/excuses" && pendingExcuseCount > 0 && role !== "student";
             return (
               <Link
                 key={item.to}
@@ -119,6 +120,11 @@ export default function AppLayout() {
               >
                 <item.icon className="h-5 w-5" />
                 {item.label}
+                {showBadge && (
+                  <Badge variant="destructive" className="ml-auto h-5 min-w-[20px] px-1.5 text-[10px] flex items-center justify-center">
+                    {pendingExcuseCount}
+                  </Badge>
+                )}
               </Link>
             );
           })}
