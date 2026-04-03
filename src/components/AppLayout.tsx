@@ -149,7 +149,7 @@ export default function AppLayout() {
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
           </div>
-          <div className="text-xs text-sidebar-foreground/60 truncate">
+          <div className="text-xs text-sidebar-foreground truncate">
             {profile?.full_name} • {role}
           </div>
           <Button
