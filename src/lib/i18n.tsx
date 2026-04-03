@@ -482,6 +482,10 @@ const translations = {
     "excuse.noExcuses": "No permission requests yet",
     "excuse.approve": "Approve",
     "excuse.reject": "Reject",
+    "excuse.attachment": "Attachment",
+    "excuse.addAttachment": "Add Attachment (optional)",
+    "excuse.viewAttachment": "View Attachment",
+    "excuse.uploadingAttachment": "Uploading...",
 
     // Absentee Alerts
     "alert.consecutiveMissed": "You have missed {count} consecutive sessions for {course}",
