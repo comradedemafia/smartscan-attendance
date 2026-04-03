@@ -40,7 +40,7 @@ export default function Auth() {
   const [role, setRole] = useState<"student" | "lecturer">("student");
   const [gender, setGender] = useState<"M" | "F">("M");
   const [programme, setProgramme] = useState("");
-  const [phone, setPhone] = useState("+255");
+  const [phone, setPhone] = useState("0");
   const [academicYear, setAcademicYear] = useState("2024/2025");
   const [studyYear, setStudyYear] = useState("1");
   const [submitting, setSubmitting] = useState(false);
