@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useI18n } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,8 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { FileText, Plus, CheckCircle2, XCircle, Clock, AlertTriangle } from "lucide-react";
+import { FileText, Plus, CheckCircle2, XCircle, Clock, Paperclip, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 
 export default function Excuses() {
@@ -21,10 +20,13 @@ export default function Excuses() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isStudent = role === "student";
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [open, setOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState("");
   const [reason, setReason] = useState("");
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   // Student: get sessions they're enrolled in
   const { data: availableSessions = [] } = useQuery({
@@ -53,7 +55,6 @@ export default function Excuses() {
         .from("excuses")
         .select("*")
         .order("created_at", { ascending: false });
-      
       if (isStudent) {
         query.eq("user_id", user!.id);
       }
@@ -94,12 +95,33 @@ export default function Excuses() {
     enabled: studentIds.length > 0 && !isStudent,
   });
 
+  const uploadAttachment = async (): Promise<string | null> => {
+    if (!attachmentFile || !user) return null;
+    setUploading(true);
+    try {
+      const ext = attachmentFile.name.split('.').pop();
+      const filePath = `${user.id}/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage
+        .from("excuse-attachments")
+        .upload(filePath, attachmentFile);
+      if (error) throw error;
+      const { data: urlData } = supabase.storage
+        .from("excuse-attachments")
+        .getPublicUrl(filePath);
+      return urlData.publicUrl;
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const createExcuse = useMutation({
     mutationFn: async () => {
+      const attachmentUrl = await uploadAttachment();
       const { error } = await supabase.from("excuses").insert({
         user_id: user!.id,
         session_id: selectedSession,
         reason,
+        attachment_url: attachmentUrl,
       });
       if (error) throw error;
     },
@@ -109,6 +131,7 @@ export default function Excuses() {
       setOpen(false);
       setSelectedSession("");
       setReason("");
+      setAttachmentFile(null);
     },
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
@@ -175,8 +198,27 @@ export default function Excuses() {
                     maxLength={500}
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={!selectedSession || !reason.trim() || createExcuse.isPending}>
-                  {createExcuse.isPending ? t("common.loading") : t("excuse.submit")}
+                <div className="space-y-2">
+                  <Label>{t("excuse.addAttachment")}</Label>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*,.pdf,.doc,.docx"
+                    className="hidden"
+                    onChange={(e) => setAttachmentFile(e.target.files?.[0] || null)}
+                  />
+                  <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                    <Paperclip className="h-4 w-4 mr-1" />
+                    {attachmentFile ? attachmentFile.name : t("excuse.attachment")}
+                  </Button>
+                  {attachmentFile && (
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setAttachmentFile(null)} className="ml-2 text-destructive">
+                      ✕
+                    </Button>
+                  )}
+                </div>
+                <Button type="submit" className="w-full" disabled={!selectedSession || !reason.trim() || createExcuse.isPending || uploading}>
+                  {uploading ? t("excuse.uploadingAttachment") : createExcuse.isPending ? t("common.loading") : t("excuse.submit")}
                 </Button>
               </form>
             </DialogContent>
@@ -221,6 +263,18 @@ export default function Excuses() {
                         )}
                       </p>
                       <p className="text-sm text-muted-foreground">{excuse.reason}</p>
+                      {excuse.attachment_url && (
+                        <a
+                          href={excuse.attachment_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                        >
+                          <Paperclip className="h-3 w-3" />
+                          {t("excuse.viewAttachment")}
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      )}
                       <p className="text-xs text-muted-foreground">
                         {format(new Date(excuse.created_at), "dd/MM/yyyy HH:mm")}
                       </p>
