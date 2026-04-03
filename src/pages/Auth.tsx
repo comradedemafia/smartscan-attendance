@@ -23,7 +23,7 @@ const signupSchema = loginSchema.extend({
   role: z.enum(["student", "lecturer"]),
   gender: z.enum(["M", "F"], { required_error: "Gender is required" }),
   programme: z.string().min(1, "Programme is required"),
-  phone: z.string().regex(/^\+255\d{9}$/, "Phone must be in format +255XXXXXXXXX"),
+  phone: z.string().regex(/^0\d{9}$/, "Phone must be 10 digits starting with 0"),
   academicYear: z.string().min(4, "Academic year is required"),
   studyYear: z.coerce.number().min(1).max(6).optional(),
 });
