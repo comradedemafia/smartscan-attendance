@@ -139,7 +139,7 @@ export default function AppLayout() {
             />
           </div>
           <div className="flex items-center justify-between">
-            <Label className="text-xs text-sidebar-foreground/70">{t("settings.appearance")}</Label>
+            <Label className="text-xs text-sidebar-foreground">{ t("settings.appearance")}</Label>
             <Button
               variant="ghost"
               size="icon"
