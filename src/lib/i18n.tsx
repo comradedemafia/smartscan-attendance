@@ -266,7 +266,7 @@ const translations = {
     "auth.academicYear": "Academic Year",
     "auth.studyYear": "Year of Study",
     "auth.year": "Year",
-    "auth.phone": "Phone Number (+255)",
+    "auth.phone": "Phone Number (0XXXXXXXXX)",
 
     // Departments
     "dept.myDepartment": "Community Development (CD)",
@@ -482,6 +482,10 @@ const translations = {
     "excuse.noExcuses": "No permission requests yet",
     "excuse.approve": "Approve",
     "excuse.reject": "Reject",
+    "excuse.attachment": "Attachment",
+    "excuse.addAttachment": "Add Attachment (optional)",
+    "excuse.viewAttachment": "View Attachment",
+    "excuse.uploadingAttachment": "Uploading...",
 
     // Absentee Alerts
     "alert.consecutiveMissed": "You have missed {count} consecutive sessions for {course}",
@@ -980,6 +984,10 @@ const translations = {
     "excuse.noExcuses": "Hakuna maombi ya ruhusa bado",
     "excuse.approve": "Kubali",
     "excuse.reject": "Kataa",
+    "excuse.attachment": "Kiambatisho",
+    "excuse.addAttachment": "Ongeza Kiambatisho (si lazima)",
+    "excuse.viewAttachment": "Angalia Kiambatisho",
+    "excuse.uploadingAttachment": "Inapakia...",
 
     // Absentee Alerts
     "alert.consecutiveMissed": "Umekosa vipindi {count} mfululizo kwa {course}",

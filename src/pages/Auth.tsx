@@ -23,7 +23,7 @@ const signupSchema = loginSchema.extend({
   role: z.enum(["student", "lecturer"]),
   gender: z.enum(["M", "F"], { required_error: "Gender is required" }),
   programme: z.string().min(1, "Programme is required"),
-  phone: z.string().regex(/^\+255\d{9}$/, "Phone must be in format +255XXXXXXXXX"),
+  phone: z.string().regex(/^0\d{9}$/, "Phone must be 10 digits starting with 0"),
   academicYear: z.string().min(4, "Academic year is required"),
   studyYear: z.coerce.number().min(1).max(6).optional(),
 });
@@ -40,7 +40,7 @@ export default function Auth() {
   const [role, setRole] = useState<"student" | "lecturer">("student");
   const [gender, setGender] = useState<"M" | "F">("M");
   const [programme, setProgramme] = useState("");
-  const [phone, setPhone] = useState("+255");
+  const [phone, setPhone] = useState("0");
   const [academicYear, setAcademicYear] = useState("2024/2025");
   const [studyYear, setStudyYear] = useState("1");
   const [submitting, setSubmitting] = useState(false);
@@ -344,8 +344,12 @@ export default function Auth() {
                     <Input
                       id="phone"
                       value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="+255712345678"
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, "");
+                        if (val.length <= 10 && (val === "" || val.startsWith("0"))) setPhone(val);
+                      }}
+                      placeholder="0712345678"
+                      maxLength={10}
                     />
                     {errors.phone && <p className="text-sm text-destructive">{errors.phone}</p>}
                   </div>
