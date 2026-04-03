@@ -238,6 +238,7 @@ export type Database = {
       }
       excuses: {
         Row: {
+          attachment_url: string | null
           created_at: string
           id: string
           reason: string
@@ -248,6 +249,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          attachment_url?: string | null
           created_at?: string
           id?: string
           reason: string
@@ -258,6 +260,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          attachment_url?: string | null
           created_at?: string
           id?: string
           reason?: string
