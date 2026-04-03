@@ -984,6 +984,10 @@ const translations = {
     "excuse.noExcuses": "Hakuna maombi ya ruhusa bado",
     "excuse.approve": "Kubali",
     "excuse.reject": "Kataa",
+    "excuse.attachment": "Kiambatisho",
+    "excuse.addAttachment": "Ongeza Kiambatisho (si lazima)",
+    "excuse.viewAttachment": "Angalia Kiambatisho",
+    "excuse.uploadingAttachment": "Inapakia...",
 
     // Absentee Alerts
     "alert.consecutiveMissed": "Umekosa vipindi {count} mfululizo kwa {course}",

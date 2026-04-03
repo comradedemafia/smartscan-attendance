@@ -344,8 +344,12 @@ export default function Auth() {
                     <Input
                       id="phone"
                       value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="+255712345678"
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, "");
+                        if (val.length <= 10 && (val === "" || val.startsWith("0"))) setPhone(val);
+                      }}
+                      placeholder="0712345678"
+                      maxLength={10}
                     />
                     {errors.phone && <p className="text-sm text-destructive">{errors.phone}</p>}
                   </div>
