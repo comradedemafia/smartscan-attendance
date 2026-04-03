@@ -143,7 +143,7 @@ export default function AppLayout() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-sidebar-foreground/70 hover:text-sidebar-foreground"
+              className="h-7 w-7 text-sidebar-foreground hover:text-sidebar-foreground"
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             >
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
