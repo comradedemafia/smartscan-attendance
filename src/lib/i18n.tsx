@@ -266,7 +266,7 @@ const translations = {
     "auth.academicYear": "Academic Year",
     "auth.studyYear": "Year of Study",
     "auth.year": "Year",
-    "auth.phone": "Phone Number (+255)",
+    "auth.phone": "Phone Number (0XXXXXXXXX)",
 
     // Departments
     "dept.myDepartment": "Community Development (CD)",
