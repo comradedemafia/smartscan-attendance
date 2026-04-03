@@ -132,7 +132,7 @@ export default function AppLayout() {
 
         <div className="p-4 border-t border-sidebar-border space-y-3">
           <div className="flex items-center justify-between">
-            <Label className="text-xs text-sidebar-foreground/70">EN / SW</Label>
+            <Label className="text-xs text-sidebar-foreground">EN / SW</Label>
             <Switch
               checked={language === "sw"}
               onCheckedChange={(checked) => setLanguage(checked ? "sw" : "en")}
