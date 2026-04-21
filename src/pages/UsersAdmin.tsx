@@ -51,6 +51,32 @@ export default function UsersAdmin() {
   // ─── Manage Staff sub-state ───────────────────────────────────────
   const [staffSearch, setStaffSearch] = useState("");
   const [staffLevelFilter, setStaffLevelFilter] = useState<string>("all");
+  const [staffSortKey, setStaffSortKey] = useState<"full_name" | "university_id" | "email" | "gender">("full_name");
+  const [staffSortDir, setStaffSortDir] = useState<"asc" | "desc">("asc");
+  const [staffPage, setStaffPage] = useState(1);
+  const [staffPageSize, setStaffPageSize] = useState(10);
+
+  // ─── Students list extra filters ─────────────────────────────────
+  const [listSemesterId, setListSemesterId] = useState<string>("all");
+  const [listGenderFilter, setListGenderFilter] = useState<string>("all");
+
+  // ─── CSV import preview state ────────────────────────────────────
+  type CsvRow = {
+    rowNum: number;
+    raw: Record<string, string>;
+    university_id: string;
+    semester: string;
+    level: string;
+    module: string;
+    userId?: string;
+    courseId?: string;
+    errors: string[];
+    alreadyEnrolled?: boolean;
+  };
+  const [csvPreviewOpen, setCsvPreviewOpen] = useState(false);
+  const [csvRows, setCsvRows] = useState<CsvRow[]>([]);
+  const [csvMissingCols, setCsvMissingCols] = useState<string[]>([]);
+  const [csvFileName, setCsvFileName] = useState("");
 
   // ─── Queries ──────────────────────────────────────────────────────
   const { data: profiles = [] } = useQuery({
