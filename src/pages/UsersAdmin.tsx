@@ -429,7 +429,14 @@ export default function UsersAdmin() {
   const filteredStudents = useMemo(() => {
     return students.filter((p: any) => {
       const q = listSearch.toLowerCase();
-      const matchSearch = !listSearch || p.full_name.toLowerCase().includes(q) || p.university_id.toLowerCase().includes(q);
+      const matchSearch =
+        !listSearch ||
+        p.full_name.toLowerCase().includes(q) ||
+        p.university_id.toLowerCase().includes(q) ||
+        (p.email || "").toLowerCase().includes(q);
+
+      const matchSemester =
+        listSemesterId === "all" || p.department_id === listSemesterId;
 
       let matchLevel = true;
       if (listLevelId !== "all") {
@@ -438,9 +445,10 @@ export default function UsersAdmin() {
       }
 
       const matchCourse = listCourseId === "all" || enrollmentsByCourse[listCourseId]?.has(p.id);
-      return matchSearch && matchLevel && matchCourse;
+      const matchGender = listGenderFilter === "all" || p.gender === listGenderFilter;
+      return matchSearch && matchSemester && matchLevel && matchCourse && matchGender;
     });
-  }, [students, listSearch, listLevelId, listCourseId, levels, enrollmentsByCourse]);
+  }, [students, listSearch, listSemesterId, listLevelId, listCourseId, listGenderFilter, levels, enrollmentsByCourse]);
 
   // Courses available in the list-tab module dropdown depend on the level chosen
   const listCourseOptions = useMemo(() => {
