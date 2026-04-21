@@ -450,11 +450,14 @@ export default function UsersAdmin() {
     });
   }, [students, listSearch, listSemesterId, listLevelId, listCourseId, listGenderFilter, levels, enrollmentsByCourse]);
 
-  // Courses available in the list-tab module dropdown depend on the level chosen
+  // Courses available in the list-tab module dropdown depend on the semester + level chosen
   const listCourseOptions = useMemo(() => {
-    if (listLevelId === "all") return courses;
-    return courses.filter((c) => c.level_id === listLevelId);
-  }, [courses, listLevelId]);
+    return courses.filter((c) => {
+      const matchSem = listSemesterId === "all" || c.department_id === listSemesterId;
+      const matchLvl = listLevelId === "all" || c.level_id === listLevelId;
+      return matchSem && matchLvl;
+    });
+  }, [courses, listSemesterId, listLevelId]);
 
   // ─── Enroll tab cascading options ─────────────────────────────────
   const enrollLevelsOptions = useMemo(
