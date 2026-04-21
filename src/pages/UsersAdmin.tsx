@@ -914,24 +914,27 @@ export default function UsersAdmin() {
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <GraduationCap className="h-4 w-4" />
-                {t("admin.staffDirectory")}
+                {t("admin.staffTable")}
               </CardTitle>
               <CardDescription>
                 {t("admin.lecturerLevel")} · {t("admin.lecturerModules")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5">
+              {/* Search & filters */}
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="space-y-1.5 flex-1 min-w-[220px]">
                   <Label className="text-xs">{t("common.search")}</Label>
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input className="pl-9" value={staffSearch} onChange={(e) => setStaffSearch(e.target.value)} placeholder={t("common.search")} />
+                    <Input className="pl-9" value={staffSearch}
+                      onChange={(e) => { setStaffSearch(e.target.value); setStaffPage(1); }}
+                      placeholder={t("admin.searchPlaceholder")} />
                   </div>
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 min-w-[180px]">
                   <Label className="text-xs">{t("enroll.level")}</Label>
-                  <Select value={staffLevelFilter} onValueChange={setStaffLevelFilter}>
+                  <Select value={staffLevelFilter} onValueChange={(v) => { setStaffLevelFilter(v); setStaffPage(1); }}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">{t("admin.allDepartments")}</SelectItem>
@@ -941,23 +944,116 @@ export default function UsersAdmin() {
                     </SelectContent>
                   </Select>
                 </div>
+                <Button
+                  variant="outline" size="sm"
+                  onClick={() => { setStaffSearch(""); setStaffLevelFilter("all"); setStaffPage(1); }}
+                >
+                  <X className="h-3.5 w-3.5 mr-1" /> {t("admin.clearFilters")}
+                </Button>
               </div>
 
-              {/* Collapsible list of lecturers */}
-              <div className="space-y-2">
-                {filteredLecturers.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8 border-2 border-dashed rounded-lg">
-                    {t("reports.noData")}
-                  </p>
-                ) : (
-                  filteredLecturers.map((lec: any) => {
-                    const lecCourseIds = lecturerCoursesMap[lec.id] || [];
-                    const lecCourses = courses.filter((c) => lecCourseIds.includes(c.id));
-                    const lecLevelIds = [...new Set(lecCourses.map((c) => c.level_id).filter(Boolean))];
-                    const lecLevels = levels.filter((l) => lecLevelIds.includes(l.id));
-                    return <LecturerRow key={lec.id} lec={lec} levels={lecLevels} coursesList={lecCourses} t={t} />;
-                  })
-                )}
+              <div className="text-xs text-muted-foreground">
+                {t("admin.resultsCount").replace("{count}", String(sortedLecturers.length))}
+              </div>
+
+              {/* Sortable lecturer table */}
+              <div className="rounded-lg border overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">#</TableHead>
+                      <SortableTh active={staffSortKey === "full_name"} dir={staffSortDir} onClick={() => toggleStaffSort("full_name")}>
+                        {t("admin.staffSortName")}
+                      </SortableTh>
+                      <SortableTh active={staffSortKey === "university_id"} dir={staffSortDir} onClick={() => toggleStaffSort("university_id")}>
+                        {t("admin.staffSortId")}
+                      </SortableTh>
+                      <SortableTh active={staffSortKey === "gender"} dir={staffSortDir} onClick={() => toggleStaffSort("gender")}>
+                        {t("auth.gender")}
+                      </SortableTh>
+                      <SortableTh active={staffSortKey === "email"} dir={staffSortDir} onClick={() => toggleStaffSort("email")}>
+                        {t("admin.staffSortEmail")}
+                      </SortableTh>
+                      <TableHead>{t("admin.staffTeaching")}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pagedLecturers.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                          {t("reports.noData")}
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      pagedLecturers.map((lec: any, i) => {
+                        const lecCourseIds = lecturerCoursesMap[lec.id] || [];
+                        const lecCourses = courses.filter((c) => lecCourseIds.includes(c.id));
+                        const lecLevelIds = [...new Set(lecCourses.map((c) => c.level_id).filter(Boolean))];
+                        const lecLevels = levels.filter((l) => lecLevelIds.includes(l.id));
+                        return (
+                          <TableRow key={lec.id} className="hover:bg-muted/40 align-top">
+                            <TableCell className="text-muted-foreground text-xs">
+                              {(staffPageSafe - 1) * staffPageSize + i + 1}
+                            </TableCell>
+                            <TableCell className="font-medium">{lec.full_name}</TableCell>
+                            <TableCell className="font-mono text-xs">{lec.university_id}</TableCell>
+                            <TableCell>
+                              <Badge variant={lec.gender === "M" ? "default" : lec.gender === "F" ? "secondary" : "outline"} className="text-xs">
+                                {lec.gender === "M" ? t("auth.male") : lec.gender === "F" ? t("auth.female") : "—"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{lec.email || "—"}</TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-1 max-w-md">
+                                {lecLevels.map((l) => (
+                                  <Badge key={`l-${l.id}`} variant="outline" className="text-[10px]">
+                                    <GraduationCap className="h-3 w-3 mr-1" />{l.code}
+                                  </Badge>
+                                ))}
+                                {lecCourses.map((c) => (
+                                  <Badge key={`c-${c.id}`} variant="secondary" className="text-[10px]">
+                                    <BookOpen className="h-3 w-3 mr-1" />{c.code}
+                                  </Badge>
+                                ))}
+                                {lecCourses.length === 0 && lecLevels.length === 0 && (
+                                  <span className="text-xs text-muted-foreground">—</span>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Pagination */}
+              <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs">{t("admin.rowsPerPage")}</Label>
+                  <Select value={String(staffPageSize)} onValueChange={(v) => { setStaffPageSize(Number(v)); setStaffPage(1); }}>
+                    <SelectTrigger className="h-8 w-[80px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {[5, 10, 20, 50].map((n) => (
+                        <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">
+                    {t("admin.pageOf").replace("{page}", String(staffPageSafe)).replace("{total}", String(staffTotalPages))}
+                  </span>
+                  <Button variant="outline" size="sm" className="h-8" disabled={staffPageSafe === 1}
+                    onClick={() => setStaffPage((p) => Math.max(1, p - 1))}>
+                    <ChevronLeft className="h-3.5 w-3.5 mr-1" />{t("admin.prev")}
+                  </Button>
+                  <Button variant="outline" size="sm" className="h-8" disabled={staffPageSafe === staffTotalPages}
+                    onClick={() => setStaffPage((p) => Math.min(staffTotalPages, p + 1))}>
+                    {t("admin.next")}<ChevronRight className="h-3.5 w-3.5 ml-1" />
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
