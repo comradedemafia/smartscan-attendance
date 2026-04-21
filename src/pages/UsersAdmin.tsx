@@ -1078,11 +1078,143 @@ export default function UsersAdmin() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* CSV preview */}
+      <Dialog open={csvPreviewOpen} onOpenChange={setCsvPreviewOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="h-5 w-5 text-primary" />
+              {t("admin.csvPreview")}
+            </DialogTitle>
+            <DialogDescription>
+              {csvFileName} · {t("admin.csvPreviewDesc")}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">{t("admin.csvRequiredColumns")}</p>
+
+            {csvMissingCols.length > 0 && (
+              <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                <div>
+                  {t("admin.csvMissingColumn")}: <strong>{csvMissingCols.join(", ")}</strong>
+                </div>
+              </div>
+            )}
+
+            {(() => {
+              const validCount = csvRows.filter((r) => r.errors.length === 0 && !r.alreadyEnrolled).length;
+              const errorCount = csvRows.filter((r) => r.errors.length > 0).length;
+              const dupCount = csvRows.filter((r) => r.alreadyEnrolled && r.errors.length === 0).length;
+              return (
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="rounded-md border bg-muted/30 px-3 py-2 flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-primary" />
+                    <span><strong>{validCount}</strong> {t("admin.csvValid")}</span>
+                  </div>
+                  <div className="rounded-md border bg-muted/30 px-3 py-2 flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-destructive" />
+                    <span><strong>{errorCount}</strong> {t("admin.csvInvalid")}</span>
+                  </div>
+                  <div className="rounded-md border bg-muted/30 px-3 py-2 flex items-center gap-2">
+                    <UserCheck className="h-4 w-4 text-muted-foreground" />
+                    <span><strong>{dupCount}</strong> {t("admin.csvAlreadyEnrolled")}</span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            <div className="max-h-80 overflow-auto rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-14">{t("admin.csvRow")}</TableHead>
+                    <TableHead>university_id</TableHead>
+                    <TableHead>semester</TableHead>
+                    <TableHead>level</TableHead>
+                    <TableHead>module</TableHead>
+                    <TableHead>{t("admin.csvIssue")}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {csvRows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-muted-foreground py-6">—</TableCell>
+                    </TableRow>
+                  ) : (
+                    csvRows.map((r) => {
+                      const hasErr = r.errors.length > 0;
+                      return (
+                        <TableRow key={r.rowNum} className={cn(hasErr && "bg-destructive/5", r.alreadyEnrolled && !hasErr && "bg-muted/30")}>
+                          <TableCell className="text-xs text-muted-foreground">{r.rowNum}</TableCell>
+                          <TableCell className="font-mono text-xs">{r.university_id || "—"}</TableCell>
+                          <TableCell className="text-xs">{r.semester || "—"}</TableCell>
+                          <TableCell className="text-xs">{r.level || "—"}</TableCell>
+                          <TableCell className="text-xs">{r.module || "—"}</TableCell>
+                          <TableCell>
+                            {hasErr ? (
+                              <div className="flex flex-col gap-0.5">
+                                {r.errors.map((err, i) => (
+                                  <span key={i} className="text-[11px] text-destructive">• {err}</span>
+                                ))}
+                              </div>
+                            ) : r.alreadyEnrolled ? (
+                              <Badge variant="outline" className="text-[10px]">{t("admin.csvAlreadyEnrolled")}</Badge>
+                            ) : (
+                              <Badge className="text-[10px] gap-1"><CheckCircle2 className="h-3 w-3" />{t("admin.csvValid")}</Badge>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCsvPreviewOpen(false)} disabled={importing}>
+              {t("admin.csvCancel")}
+            </Button>
+            <Button
+              onClick={confirmCsvImport}
+              disabled={importing || csvMissingCols.length > 0 || csvRows.every((r) => r.errors.length > 0 || r.alreadyEnrolled)}
+            >
+              <Upload className="h-4 w-4 mr-1.5" />
+              {importing ? t("admin.importingNow") : t("admin.csvConfirmImport")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────
+function SortableTh({
+  active, dir, onClick, children,
+}: { active: boolean; dir: "asc" | "desc"; onClick: () => void; children: React.ReactNode }) {
+  const Icon = !active ? ArrowUpDown : dir === "asc" ? ArrowUp : ArrowDown;
+  return (
+    <TableHead>
+      <button
+        type="button"
+        onClick={onClick}
+        className={cn(
+          "inline-flex items-center gap-1 -ml-1 px-1 rounded hover:bg-muted/50 transition-colors",
+          active && "text-foreground font-semibold"
+        )}
+      >
+        {children}
+        <Icon className="h-3 w-3 opacity-70" />
+      </button>
+    </TableHead>
+  );
+}
+
 function StatCell({ icon, value, label }: { icon: React.ReactNode; value: number; label: string }) {
   return (
     <div className="rounded-lg border bg-muted/20 px-3 py-2.5 flex items-center gap-3">
