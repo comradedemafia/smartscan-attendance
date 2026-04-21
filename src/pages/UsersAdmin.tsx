@@ -488,21 +488,49 @@ export default function UsersAdmin() {
     });
   }, [students, enrollSearch, enrollDeptId, enrollLevelId, levels, enrollCourseId]);
 
-  // ─── Filtered staff ──────────────────────────────────────────────
+  // ─── Filtered staff (search across name/id/email/module) ────────
   const filteredLecturers = useMemo(() => {
     return lecturers.filter((lec: any) => {
       const q = staffSearch.toLowerCase();
-      const matchSearch = !staffSearch ||
+      const lecCourseIds = lecturerCoursesMap[lec.id] || [];
+      const lecCourses = courses.filter((c) => lecCourseIds.includes(c.id));
+      const matchSearch =
+        !staffSearch ||
         lec.full_name.toLowerCase().includes(q) ||
         lec.university_id.toLowerCase().includes(q) ||
-        (lec.email || "").toLowerCase().includes(q);
+        (lec.email || "").toLowerCase().includes(q) ||
+        lecCourses.some((c) => `${c.code} ${c.name}`.toLowerCase().includes(q));
       if (!matchSearch) return false;
       if (staffLevelFilter === "all") return true;
-      const lecCourseIds = lecturerCoursesMap[lec.id] || [];
-      const lvlIds = new Set(courses.filter((c) => lecCourseIds.includes(c.id)).map((c) => c.level_id));
+      const lvlIds = new Set(lecCourses.map((c) => c.level_id));
       return lvlIds.has(staffLevelFilter);
     });
   }, [lecturers, staffSearch, staffLevelFilter, lecturerCoursesMap, courses]);
+
+  // Sort & paginate
+  const sortedLecturers = useMemo(() => {
+    const arr = [...filteredLecturers];
+    arr.sort((a: any, b: any) => {
+      const av = (a[staffSortKey] || "").toString().toLowerCase();
+      const bv = (b[staffSortKey] || "").toString().toLowerCase();
+      if (av < bv) return staffSortDir === "asc" ? -1 : 1;
+      if (av > bv) return staffSortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+    return arr;
+  }, [filteredLecturers, staffSortKey, staffSortDir]);
+
+  const staffTotalPages = Math.max(1, Math.ceil(sortedLecturers.length / staffPageSize));
+  const staffPageSafe = Math.min(staffPage, staffTotalPages);
+  const pagedLecturers = useMemo(
+    () => sortedLecturers.slice((staffPageSafe - 1) * staffPageSize, staffPageSafe * staffPageSize),
+    [sortedLecturers, staffPageSafe, staffPageSize]
+  );
+
+  const toggleStaffSort = (key: typeof staffSortKey) => {
+    if (staffSortKey === key) setStaffSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setStaffSortKey(key); setStaffSortDir("asc"); }
+  };
 
   if (role !== "admin") {
     return <p className="text-muted-foreground">{t("reports.noData")}</p>;
