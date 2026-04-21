@@ -14,9 +14,11 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import {
   Users, Search, UserCheck, UserX, BookOpen, Trash2, ChevronDown,
   GraduationCap, UsersRound, UserPlus, Upload, FileSpreadsheet, Mail, IdCard, Settings2,
+  ArrowUpDown, ArrowUp, ArrowDown, X, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,6 +51,32 @@ export default function UsersAdmin() {
   // ─── Manage Staff sub-state ───────────────────────────────────────
   const [staffSearch, setStaffSearch] = useState("");
   const [staffLevelFilter, setStaffLevelFilter] = useState<string>("all");
+  const [staffSortKey, setStaffSortKey] = useState<"full_name" | "university_id" | "email" | "gender">("full_name");
+  const [staffSortDir, setStaffSortDir] = useState<"asc" | "desc">("asc");
+  const [staffPage, setStaffPage] = useState(1);
+  const [staffPageSize, setStaffPageSize] = useState(10);
+
+  // ─── Students list extra filters ─────────────────────────────────
+  const [listSemesterId, setListSemesterId] = useState<string>("all");
+  const [listGenderFilter, setListGenderFilter] = useState<string>("all");
+
+  // ─── CSV import preview state ────────────────────────────────────
+  type CsvRow = {
+    rowNum: number;
+    raw: Record<string, string>;
+    university_id: string;
+    semester: string;
+    level: string;
+    module: string;
+    userId?: string;
+    courseId?: string;
+    errors: string[];
+    alreadyEnrolled?: boolean;
+  };
+  const [csvPreviewOpen, setCsvPreviewOpen] = useState(false);
+  const [csvRows, setCsvRows] = useState<CsvRow[]>([]);
+  const [csvMissingCols, setCsvMissingCols] = useState<string[]>([]);
+  const [csvFileName, setCsvFileName] = useState("");
 
   // ─── Queries ──────────────────────────────────────────────────────
   const { data: profiles = [] } = useQuery({
@@ -240,58 +268,160 @@ export default function UsersAdmin() {
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
-  // ─── Bulk CSV import (university IDs → enroll) ────────────────────
+  // ─── Bulk CSV import — parse + validate + show preview ───────────
+  const parseCsv = (text: string): { headers: string[]; rows: Record<string, string>[] } => {
+    const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+    if (lines.length === 0) return { headers: [], rows: [] };
+    const splitLine = (l: string) =>
+      l.split(/[,;\t]/).map((c) => c.trim().replace(/^["']|["']$/g, ""));
+    const headers = splitLine(lines[0]).map((h) => h.toLowerCase().replace(/\s+/g, "_"));
+    const rows = lines.slice(1).map((l) => {
+      const cells = splitLine(l);
+      const obj: Record<string, string> = {};
+      headers.forEach((h, i) => (obj[h] = cells[i] ?? ""));
+      return obj;
+    });
+    return { headers, rows };
+  };
+
   const handleCsvImport = async (file: File) => {
-    if (!enrollCourseId) {
-      toast({ title: t("common.error"), description: t("admin.selectModuleToEnroll"), variant: "destructive" });
-      return;
-    }
-    setImporting(true);
+    setCsvFileName(file.name);
     try {
       const text = await file.text();
-      const ids = text
-        .split(/[\r\n,]+/)
-        .map((s) => s.trim())
-        .filter(Boolean);
-
-      if (ids.length === 0) {
+      const { headers, rows } = parseCsv(text);
+      if (rows.length === 0) {
         toast({ title: t("common.error"), description: "Empty file", variant: "destructive" });
+        if (fileInputRef.current) fileInputRef.current.value = "";
         return;
       }
 
-      const { data: matched, error } = await supabase
-        .from("profiles")
-        .select("id, university_id")
-        .in("university_id", ids);
-      if (error) throw error;
+      // Required column normalisation — accept aliases
+      const colAliases: Record<string, string[]> = {
+        university_id: ["university_id", "universityid", "id", "student_id", "studentid"],
+        semester: ["semester", "department", "dept"],
+        level: ["level", "programme", "program", "level_programme"],
+        module: ["module", "course", "course_code"],
+      };
+      const required = ["university_id", "semester", "level", "module"];
+      const colMap: Record<string, string> = {};
+      const missing: string[] = [];
+      required.forEach((req) => {
+        const found = colAliases[req].find((a) => headers.includes(a));
+        if (found) colMap[req] = found;
+        else missing.push(req);
+      });
+      setCsvMissingCols(missing);
 
+      // Lookup maps
       const studentRoleSet = new Set(roles.filter((r) => r.role === "student").map((r) => r.user_id));
-      const validStudents = (matched || []).filter((p) => studentRoleSet.has(p.id));
-      const enrolled = enrollmentsByCourse[enrollCourseId] || new Set();
-      const toEnroll = validStudents.filter((p) => !enrolled.has(p.id));
-      const alreadyEnrolled = validStudents.length - toEnroll.length;
-      const notFound = ids.length - validStudents.length;
+      const profilesByUniId: Record<string, any> = {};
+      profiles.forEach((p: any) => {
+        if (studentRoleSet.has(p.id)) profilesByUniId[p.university_id.toLowerCase()] = p;
+      });
+      const deptByName: Record<string, any> = {};
+      departments.forEach((d) => (deptByName[d.name.toLowerCase()] = d));
+      const levelByKey: Record<string, any> = {};
+      levels.forEach((l) => {
+        levelByKey[l.code.toLowerCase()] = l;
+        levelByKey[l.name.toLowerCase()] = l;
+      });
+      const courseByKey: Record<string, any> = {};
+      courses.forEach((c) => {
+        courseByKey[c.code.toLowerCase()] = c;
+        courseByKey[c.name.toLowerCase()] = c;
+      });
 
-      if (toEnroll.length > 0) {
-        const rows = toEnroll.map((p) => ({ course_id: enrollCourseId, user_id: p.id }));
-        const { error: insErr } = await supabase.from("course_enrollments").insert(rows);
-        if (insErr) throw insErr;
+      const seen = new Set<string>();
+      const parsed: CsvRow[] = rows.map((raw, i) => {
+        const errors: string[] = [];
+        if (missing.length > 0) {
+          missing.forEach((m) => errors.push(`${t("admin.csvMissingColumn")}: ${m}`));
+        }
+        const uni = (raw[colMap.university_id] || "").trim();
+        const sem = (raw[colMap.semester] || "").trim();
+        const lvl = (raw[colMap.level] || "").trim();
+        const mod = (raw[colMap.module] || "").trim();
+
+        if (colMap.university_id && !uni) errors.push(`${t("admin.csvEmptyValue")}: university_id`);
+        if (colMap.semester && !sem) errors.push(`${t("admin.csvEmptyValue")}: semester`);
+        if (colMap.level && !lvl) errors.push(`${t("admin.csvEmptyValue")}: level`);
+        if (colMap.module && !mod) errors.push(`${t("admin.csvEmptyValue")}: module`);
+
+        const profile = uni ? profilesByUniId[uni.toLowerCase()] : null;
+        if (uni && !profile) errors.push(t("admin.csvUnknownId"));
+
+        const dept = sem ? deptByName[sem.toLowerCase()] : null;
+        if (sem && !dept) errors.push(t("admin.csvUnknownSemester"));
+
+        const lvlObj = lvl ? levelByKey[lvl.toLowerCase()] : null;
+        if (lvl && !lvlObj) errors.push(t("admin.csvUnknownLevel"));
+
+        const courseObj = mod ? courseByKey[mod.toLowerCase()] : null;
+        if (mod && !courseObj) errors.push(t("admin.csvUnknownModule"));
+
+        if (courseObj && lvlObj && courseObj.level_id && courseObj.level_id !== lvlObj.id) {
+          errors.push(t("admin.csvMismatch"));
+        }
+        if (courseObj && dept && courseObj.department_id && courseObj.department_id !== dept.id) {
+          errors.push(t("admin.csvMismatch"));
+        }
+
+        const dedupKey = `${uni.toLowerCase()}|${(courseObj?.id || mod).toLowerCase()}`;
+        if (uni && courseObj) {
+          if (seen.has(dedupKey)) errors.push(t("admin.csvDuplicate"));
+          else seen.add(dedupKey);
+        }
+
+        let alreadyEnrolled = false;
+        if (profile && courseObj) {
+          alreadyEnrolled = !!enrollmentsByCourse[courseObj.id]?.has(profile.id);
+        }
+
+        return {
+          rowNum: i + 2, // +2: header row + 1-based
+          raw,
+          university_id: uni,
+          semester: sem,
+          level: lvl,
+          module: mod,
+          userId: profile?.id,
+          courseId: courseObj?.id,
+          errors,
+          alreadyEnrolled,
+        };
+      });
+
+      setCsvRows(parsed);
+      setCsvPreviewOpen(true);
+    } catch (e: any) {
+      toast({ title: t("common.error"), description: e.message, variant: "destructive" });
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const confirmCsvImport = async () => {
+    setImporting(true);
+    try {
+      const validRows = csvRows.filter((r) => r.errors.length === 0 && !r.alreadyEnrolled && r.userId && r.courseId);
+      if (validRows.length === 0) {
+        toast({ title: t("common.error"), description: t("admin.csvErrorsFound"), variant: "destructive" });
+        return;
       }
-
+      const payload = validRows.map((r) => ({ user_id: r.userId!, course_id: r.courseId! }));
+      const { error } = await supabase.from("course_enrollments").insert(payload);
+      if (error) throw error;
       queryClient.invalidateQueries({ queryKey: ["mu-enrollments"] });
       toast({
         title: t("common.success"),
-        description: [
-          t("admin.importedCount").replace("{count}", String(toEnroll.length)),
-          alreadyEnrolled > 0 && t("admin.alreadyEnrolledCount").replace("{count}", String(alreadyEnrolled)),
-          notFound > 0 && t("admin.notFoundCount").replace("{count}", String(notFound)),
-        ].filter(Boolean).join(" • "),
+        description: t("admin.importedCount").replace("{count}", String(validRows.length)),
       });
+      setCsvPreviewOpen(false);
+      setCsvRows([]);
     } catch (e: any) {
       toast({ title: t("common.error"), description: e.message, variant: "destructive" });
     } finally {
       setImporting(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -299,7 +429,14 @@ export default function UsersAdmin() {
   const filteredStudents = useMemo(() => {
     return students.filter((p: any) => {
       const q = listSearch.toLowerCase();
-      const matchSearch = !listSearch || p.full_name.toLowerCase().includes(q) || p.university_id.toLowerCase().includes(q);
+      const matchSearch =
+        !listSearch ||
+        p.full_name.toLowerCase().includes(q) ||
+        p.university_id.toLowerCase().includes(q) ||
+        (p.email || "").toLowerCase().includes(q);
+
+      const matchSemester =
+        listSemesterId === "all" || p.department_id === listSemesterId;
 
       let matchLevel = true;
       if (listLevelId !== "all") {
@@ -308,15 +445,19 @@ export default function UsersAdmin() {
       }
 
       const matchCourse = listCourseId === "all" || enrollmentsByCourse[listCourseId]?.has(p.id);
-      return matchSearch && matchLevel && matchCourse;
+      const matchGender = listGenderFilter === "all" || p.gender === listGenderFilter;
+      return matchSearch && matchSemester && matchLevel && matchCourse && matchGender;
     });
-  }, [students, listSearch, listLevelId, listCourseId, levels, enrollmentsByCourse]);
+  }, [students, listSearch, listSemesterId, listLevelId, listCourseId, listGenderFilter, levels, enrollmentsByCourse]);
 
-  // Courses available in the list-tab module dropdown depend on the level chosen
+  // Courses available in the list-tab module dropdown depend on the semester + level chosen
   const listCourseOptions = useMemo(() => {
-    if (listLevelId === "all") return courses;
-    return courses.filter((c) => c.level_id === listLevelId);
-  }, [courses, listLevelId]);
+    return courses.filter((c) => {
+      const matchSem = listSemesterId === "all" || c.department_id === listSemesterId;
+      const matchLvl = listLevelId === "all" || c.level_id === listLevelId;
+      return matchSem && matchLvl;
+    });
+  }, [courses, listSemesterId, listLevelId]);
 
   // ─── Enroll tab cascading options ─────────────────────────────────
   const enrollLevelsOptions = useMemo(
@@ -350,21 +491,49 @@ export default function UsersAdmin() {
     });
   }, [students, enrollSearch, enrollDeptId, enrollLevelId, levels, enrollCourseId]);
 
-  // ─── Filtered staff ──────────────────────────────────────────────
+  // ─── Filtered staff (search across name/id/email/module) ────────
   const filteredLecturers = useMemo(() => {
     return lecturers.filter((lec: any) => {
       const q = staffSearch.toLowerCase();
-      const matchSearch = !staffSearch ||
+      const lecCourseIds = lecturerCoursesMap[lec.id] || [];
+      const lecCourses = courses.filter((c) => lecCourseIds.includes(c.id));
+      const matchSearch =
+        !staffSearch ||
         lec.full_name.toLowerCase().includes(q) ||
         lec.university_id.toLowerCase().includes(q) ||
-        (lec.email || "").toLowerCase().includes(q);
+        (lec.email || "").toLowerCase().includes(q) ||
+        lecCourses.some((c) => `${c.code} ${c.name}`.toLowerCase().includes(q));
       if (!matchSearch) return false;
       if (staffLevelFilter === "all") return true;
-      const lecCourseIds = lecturerCoursesMap[lec.id] || [];
-      const lvlIds = new Set(courses.filter((c) => lecCourseIds.includes(c.id)).map((c) => c.level_id));
+      const lvlIds = new Set(lecCourses.map((c) => c.level_id));
       return lvlIds.has(staffLevelFilter);
     });
   }, [lecturers, staffSearch, staffLevelFilter, lecturerCoursesMap, courses]);
+
+  // Sort & paginate
+  const sortedLecturers = useMemo(() => {
+    const arr = [...filteredLecturers];
+    arr.sort((a: any, b: any) => {
+      const av = (a[staffSortKey] || "").toString().toLowerCase();
+      const bv = (b[staffSortKey] || "").toString().toLowerCase();
+      if (av < bv) return staffSortDir === "asc" ? -1 : 1;
+      if (av > bv) return staffSortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+    return arr;
+  }, [filteredLecturers, staffSortKey, staffSortDir]);
+
+  const staffTotalPages = Math.max(1, Math.ceil(sortedLecturers.length / staffPageSize));
+  const staffPageSafe = Math.min(staffPage, staffTotalPages);
+  const pagedLecturers = useMemo(
+    () => sortedLecturers.slice((staffPageSafe - 1) * staffPageSize, staffPageSafe * staffPageSize),
+    [sortedLecturers, staffPageSafe, staffPageSize]
+  );
+
+  const toggleStaffSort = (key: typeof staffSortKey) => {
+    if (staffSortKey === key) setStaffSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setStaffSortKey(key); setStaffSortDir("asc"); }
+  };
 
   if (role !== "admin") {
     return <p className="text-muted-foreground">{t("reports.noData")}</p>;
@@ -432,14 +601,44 @@ export default function UsersAdmin() {
                   <CardDescription>{t("enroll.level")} → {t("enroll.module")}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid gap-3 sm:grid-cols-3">
+                  {/* Search bar + clear */}
+                  <div className="flex flex-wrap items-end gap-2">
+                    <div className="space-y-1.5 flex-1 min-w-[220px]">
+                      <Label className="text-xs">{t("common.search")}</Label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input className="pl-9" value={listSearch} onChange={(e) => setListSearch(e.target.value)}
+                          placeholder={t("admin.searchPlaceholder")} />
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline" size="sm"
+                      onClick={() => { setListSearch(""); setListSemesterId("all"); setListLevelId("all"); setListCourseId("all"); setListGenderFilter("all"); }}
+                    >
+                      <X className="h-3.5 w-3.5 mr-1" /> {t("admin.clearFilters")}
+                    </Button>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">{t("admin.filterSemester")}</Label>
+                      <Select value={listSemesterId} onValueChange={(v) => { setListSemesterId(v); setListLevelId("all"); setListCourseId("all"); }}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">{t("admin.allSemesters")}</SelectItem>
+                          {departments.map((d) => (
+                            <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs">{t("enroll.level")}</Label>
                       <Select value={listLevelId} onValueChange={(v) => { setListLevelId(v); setListCourseId("all"); }}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">{t("admin.allDepartments")}</SelectItem>
-                          {levels.map((l) => (
+                          {(listSemesterId === "all" ? levels : levels.filter((l) => l.department_id === listSemesterId)).map((l) => (
                             <SelectItem key={l.id} value={l.id}>{l.code} — {l.name}</SelectItem>
                           ))}
                         </SelectContent>
@@ -458,11 +657,15 @@ export default function UsersAdmin() {
                       </Select>
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs">{t("common.search")}</Label>
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input className="pl-9" value={listSearch} onChange={(e) => setListSearch(e.target.value)} placeholder={t("common.search")} />
-                      </div>
+                      <Label className="text-xs">{t("admin.filterGender")}</Label>
+                      <Select value={listGenderFilter} onValueChange={setListGenderFilter}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">{t("admin.allGenders")}</SelectItem>
+                          <SelectItem value="M">{t("auth.male")}</SelectItem>
+                          <SelectItem value="F">{t("auth.female")}</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
@@ -711,24 +914,27 @@ export default function UsersAdmin() {
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <GraduationCap className="h-4 w-4" />
-                {t("admin.staffDirectory")}
+                {t("admin.staffTable")}
               </CardTitle>
               <CardDescription>
                 {t("admin.lecturerLevel")} · {t("admin.lecturerModules")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5">
+              {/* Search & filters */}
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="space-y-1.5 flex-1 min-w-[220px]">
                   <Label className="text-xs">{t("common.search")}</Label>
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input className="pl-9" value={staffSearch} onChange={(e) => setStaffSearch(e.target.value)} placeholder={t("common.search")} />
+                    <Input className="pl-9" value={staffSearch}
+                      onChange={(e) => { setStaffSearch(e.target.value); setStaffPage(1); }}
+                      placeholder={t("admin.searchPlaceholder")} />
                   </div>
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 min-w-[180px]">
                   <Label className="text-xs">{t("enroll.level")}</Label>
-                  <Select value={staffLevelFilter} onValueChange={setStaffLevelFilter}>
+                  <Select value={staffLevelFilter} onValueChange={(v) => { setStaffLevelFilter(v); setStaffPage(1); }}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">{t("admin.allDepartments")}</SelectItem>
@@ -738,23 +944,116 @@ export default function UsersAdmin() {
                     </SelectContent>
                   </Select>
                 </div>
+                <Button
+                  variant="outline" size="sm"
+                  onClick={() => { setStaffSearch(""); setStaffLevelFilter("all"); setStaffPage(1); }}
+                >
+                  <X className="h-3.5 w-3.5 mr-1" /> {t("admin.clearFilters")}
+                </Button>
               </div>
 
-              {/* Collapsible list of lecturers */}
-              <div className="space-y-2">
-                {filteredLecturers.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8 border-2 border-dashed rounded-lg">
-                    {t("reports.noData")}
-                  </p>
-                ) : (
-                  filteredLecturers.map((lec: any) => {
-                    const lecCourseIds = lecturerCoursesMap[lec.id] || [];
-                    const lecCourses = courses.filter((c) => lecCourseIds.includes(c.id));
-                    const lecLevelIds = [...new Set(lecCourses.map((c) => c.level_id).filter(Boolean))];
-                    const lecLevels = levels.filter((l) => lecLevelIds.includes(l.id));
-                    return <LecturerRow key={lec.id} lec={lec} levels={lecLevels} coursesList={lecCourses} t={t} />;
-                  })
-                )}
+              <div className="text-xs text-muted-foreground">
+                {t("admin.resultsCount").replace("{count}", String(sortedLecturers.length))}
+              </div>
+
+              {/* Sortable lecturer table */}
+              <div className="rounded-lg border overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">#</TableHead>
+                      <SortableTh active={staffSortKey === "full_name"} dir={staffSortDir} onClick={() => toggleStaffSort("full_name")}>
+                        {t("admin.staffSortName")}
+                      </SortableTh>
+                      <SortableTh active={staffSortKey === "university_id"} dir={staffSortDir} onClick={() => toggleStaffSort("university_id")}>
+                        {t("admin.staffSortId")}
+                      </SortableTh>
+                      <SortableTh active={staffSortKey === "gender"} dir={staffSortDir} onClick={() => toggleStaffSort("gender")}>
+                        {t("auth.gender")}
+                      </SortableTh>
+                      <SortableTh active={staffSortKey === "email"} dir={staffSortDir} onClick={() => toggleStaffSort("email")}>
+                        {t("admin.staffSortEmail")}
+                      </SortableTh>
+                      <TableHead>{t("admin.staffTeaching")}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pagedLecturers.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                          {t("reports.noData")}
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      pagedLecturers.map((lec: any, i) => {
+                        const lecCourseIds = lecturerCoursesMap[lec.id] || [];
+                        const lecCourses = courses.filter((c) => lecCourseIds.includes(c.id));
+                        const lecLevelIds = [...new Set(lecCourses.map((c) => c.level_id).filter(Boolean))];
+                        const lecLevels = levels.filter((l) => lecLevelIds.includes(l.id));
+                        return (
+                          <TableRow key={lec.id} className="hover:bg-muted/40 align-top">
+                            <TableCell className="text-muted-foreground text-xs">
+                              {(staffPageSafe - 1) * staffPageSize + i + 1}
+                            </TableCell>
+                            <TableCell className="font-medium">{lec.full_name}</TableCell>
+                            <TableCell className="font-mono text-xs">{lec.university_id}</TableCell>
+                            <TableCell>
+                              <Badge variant={lec.gender === "M" ? "default" : lec.gender === "F" ? "secondary" : "outline"} className="text-xs">
+                                {lec.gender === "M" ? t("auth.male") : lec.gender === "F" ? t("auth.female") : "—"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{lec.email || "—"}</TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-1 max-w-md">
+                                {lecLevels.map((l) => (
+                                  <Badge key={`l-${l.id}`} variant="outline" className="text-[10px]">
+                                    <GraduationCap className="h-3 w-3 mr-1" />{l.code}
+                                  </Badge>
+                                ))}
+                                {lecCourses.map((c) => (
+                                  <Badge key={`c-${c.id}`} variant="secondary" className="text-[10px]">
+                                    <BookOpen className="h-3 w-3 mr-1" />{c.code}
+                                  </Badge>
+                                ))}
+                                {lecCourses.length === 0 && lecLevels.length === 0 && (
+                                  <span className="text-xs text-muted-foreground">—</span>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Pagination */}
+              <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs">{t("admin.rowsPerPage")}</Label>
+                  <Select value={String(staffPageSize)} onValueChange={(v) => { setStaffPageSize(Number(v)); setStaffPage(1); }}>
+                    <SelectTrigger className="h-8 w-[80px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {[5, 10, 20, 50].map((n) => (
+                        <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">
+                    {t("admin.pageOf").replace("{page}", String(staffPageSafe)).replace("{total}", String(staffTotalPages))}
+                  </span>
+                  <Button variant="outline" size="sm" className="h-8" disabled={staffPageSafe === 1}
+                    onClick={() => setStaffPage((p) => Math.max(1, p - 1))}>
+                    <ChevronLeft className="h-3.5 w-3.5 mr-1" />{t("admin.prev")}
+                  </Button>
+                  <Button variant="outline" size="sm" className="h-8" disabled={staffPageSafe === staffTotalPages}
+                    onClick={() => setStaffPage((p) => Math.min(staffTotalPages, p + 1))}>
+                    {t("admin.next")}<ChevronRight className="h-3.5 w-3.5 ml-1" />
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -779,11 +1078,143 @@ export default function UsersAdmin() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* CSV preview */}
+      <Dialog open={csvPreviewOpen} onOpenChange={setCsvPreviewOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="h-5 w-5 text-primary" />
+              {t("admin.csvPreview")}
+            </DialogTitle>
+            <DialogDescription>
+              {csvFileName} · {t("admin.csvPreviewDesc")}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">{t("admin.csvRequiredColumns")}</p>
+
+            {csvMissingCols.length > 0 && (
+              <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                <div>
+                  {t("admin.csvMissingColumn")}: <strong>{csvMissingCols.join(", ")}</strong>
+                </div>
+              </div>
+            )}
+
+            {(() => {
+              const validCount = csvRows.filter((r) => r.errors.length === 0 && !r.alreadyEnrolled).length;
+              const errorCount = csvRows.filter((r) => r.errors.length > 0).length;
+              const dupCount = csvRows.filter((r) => r.alreadyEnrolled && r.errors.length === 0).length;
+              return (
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="rounded-md border bg-muted/30 px-3 py-2 flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-primary" />
+                    <span><strong>{validCount}</strong> {t("admin.csvValid")}</span>
+                  </div>
+                  <div className="rounded-md border bg-muted/30 px-3 py-2 flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-destructive" />
+                    <span><strong>{errorCount}</strong> {t("admin.csvInvalid")}</span>
+                  </div>
+                  <div className="rounded-md border bg-muted/30 px-3 py-2 flex items-center gap-2">
+                    <UserCheck className="h-4 w-4 text-muted-foreground" />
+                    <span><strong>{dupCount}</strong> {t("admin.csvAlreadyEnrolled")}</span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            <div className="max-h-80 overflow-auto rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-14">{t("admin.csvRow")}</TableHead>
+                    <TableHead>university_id</TableHead>
+                    <TableHead>semester</TableHead>
+                    <TableHead>level</TableHead>
+                    <TableHead>module</TableHead>
+                    <TableHead>{t("admin.csvIssue")}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {csvRows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-muted-foreground py-6">—</TableCell>
+                    </TableRow>
+                  ) : (
+                    csvRows.map((r) => {
+                      const hasErr = r.errors.length > 0;
+                      return (
+                        <TableRow key={r.rowNum} className={cn(hasErr && "bg-destructive/5", r.alreadyEnrolled && !hasErr && "bg-muted/30")}>
+                          <TableCell className="text-xs text-muted-foreground">{r.rowNum}</TableCell>
+                          <TableCell className="font-mono text-xs">{r.university_id || "—"}</TableCell>
+                          <TableCell className="text-xs">{r.semester || "—"}</TableCell>
+                          <TableCell className="text-xs">{r.level || "—"}</TableCell>
+                          <TableCell className="text-xs">{r.module || "—"}</TableCell>
+                          <TableCell>
+                            {hasErr ? (
+                              <div className="flex flex-col gap-0.5">
+                                {r.errors.map((err, i) => (
+                                  <span key={i} className="text-[11px] text-destructive">• {err}</span>
+                                ))}
+                              </div>
+                            ) : r.alreadyEnrolled ? (
+                              <Badge variant="outline" className="text-[10px]">{t("admin.csvAlreadyEnrolled")}</Badge>
+                            ) : (
+                              <Badge className="text-[10px] gap-1"><CheckCircle2 className="h-3 w-3" />{t("admin.csvValid")}</Badge>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCsvPreviewOpen(false)} disabled={importing}>
+              {t("admin.csvCancel")}
+            </Button>
+            <Button
+              onClick={confirmCsvImport}
+              disabled={importing || csvMissingCols.length > 0 || csvRows.every((r) => r.errors.length > 0 || r.alreadyEnrolled)}
+            >
+              <Upload className="h-4 w-4 mr-1.5" />
+              {importing ? t("admin.importingNow") : t("admin.csvConfirmImport")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────
+function SortableTh({
+  active, dir, onClick, children,
+}: { active: boolean; dir: "asc" | "desc"; onClick: () => void; children: React.ReactNode }) {
+  const Icon = !active ? ArrowUpDown : dir === "asc" ? ArrowUp : ArrowDown;
+  return (
+    <TableHead>
+      <button
+        type="button"
+        onClick={onClick}
+        className={cn(
+          "inline-flex items-center gap-1 -ml-1 px-1 rounded hover:bg-muted/50 transition-colors",
+          active && "text-foreground font-semibold"
+        )}
+      >
+        {children}
+        <Icon className="h-3 w-3 opacity-70" />
+      </button>
+    </TableHead>
+  );
+}
+
 function StatCell({ icon, value, label }: { icon: React.ReactNode; value: number; label: string }) {
   return (
     <div className="rounded-lg border bg-muted/20 px-3 py-2.5 flex items-center gap-3">
