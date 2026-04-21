@@ -268,58 +268,160 @@ export default function UsersAdmin() {
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
-  // ─── Bulk CSV import (university IDs → enroll) ────────────────────
+  // ─── Bulk CSV import — parse + validate + show preview ───────────
+  const parseCsv = (text: string): { headers: string[]; rows: Record<string, string>[] } => {
+    const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+    if (lines.length === 0) return { headers: [], rows: [] };
+    const splitLine = (l: string) =>
+      l.split(/[,;\t]/).map((c) => c.trim().replace(/^["']|["']$/g, ""));
+    const headers = splitLine(lines[0]).map((h) => h.toLowerCase().replace(/\s+/g, "_"));
+    const rows = lines.slice(1).map((l) => {
+      const cells = splitLine(l);
+      const obj: Record<string, string> = {};
+      headers.forEach((h, i) => (obj[h] = cells[i] ?? ""));
+      return obj;
+    });
+    return { headers, rows };
+  };
+
   const handleCsvImport = async (file: File) => {
-    if (!enrollCourseId) {
-      toast({ title: t("common.error"), description: t("admin.selectModuleToEnroll"), variant: "destructive" });
-      return;
-    }
-    setImporting(true);
+    setCsvFileName(file.name);
     try {
       const text = await file.text();
-      const ids = text
-        .split(/[\r\n,]+/)
-        .map((s) => s.trim())
-        .filter(Boolean);
-
-      if (ids.length === 0) {
+      const { headers, rows } = parseCsv(text);
+      if (rows.length === 0) {
         toast({ title: t("common.error"), description: "Empty file", variant: "destructive" });
+        if (fileInputRef.current) fileInputRef.current.value = "";
         return;
       }
 
-      const { data: matched, error } = await supabase
-        .from("profiles")
-        .select("id, university_id")
-        .in("university_id", ids);
-      if (error) throw error;
+      // Required column normalisation — accept aliases
+      const colAliases: Record<string, string[]> = {
+        university_id: ["university_id", "universityid", "id", "student_id", "studentid"],
+        semester: ["semester", "department", "dept"],
+        level: ["level", "programme", "program", "level_programme"],
+        module: ["module", "course", "course_code"],
+      };
+      const required = ["university_id", "semester", "level", "module"];
+      const colMap: Record<string, string> = {};
+      const missing: string[] = [];
+      required.forEach((req) => {
+        const found = colAliases[req].find((a) => headers.includes(a));
+        if (found) colMap[req] = found;
+        else missing.push(req);
+      });
+      setCsvMissingCols(missing);
 
+      // Lookup maps
       const studentRoleSet = new Set(roles.filter((r) => r.role === "student").map((r) => r.user_id));
-      const validStudents = (matched || []).filter((p) => studentRoleSet.has(p.id));
-      const enrolled = enrollmentsByCourse[enrollCourseId] || new Set();
-      const toEnroll = validStudents.filter((p) => !enrolled.has(p.id));
-      const alreadyEnrolled = validStudents.length - toEnroll.length;
-      const notFound = ids.length - validStudents.length;
+      const profilesByUniId: Record<string, any> = {};
+      profiles.forEach((p: any) => {
+        if (studentRoleSet.has(p.id)) profilesByUniId[p.university_id.toLowerCase()] = p;
+      });
+      const deptByName: Record<string, any> = {};
+      departments.forEach((d) => (deptByName[d.name.toLowerCase()] = d));
+      const levelByKey: Record<string, any> = {};
+      levels.forEach((l) => {
+        levelByKey[l.code.toLowerCase()] = l;
+        levelByKey[l.name.toLowerCase()] = l;
+      });
+      const courseByKey: Record<string, any> = {};
+      courses.forEach((c) => {
+        courseByKey[c.code.toLowerCase()] = c;
+        courseByKey[c.name.toLowerCase()] = c;
+      });
 
-      if (toEnroll.length > 0) {
-        const rows = toEnroll.map((p) => ({ course_id: enrollCourseId, user_id: p.id }));
-        const { error: insErr } = await supabase.from("course_enrollments").insert(rows);
-        if (insErr) throw insErr;
+      const seen = new Set<string>();
+      const parsed: CsvRow[] = rows.map((raw, i) => {
+        const errors: string[] = [];
+        if (missing.length > 0) {
+          missing.forEach((m) => errors.push(`${t("admin.csvMissingColumn")}: ${m}`));
+        }
+        const uni = (raw[colMap.university_id] || "").trim();
+        const sem = (raw[colMap.semester] || "").trim();
+        const lvl = (raw[colMap.level] || "").trim();
+        const mod = (raw[colMap.module] || "").trim();
+
+        if (colMap.university_id && !uni) errors.push(`${t("admin.csvEmptyValue")}: university_id`);
+        if (colMap.semester && !sem) errors.push(`${t("admin.csvEmptyValue")}: semester`);
+        if (colMap.level && !lvl) errors.push(`${t("admin.csvEmptyValue")}: level`);
+        if (colMap.module && !mod) errors.push(`${t("admin.csvEmptyValue")}: module`);
+
+        const profile = uni ? profilesByUniId[uni.toLowerCase()] : null;
+        if (uni && !profile) errors.push(t("admin.csvUnknownId"));
+
+        const dept = sem ? deptByName[sem.toLowerCase()] : null;
+        if (sem && !dept) errors.push(t("admin.csvUnknownSemester"));
+
+        const lvlObj = lvl ? levelByKey[lvl.toLowerCase()] : null;
+        if (lvl && !lvlObj) errors.push(t("admin.csvUnknownLevel"));
+
+        const courseObj = mod ? courseByKey[mod.toLowerCase()] : null;
+        if (mod && !courseObj) errors.push(t("admin.csvUnknownModule"));
+
+        if (courseObj && lvlObj && courseObj.level_id && courseObj.level_id !== lvlObj.id) {
+          errors.push(t("admin.csvMismatch"));
+        }
+        if (courseObj && dept && courseObj.department_id && courseObj.department_id !== dept.id) {
+          errors.push(t("admin.csvMismatch"));
+        }
+
+        const dedupKey = `${uni.toLowerCase()}|${(courseObj?.id || mod).toLowerCase()}`;
+        if (uni && courseObj) {
+          if (seen.has(dedupKey)) errors.push(t("admin.csvDuplicate"));
+          else seen.add(dedupKey);
+        }
+
+        let alreadyEnrolled = false;
+        if (profile && courseObj) {
+          alreadyEnrolled = !!enrollmentsByCourse[courseObj.id]?.has(profile.id);
+        }
+
+        return {
+          rowNum: i + 2, // +2: header row + 1-based
+          raw,
+          university_id: uni,
+          semester: sem,
+          level: lvl,
+          module: mod,
+          userId: profile?.id,
+          courseId: courseObj?.id,
+          errors,
+          alreadyEnrolled,
+        };
+      });
+
+      setCsvRows(parsed);
+      setCsvPreviewOpen(true);
+    } catch (e: any) {
+      toast({ title: t("common.error"), description: e.message, variant: "destructive" });
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const confirmCsvImport = async () => {
+    setImporting(true);
+    try {
+      const validRows = csvRows.filter((r) => r.errors.length === 0 && !r.alreadyEnrolled && r.userId && r.courseId);
+      if (validRows.length === 0) {
+        toast({ title: t("common.error"), description: t("admin.csvErrorsFound"), variant: "destructive" });
+        return;
       }
-
+      const payload = validRows.map((r) => ({ user_id: r.userId!, course_id: r.courseId! }));
+      const { error } = await supabase.from("course_enrollments").insert(payload);
+      if (error) throw error;
       queryClient.invalidateQueries({ queryKey: ["mu-enrollments"] });
       toast({
         title: t("common.success"),
-        description: [
-          t("admin.importedCount").replace("{count}", String(toEnroll.length)),
-          alreadyEnrolled > 0 && t("admin.alreadyEnrolledCount").replace("{count}", String(alreadyEnrolled)),
-          notFound > 0 && t("admin.notFoundCount").replace("{count}", String(notFound)),
-        ].filter(Boolean).join(" • "),
+        description: t("admin.importedCount").replace("{count}", String(validRows.length)),
       });
+      setCsvPreviewOpen(false);
+      setCsvRows([]);
     } catch (e: any) {
       toast({ title: t("common.error"), description: e.message, variant: "destructive" });
     } finally {
       setImporting(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
