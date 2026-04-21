@@ -598,14 +598,44 @@ export default function UsersAdmin() {
                   <CardDescription>{t("enroll.level")} → {t("enroll.module")}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid gap-3 sm:grid-cols-3">
+                  {/* Search bar + clear */}
+                  <div className="flex flex-wrap items-end gap-2">
+                    <div className="space-y-1.5 flex-1 min-w-[220px]">
+                      <Label className="text-xs">{t("common.search")}</Label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input className="pl-9" value={listSearch} onChange={(e) => setListSearch(e.target.value)}
+                          placeholder={t("admin.searchPlaceholder")} />
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline" size="sm"
+                      onClick={() => { setListSearch(""); setListSemesterId("all"); setListLevelId("all"); setListCourseId("all"); setListGenderFilter("all"); }}
+                    >
+                      <X className="h-3.5 w-3.5 mr-1" /> {t("admin.clearFilters")}
+                    </Button>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">{t("admin.filterSemester")}</Label>
+                      <Select value={listSemesterId} onValueChange={(v) => { setListSemesterId(v); setListLevelId("all"); setListCourseId("all"); }}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">{t("admin.allSemesters")}</SelectItem>
+                          {departments.map((d) => (
+                            <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs">{t("enroll.level")}</Label>
                       <Select value={listLevelId} onValueChange={(v) => { setListLevelId(v); setListCourseId("all"); }}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">{t("admin.allDepartments")}</SelectItem>
-                          {levels.map((l) => (
+                          {(listSemesterId === "all" ? levels : levels.filter((l) => l.department_id === listSemesterId)).map((l) => (
                             <SelectItem key={l.id} value={l.id}>{l.code} — {l.name}</SelectItem>
                           ))}
                         </SelectContent>
@@ -624,11 +654,15 @@ export default function UsersAdmin() {
                       </Select>
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs">{t("common.search")}</Label>
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input className="pl-9" value={listSearch} onChange={(e) => setListSearch(e.target.value)} placeholder={t("common.search")} />
-                      </div>
+                      <Label className="text-xs">{t("admin.filterGender")}</Label>
+                      <Select value={listGenderFilter} onValueChange={setListGenderFilter}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">{t("admin.allGenders")}</SelectItem>
+                          <SelectItem value="M">{t("auth.male")}</SelectItem>
+                          <SelectItem value="F">{t("auth.female")}</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
