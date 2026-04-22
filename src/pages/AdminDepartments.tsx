@@ -704,7 +704,7 @@ export default function AdminDepartments() {
         {filteredDepartments.map((dept) => {
           const courses = deptCourses(dept.id);
           const levels = deptLevels(dept.id);
-          const isExpanded = expandedDept === dept.id;
+          const isExpanded = expandedDept === dept.id || filterDeptId === dept.id;
           return (
             <Card key={dept.id} className={isExpanded ? "border-primary/40" : ""}>
               <CardHeader className="pb-3">
