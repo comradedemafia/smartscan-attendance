@@ -13,7 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Users, BookOpen, Plus, ChevronDown, ChevronRight, AlertCircle, Edit, Trash2, UserPlus, GraduationCap } from "lucide-react";
+import { Building2, Users, BookOpen, Plus, ChevronDown, ChevronRight, AlertCircle, Edit, Trash2, UserPlus, GraduationCap, ArrowRightLeft, X } from "lucide-react";
 
 type Department = { id: string; name: string; description: string | null };
 type Level = { id: string; name: string; code: string; department_id: string; sort_order: number };
@@ -81,6 +81,18 @@ export default function AdminDepartments() {
 
   // Delete lecturer
   const [deleteLecturerId, setDeleteLecturerId] = useState<string | null>(null);
+
+  // Move course dialog
+  const [moveCourse, setMoveCourse] = useState<any>(null);
+  const [moveDeptId, setMoveDeptId] = useState("");
+  const [moveLevelId, setMoveLevelId] = useState("");
+  const [moveSemesterId, setMoveSemesterId] = useState("");
+  const [confirmMove, setConfirmMove] = useState(false);
+
+  // Cascading filters for the admin department list
+  const [filterDeptId, setFilterDeptId] = useState<string>("all");
+  const [filterLevelId, setFilterLevelId] = useState<string>("all");
+  const [filterSemesterId, setFilterSemesterId] = useState<string>("all");
 
   // Departments
   const { data: departments = [] } = useQuery<Department[]>({
@@ -231,6 +243,20 @@ export default function AdminDepartments() {
 
   const saveCourseMutation = useMutation({
     mutationFn: async () => {
+      // Validation: require Department -> Level -> Semester in sequence
+      if (!courseDeptId || !courseLevelId || !courseSemesterId) {
+        throw new Error(t("dept.requireDeptLevelSemester"));
+      }
+      // Validation: semester must belong to the chosen level
+      const sem = allSemesters.find((s) => s.id === courseSemesterId);
+      if (!sem || sem.level_id !== courseLevelId) {
+        throw new Error(t("dept.semesterNotInLevel"));
+      }
+      // Validation: level must belong to the chosen department
+      const lvl = allLevels.find((l) => l.id === courseLevelId);
+      if (!lvl || lvl.department_id !== courseDeptId) {
+        throw new Error(t("dept.semesterNotInLevel"));
+      }
       if (editingCourse) {
         const { error } = await supabase.from("courses").update({ name: courseName, code: courseCode.toUpperCase(), description: courseDesc || null, department_id: courseDeptId || null, level_id: courseLevelId || null, semester_id: courseSemesterId || null } as any).eq("id", editingCourse.id);
         if (error) throw error;
@@ -258,6 +284,40 @@ export default function AdminDepartments() {
       toast({ title: t("common.success"), description: t("dept.courseDeleted") });
     },
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
+  });
+
+  // Move course to another semester
+  const moveCourseMutation = useMutation({
+    mutationFn: async () => {
+      if (!moveCourse) throw new Error("No course selected");
+      if (!moveDeptId || !moveLevelId || !moveSemesterId) {
+        throw new Error(t("dept.requireDeptLevelSemester"));
+      }
+      const sem = allSemesters.find((s) => s.id === moveSemesterId);
+      if (!sem || sem.level_id !== moveLevelId) {
+        throw new Error(t("dept.semesterNotInLevel"));
+      }
+      const lvl = allLevels.find((l) => l.id === moveLevelId);
+      if (!lvl || lvl.department_id !== moveDeptId) {
+        throw new Error(t("dept.semesterNotInLevel"));
+      }
+      const { error } = await supabase
+        .from("courses")
+        .update({ department_id: moveDeptId, level_id: moveLevelId, semester_id: moveSemesterId } as any)
+        .eq("id", moveCourse.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["all-courses-admin"] });
+      toast({ title: t("common.success"), description: t("dept.courseMoved") });
+      setConfirmMove(false);
+      setMoveCourse(null);
+      setMoveDeptId(""); setMoveLevelId(""); setMoveSemesterId("");
+    },
+    onError: (e: any) => {
+      toast({ title: t("common.error"), description: e.message, variant: "destructive" });
+      setConfirmMove(false);
+    },
   });
 
   const assignMutation = useMutation({
@@ -420,6 +480,24 @@ export default function AdminDepartments() {
   const courseDeptLevels = courseDeptId ? deptLevels(courseDeptId) : [];
   const courseLevelSemesters = courseLevelId ? levelSemesters(courseLevelId) : [];
 
+  // Cascading filter helpers
+  const filterDeptLevels = filterDeptId !== "all" ? deptLevels(filterDeptId) : [];
+  const filterLevelSemesters = filterLevelId !== "all" ? levelSemesters(filterLevelId) : [];
+  const filteredDepartments = filterDeptId === "all" ? departments : departments.filter((d) => d.id === filterDeptId);
+  const isLevelVisible = (levelId: string) => filterLevelId === "all" || filterLevelId === levelId;
+  const isSemesterVisible = (semesterId: string) => filterSemesterId === "all" || filterSemesterId === semesterId;
+  const filtersActive = filterDeptId !== "all" || filterLevelId !== "all" || filterSemesterId !== "all";
+
+  // Move course dialog helpers
+  const moveDeptLevels = moveDeptId ? deptLevels(moveDeptId) : [];
+  const moveLevelSemesters = moveLevelId ? levelSemesters(moveLevelId) : [];
+  const openMoveCourseDialog = (course: any) => {
+    setMoveCourse(course);
+    setMoveDeptId(course.department_id || "");
+    setMoveLevelId(course.level_id || "");
+    setMoveSemesterId(course.semester_id || "");
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -580,10 +658,53 @@ export default function AdminDepartments() {
 
       {/* Department list */}
       <div className="space-y-4">
-        {departments.map((dept) => {
+        {/* Cascading filters */}
+        <Card className="bg-muted/30">
+          <CardContent className="py-3">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1 min-w-[180px] flex-1">
+                <Label className="text-xs">{t("dept.filterDept")}</Label>
+                <Select value={filterDeptId} onValueChange={(v) => { setFilterDeptId(v); setFilterLevelId("all"); setFilterSemesterId("all"); }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("dept.allDepartments")}</SelectItem>
+                    {departments.map((d) => (<SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1 min-w-[180px] flex-1">
+                <Label className="text-xs">{t("dept.filterLevel")}</Label>
+                <Select value={filterLevelId} onValueChange={(v) => { setFilterLevelId(v); setFilterSemesterId("all"); }} disabled={filterDeptId === "all"}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("dept.allLevels")}</SelectItem>
+                    {filterDeptLevels.map((l) => (<SelectItem key={l.id} value={l.id}>{l.code} — {l.name}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1 min-w-[180px] flex-1">
+                <Label className="text-xs">{t("dept.filterSemester")}</Label>
+                <Select value={filterSemesterId} onValueChange={setFilterSemesterId} disabled={filterLevelId === "all"}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("dept.allSemesters")}</SelectItem>
+                    {filterLevelSemesters.map((s) => (<SelectItem key={s.id} value={s.id}>{s.code} — {s.name}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {filtersActive && (
+                <Button variant="ghost" size="sm" onClick={() => { setFilterDeptId("all"); setFilterLevelId("all"); setFilterSemesterId("all"); }}>
+                  <X className="h-3.5 w-3.5 mr-1" />{t("dept.clearFilters")}
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {filteredDepartments.map((dept) => {
           const courses = deptCourses(dept.id);
           const levels = deptLevels(dept.id);
-          const isExpanded = expandedDept === dept.id;
+          const isExpanded = expandedDept === dept.id || filterDeptId === dept.id;
           return (
             <Card key={dept.id} className={isExpanded ? "border-primary/40" : ""}>
               <CardHeader className="pb-3">
@@ -618,10 +739,10 @@ export default function AdminDepartments() {
                     <p className="text-xs text-muted-foreground py-2">{t("dept.noLevels")}</p>
                   ) : (
                     <div className="space-y-2">
-                      {levels.map((level) => {
+                      {levels.filter((lvl) => isLevelVisible(lvl.id)).map((level) => {
                         const lvlCourses = levelCourses(level.id);
                         const semesters = levelSemesters(level.id);
-                        const isLevelExpanded = expandedLevel === level.id;
+                        const isLevelExpanded = expandedLevel === level.id || filterLevelId === level.id;
                         return (
                           <div key={level.id} className="border rounded-lg overflow-hidden">
                             <div
@@ -655,9 +776,9 @@ export default function AdminDepartments() {
                                   <p className="text-xs text-muted-foreground py-2">{t("dept.noSemesters")}</p>
                                 ) : (
                                   <div className="space-y-2">
-                                    {semesters.map((sem) => {
+                                    {semesters.filter((s) => isSemesterVisible(s.id)).map((sem) => {
                                       const semCourses = semesterCourses(sem.id);
-                                      const isSemExpanded = expandedSemester === sem.id;
+                                      const isSemExpanded = expandedSemester === sem.id || filterSemesterId === sem.id;
                                       return (
                                         <div key={sem.id} className="border rounded-md overflow-hidden bg-background">
                                           <div
@@ -698,6 +819,9 @@ export default function AdminDepartments() {
                                                         <span className="text-sm">{c.name}</span>
                                                       </div>
                                                       <div className="flex items-center gap-1">
+                                                        <Button variant="ghost" size="icon" className="h-6 w-6" title={t("dept.moveCourse")} onClick={() => openMoveCourseDialog(c)}>
+                                                          <ArrowRightLeft className="h-3 w-3" />
+                                                        </Button>
                                                         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditCourse(c)}><Edit className="h-3 w-3" /></Button>
                                                         <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => setConfirmDeleteCourseId(c.id)}><Trash2 className="h-3 w-3" /></Button>
                                                       </div>
@@ -874,6 +998,64 @@ export default function AdminDepartments() {
           if (confirmDeleteSemesterId) deleteSemesterMutation.mutate(confirmDeleteSemesterId);
           setConfirmDeleteSemesterId(null);
         }}
+      />
+
+      {/* Move Course Dialog */}
+      <Dialog open={!!moveCourse && !confirmMove} onOpenChange={(o) => { if (!o) { setMoveCourse(null); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("dept.moveCourseTitle")}</DialogTitle>
+          </DialogHeader>
+          {moveCourse && (
+            <div className="space-y-4">
+              <div className="rounded-md border bg-muted/30 px-3 py-2">
+                <p className="text-xs text-muted-foreground">{t("dept.course")}</p>
+                <p className="text-sm font-medium">
+                  <span className="font-mono text-xs text-muted-foreground mr-2">{moveCourse.code}</span>
+                  {moveCourse.name}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label>{t("auth.department")}</Label>
+                <Select value={moveDeptId} onValueChange={(v) => { setMoveDeptId(v); setMoveLevelId(""); setMoveSemesterId(""); }}>
+                  <SelectTrigger><SelectValue placeholder={t("auth.selectDepartment")} /></SelectTrigger>
+                  <SelectContent>{departments.map((d) => (<SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>))}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>{t("dept.level")}</Label>
+                <Select value={moveLevelId} onValueChange={(v) => { setMoveLevelId(v); setMoveSemesterId(""); }} disabled={!moveDeptId}>
+                  <SelectTrigger><SelectValue placeholder={t("dept.selectLevel")} /></SelectTrigger>
+                  <SelectContent>{moveDeptLevels.map((l) => (<SelectItem key={l.id} value={l.id}>{l.code} — {l.name}</SelectItem>))}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>{t("dept.semester")}</Label>
+                <Select value={moveSemesterId} onValueChange={setMoveSemesterId} disabled={!moveLevelId}>
+                  <SelectTrigger><SelectValue placeholder={t("dept.selectSemester")} /></SelectTrigger>
+                  <SelectContent>{moveLevelSemesters.map((s) => (<SelectItem key={s.id} value={s.id}>{s.code} — {s.name}</SelectItem>))}</SelectContent>
+                </Select>
+              </div>
+              <Button
+                className="w-full"
+                disabled={!moveDeptId || !moveLevelId || !moveSemesterId || moveSemesterId === moveCourse.semester_id}
+                onClick={() => setConfirmMove(true)}
+              >
+                <ArrowRightLeft className="h-4 w-4 mr-2" />{t("dept.moveCourse")}
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={confirmMove}
+        onOpenChange={(open) => !open && setConfirmMove(false)}
+        title={t("dept.moveCourseTitle")}
+        description={t("dept.confirmMoveCourse")}
+        confirmLabel={t("dept.moveCourse")}
+        variant="default"
+        onConfirm={() => moveCourseMutation.mutate()}
       />
     </div>
   );
