@@ -658,7 +658,50 @@ export default function AdminDepartments() {
 
       {/* Department list */}
       <div className="space-y-4">
-        {departments.map((dept) => {
+        {/* Cascading filters */}
+        <Card className="bg-muted/30">
+          <CardContent className="py-3">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1 min-w-[180px] flex-1">
+                <Label className="text-xs">{t("dept.filterDept")}</Label>
+                <Select value={filterDeptId} onValueChange={(v) => { setFilterDeptId(v); setFilterLevelId("all"); setFilterSemesterId("all"); }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("dept.allDepartments")}</SelectItem>
+                    {departments.map((d) => (<SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1 min-w-[180px] flex-1">
+                <Label className="text-xs">{t("dept.filterLevel")}</Label>
+                <Select value={filterLevelId} onValueChange={(v) => { setFilterLevelId(v); setFilterSemesterId("all"); }} disabled={filterDeptId === "all"}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("dept.allLevels")}</SelectItem>
+                    {filterDeptLevels.map((l) => (<SelectItem key={l.id} value={l.id}>{l.code} — {l.name}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1 min-w-[180px] flex-1">
+                <Label className="text-xs">{t("dept.filterSemester")}</Label>
+                <Select value={filterSemesterId} onValueChange={setFilterSemesterId} disabled={filterLevelId === "all"}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("dept.allSemesters")}</SelectItem>
+                    {filterLevelSemesters.map((s) => (<SelectItem key={s.id} value={s.id}>{s.code} — {s.name}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {filtersActive && (
+                <Button variant="ghost" size="sm" onClick={() => { setFilterDeptId("all"); setFilterLevelId("all"); setFilterSemesterId("all"); }}>
+                  <X className="h-3.5 w-3.5 mr-1" />{t("dept.clearFilters")}
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {filteredDepartments.map((dept) => {
           const courses = deptCourses(dept.id);
           const levels = deptLevels(dept.id);
           const isExpanded = expandedDept === dept.id;
