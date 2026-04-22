@@ -286,6 +286,40 @@ export default function AdminDepartments() {
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
+  // Move course to another semester
+  const moveCourseMutation = useMutation({
+    mutationFn: async () => {
+      if (!moveCourse) throw new Error("No course selected");
+      if (!moveDeptId || !moveLevelId || !moveSemesterId) {
+        throw new Error(t("dept.requireDeptLevelSemester"));
+      }
+      const sem = allSemesters.find((s) => s.id === moveSemesterId);
+      if (!sem || sem.level_id !== moveLevelId) {
+        throw new Error(t("dept.semesterNotInLevel"));
+      }
+      const lvl = allLevels.find((l) => l.id === moveLevelId);
+      if (!lvl || lvl.department_id !== moveDeptId) {
+        throw new Error(t("dept.semesterNotInLevel"));
+      }
+      const { error } = await supabase
+        .from("courses")
+        .update({ department_id: moveDeptId, level_id: moveLevelId, semester_id: moveSemesterId } as any)
+        .eq("id", moveCourse.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["all-courses-admin"] });
+      toast({ title: t("common.success"), description: t("dept.courseMoved") });
+      setConfirmMove(false);
+      setMoveCourse(null);
+      setMoveDeptId(""); setMoveLevelId(""); setMoveSemesterId("");
+    },
+    onError: (e: any) => {
+      toast({ title: t("common.error"), description: e.message, variant: "destructive" });
+      setConfirmMove(false);
+    },
+  });
+
   const assignMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from("course_lecturers").insert({
