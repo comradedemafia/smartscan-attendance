@@ -776,9 +776,9 @@ export default function AdminDepartments() {
                                   <p className="text-xs text-muted-foreground py-2">{t("dept.noSemesters")}</p>
                                 ) : (
                                   <div className="space-y-2">
-                                    {semesters.map((sem) => {
+                                    {semesters.filter((s) => isSemesterVisible(s.id)).map((sem) => {
                                       const semCourses = semesterCourses(sem.id);
-                                      const isSemExpanded = expandedSemester === sem.id;
+                                      const isSemExpanded = expandedSemester === sem.id || filterSemesterId === sem.id;
                                       return (
                                         <div key={sem.id} className="border rounded-md overflow-hidden bg-background">
                                           <div
