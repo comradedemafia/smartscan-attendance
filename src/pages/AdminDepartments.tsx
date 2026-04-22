@@ -480,6 +480,24 @@ export default function AdminDepartments() {
   const courseDeptLevels = courseDeptId ? deptLevels(courseDeptId) : [];
   const courseLevelSemesters = courseLevelId ? levelSemesters(courseLevelId) : [];
 
+  // Cascading filter helpers
+  const filterDeptLevels = filterDeptId !== "all" ? deptLevels(filterDeptId) : [];
+  const filterLevelSemesters = filterLevelId !== "all" ? levelSemesters(filterLevelId) : [];
+  const filteredDepartments = filterDeptId === "all" ? departments : departments.filter((d) => d.id === filterDeptId);
+  const isLevelVisible = (levelId: string) => filterLevelId === "all" || filterLevelId === levelId;
+  const isSemesterVisible = (semesterId: string) => filterSemesterId === "all" || filterSemesterId === semesterId;
+  const filtersActive = filterDeptId !== "all" || filterLevelId !== "all" || filterSemesterId !== "all";
+
+  // Move course dialog helpers
+  const moveDeptLevels = moveDeptId ? deptLevels(moveDeptId) : [];
+  const moveLevelSemesters = moveLevelId ? levelSemesters(moveLevelId) : [];
+  const openMoveCourseDialog = (course: any) => {
+    setMoveCourse(course);
+    setMoveDeptId(course.department_id || "");
+    setMoveLevelId(course.level_id || "");
+    setMoveSemesterId(course.semester_id || "");
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
