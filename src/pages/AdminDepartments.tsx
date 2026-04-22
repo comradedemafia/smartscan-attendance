@@ -819,6 +819,9 @@ export default function AdminDepartments() {
                                                         <span className="text-sm">{c.name}</span>
                                                       </div>
                                                       <div className="flex items-center gap-1">
+                                                        <Button variant="ghost" size="icon" className="h-6 w-6" title={t("dept.moveCourse")} onClick={() => openMoveCourseDialog(c)}>
+                                                          <ArrowRightLeft className="h-3 w-3" />
+                                                        </Button>
                                                         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditCourse(c)}><Edit className="h-3 w-3" /></Button>
                                                         <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => setConfirmDeleteCourseId(c.id)}><Trash2 className="h-3 w-3" /></Button>
                                                       </div>
