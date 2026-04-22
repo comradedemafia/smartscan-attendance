@@ -186,20 +186,29 @@ export default function AdminDepartments() {
       } else {
         const { data: newDept, error } = await supabase.from("departments").insert({ name: deptName, description: deptDesc || null } as any).select("id").single();
         if (error) throw error;
-        // Auto-create the 3 levels for new semester
+        // Auto-create the 3 NTA levels for the new department, plus 2 semesters per level
         if (newDept) {
-          const { error: levelsError } = await supabase.from("levels").insert([
+          const { data: newLevels, error: levelsError } = await supabase.from("levels").insert([
             { department_id: newDept.id, name: "Basic Technician Certificate (NTA LEVEL 4)", code: "BTCCD", sort_order: 1 },
             { department_id: newDept.id, name: "Technician Certificate (NTA LEVEL 5)", code: "TCCD", sort_order: 2 },
             { department_id: newDept.id, name: "Ordinary Diploma (NTA LEVEL 6)", code: "ODCD", sort_order: 3 },
-          ] as any);
+          ] as any).select("id");
           if (levelsError) console.error("Failed to create levels:", levelsError);
+          if (newLevels && newLevels.length > 0) {
+            const semRows = newLevels.flatMap((l: any) => [
+              { level_id: l.id, name: "Semester 1", code: "S1", sort_order: 1 },
+              { level_id: l.id, name: "Semester 2", code: "S2", sort_order: 2 },
+            ]);
+            const { error: semErr } = await (supabase as any).from("semesters").insert(semRows);
+            if (semErr) console.error("Failed to create semesters:", semErr);
+          }
         }
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["departments"] });
       queryClient.invalidateQueries({ queryKey: ["all-levels"] });
+      queryClient.invalidateQueries({ queryKey: ["all-semesters"] });
       toast({ title: t("common.success"), description: editingDept ? t("dept.deptUpdated") : t("dept.deptCreated") });
       resetDeptForm();
     },
