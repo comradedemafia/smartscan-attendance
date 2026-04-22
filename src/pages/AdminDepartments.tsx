@@ -243,6 +243,20 @@ export default function AdminDepartments() {
 
   const saveCourseMutation = useMutation({
     mutationFn: async () => {
+      // Validation: require Department -> Level -> Semester in sequence
+      if (!courseDeptId || !courseLevelId || !courseSemesterId) {
+        throw new Error(t("dept.requireDeptLevelSemester"));
+      }
+      // Validation: semester must belong to the chosen level
+      const sem = allSemesters.find((s) => s.id === courseSemesterId);
+      if (!sem || sem.level_id !== courseLevelId) {
+        throw new Error(t("dept.semesterNotInLevel"));
+      }
+      // Validation: level must belong to the chosen department
+      const lvl = allLevels.find((l) => l.id === courseLevelId);
+      if (!lvl || lvl.department_id !== courseDeptId) {
+        throw new Error(t("dept.semesterNotInLevel"));
+      }
       if (editingCourse) {
         const { error } = await supabase.from("courses").update({ name: courseName, code: courseCode.toUpperCase(), description: courseDesc || null, department_id: courseDeptId || null, level_id: courseLevelId || null, semester_id: courseSemesterId || null } as any).eq("id", editingCourse.id);
         if (error) throw error;
