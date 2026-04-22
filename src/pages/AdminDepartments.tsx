@@ -13,7 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Users, BookOpen, Plus, ChevronDown, ChevronRight, AlertCircle, Edit, Trash2, UserPlus, GraduationCap } from "lucide-react";
+import { Building2, Users, BookOpen, Plus, ChevronDown, ChevronRight, AlertCircle, Edit, Trash2, UserPlus, GraduationCap, ArrowRightLeft, X } from "lucide-react";
 
 type Department = { id: string; name: string; description: string | null };
 type Level = { id: string; name: string; code: string; department_id: string; sort_order: number };
@@ -81,6 +81,18 @@ export default function AdminDepartments() {
 
   // Delete lecturer
   const [deleteLecturerId, setDeleteLecturerId] = useState<string | null>(null);
+
+  // Move course dialog
+  const [moveCourse, setMoveCourse] = useState<any>(null);
+  const [moveDeptId, setMoveDeptId] = useState("");
+  const [moveLevelId, setMoveLevelId] = useState("");
+  const [moveSemesterId, setMoveSemesterId] = useState("");
+  const [confirmMove, setConfirmMove] = useState(false);
+
+  // Cascading filters for the admin department list
+  const [filterDeptId, setFilterDeptId] = useState<string>("all");
+  const [filterLevelId, setFilterLevelId] = useState<string>("all");
+  const [filterSemesterId, setFilterSemesterId] = useState<string>("all");
 
   // Departments
   const { data: departments = [] } = useQuery<Department[]>({
