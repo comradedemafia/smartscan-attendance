@@ -620,6 +620,7 @@ export default function AdminDepartments() {
                     <div className="space-y-2">
                       {levels.map((level) => {
                         const lvlCourses = levelCourses(level.id);
+                        const semesters = levelSemesters(level.id);
                         const isLevelExpanded = expandedLevel === level.id;
                         return (
                           <div key={level.id} className="border rounded-lg overflow-hidden">
@@ -635,6 +636,7 @@ export default function AdminDepartments() {
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
+                                <Badge variant="secondary" className="text-xs">{semesters.length} {t("dept.semesters")}</Badge>
                                 <Badge variant="secondary" className="text-xs">{lvlCourses.length} {t("dept.courses")}</Badge>
                                 {isLevelExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
                               </div>
@@ -643,28 +645,71 @@ export default function AdminDepartments() {
                               <div className="px-3 pb-3 bg-muted/20">
                                 <div className="flex items-center justify-between mb-2 pt-2">
                                   <h4 className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                                    <BookOpen className="h-3 w-3" />{t("dept.modulesInLevel")}
+                                    <BookOpen className="h-3 w-3" />{t("dept.semesters")}
                                   </h4>
-                                  <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => openAddCourseForLevel(dept.id, level.id)}>
-                                    <Plus className="h-3 w-3 mr-1" />{t("dept.addCourse")}
+                                  <Button size="sm" variant="outline" className="h-6 text-xs" onClick={(e) => { e.stopPropagation(); openAddSemesterForLevel(level.id); }}>
+                                    <Plus className="h-3 w-3 mr-1" />{t("dept.addSemester")}
                                   </Button>
                                 </div>
-                                {lvlCourses.length === 0 ? (
-                                  <p className="text-xs text-muted-foreground py-2">{t("dept.noCourses")}</p>
+                                {semesters.length === 0 ? (
+                                  <p className="text-xs text-muted-foreground py-2">{t("dept.noSemesters")}</p>
                                 ) : (
-                                  <div className="space-y-1">
-                                    {lvlCourses.map((c: any) => (
-                                      <div key={c.id} className="flex items-center justify-between px-2 py-1.5 rounded-md bg-background border">
-                                        <div>
-                                          <span className="font-mono text-xs text-muted-foreground mr-2">{c.code}</span>
-                                          <span className="text-sm">{c.name}</span>
+                                  <div className="space-y-2">
+                                    {semesters.map((sem) => {
+                                      const semCourses = semesterCourses(sem.id);
+                                      const isSemExpanded = expandedSemester === sem.id;
+                                      return (
+                                        <div key={sem.id} className="border rounded-md overflow-hidden bg-background">
+                                          <div
+                                            className="flex items-center justify-between px-2.5 py-2 cursor-pointer hover:bg-muted/40"
+                                            onClick={() => setExpandedSemester(isSemExpanded ? null : sem.id)}
+                                          >
+                                            <div className="flex items-center gap-2">
+                                              <span className="text-sm font-medium">{sem.name}</span>
+                                              <Badge variant="outline" className="text-[10px]">{sem.code}</Badge>
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                              <Badge variant="secondary" className="text-[10px]">{semCourses.length} {t("dept.courses")}</Badge>
+                                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); openEditSemester(sem); }}>
+                                                <Edit className="h-3 w-3" />
+                                              </Button>
+                                              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={(e) => { e.stopPropagation(); setConfirmDeleteSemesterId(sem.id); }}>
+                                                <Trash2 className="h-3 w-3" />
+                                              </Button>
+                                              {isSemExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                                            </div>
+                                          </div>
+                                          {isSemExpanded && (
+                                            <div className="px-3 pb-3 pt-1 border-t">
+                                              <div className="flex items-center justify-between mb-2">
+                                                <span className="text-[11px] font-medium text-muted-foreground">{t("dept.modulesInSemester")}</span>
+                                                <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => openAddCourseForSemester(dept.id, level.id, sem.id)}>
+                                                  <Plus className="h-3 w-3 mr-1" />{t("dept.addCourse")}
+                                                </Button>
+                                              </div>
+                                              {semCourses.length === 0 ? (
+                                                <p className="text-xs text-muted-foreground py-1">{t("dept.noCourses")}</p>
+                                              ) : (
+                                                <div className="space-y-1">
+                                                  {semCourses.map((c: any) => (
+                                                    <div key={c.id} className="flex items-center justify-between px-2 py-1.5 rounded-md border">
+                                                      <div>
+                                                        <span className="font-mono text-xs text-muted-foreground mr-2">{c.code}</span>
+                                                        <span className="text-sm">{c.name}</span>
+                                                      </div>
+                                                      <div className="flex items-center gap-1">
+                                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditCourse(c)}><Edit className="h-3 w-3" /></Button>
+                                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => setConfirmDeleteCourseId(c.id)}><Trash2 className="h-3 w-3" /></Button>
+                                                      </div>
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              )}
+                                            </div>
+                                          )}
                                         </div>
-                                        <div className="flex items-center gap-1">
-                                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditCourse(c)}><Edit className="h-3 w-3" /></Button>
-                                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => setConfirmDeleteCourseId(c.id)}><Trash2 className="h-3 w-3" /></Button>
-                                        </div>
-                                      </div>
-                                    ))}
+                                      );
+                                    })}
                                   </div>
                                 )}
                               </div>
