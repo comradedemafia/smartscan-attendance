@@ -289,6 +289,39 @@ export default function AdminDepartments() {
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
+  // Semester mutations
+  const saveSemesterMutation = useMutation({
+    mutationFn: async () => {
+      if (editingSemester) {
+        const { error } = await (supabase as any).from("semesters").update({ name: semesterName, code: semesterCode.toUpperCase(), level_id: semesterLevelId }).eq("id", editingSemester.id);
+        if (error) throw error;
+      } else {
+        const { error } = await (supabase as any).from("semesters").insert({ name: semesterName, code: semesterCode.toUpperCase(), level_id: semesterLevelId, sort_order: 99 });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["all-semesters"] });
+      toast({ title: t("common.success"), description: editingSemester ? t("dept.semesterUpdated") : t("dept.semesterCreated") });
+      setOpenSemesterDialog(false);
+      setEditingSemester(null); setSemesterName(""); setSemesterCode(""); setSemesterLevelId("");
+    },
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
+  });
+
+  const deleteSemesterMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await (supabase as any).from("semesters").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["all-semesters"] });
+      queryClient.invalidateQueries({ queryKey: ["all-courses-admin"] });
+      toast({ title: t("common.success"), description: t("dept.semesterDeleted") });
+    },
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
+  });
+
   // Register new lecturer
   const registerLecturerMutation = useMutation({
     mutationFn: async () => {
@@ -357,9 +390,11 @@ export default function AdminDepartments() {
   // ─── Form helpers ───
   const resetDeptForm = () => { setOpenDeptDialog(false); setEditingDept(null); setDeptName(""); setDeptDesc(""); };
   const openEditDept = (dept: Department) => { setEditingDept(dept); setDeptName(dept.name); setDeptDesc(dept.description || ""); setOpenDeptDialog(true); };
-  const resetCourseForm = () => { setOpenCourseDialog(false); setEditingCourse(null); setCourseName(""); setCourseCode(""); setCourseDesc(""); setCourseDeptId(""); setCourseLevelId(""); };
-  const openEditCourse = (course: any) => { setEditingCourse(course); setCourseName(course.name); setCourseCode(course.code); setCourseDesc(course.description || ""); setCourseDeptId(course.department_id || ""); setCourseLevelId(course.level_id || ""); setOpenCourseDialog(true); };
-  const openAddCourseForLevel = (deptId: string, levelId: string) => { resetCourseForm(); setCourseDeptId(deptId); setCourseLevelId(levelId); setOpenCourseDialog(true); };
+  const resetCourseForm = () => { setOpenCourseDialog(false); setEditingCourse(null); setCourseName(""); setCourseCode(""); setCourseDesc(""); setCourseDeptId(""); setCourseLevelId(""); setCourseSemesterId(""); };
+  const openEditCourse = (course: any) => { setEditingCourse(course); setCourseName(course.name); setCourseCode(course.code); setCourseDesc(course.description || ""); setCourseDeptId(course.department_id || ""); setCourseLevelId(course.level_id || ""); setCourseSemesterId(course.semester_id || ""); setOpenCourseDialog(true); };
+  const openAddCourseForSemester = (deptId: string, levelId: string, semesterId: string) => { resetCourseForm(); setCourseDeptId(deptId); setCourseLevelId(levelId); setCourseSemesterId(semesterId); setOpenCourseDialog(true); };
+  const openAddSemesterForLevel = (levelId: string) => { setEditingSemester(null); setSemesterName(""); setSemesterCode(""); setSemesterLevelId(levelId); setOpenSemesterDialog(true); };
+  const openEditSemester = (sem: Semester) => { setEditingSemester(sem); setSemesterName(sem.name); setSemesterCode(sem.code); setSemesterLevelId(sem.level_id); setOpenSemesterDialog(true); };
   const openAssignForDept = (deptId: string) => { setAssignDeptId(deptId); setAssignCourseId(""); setAssignLecturerId(""); setOpenAssignDialog(true); };
   const openRegisterForDept = (deptId: string) => { setRegDeptId(deptId); setRegName(""); setRegEmail(""); setRegUniId(""); setRegGender("M"); setRegPhone(""); setOpenRegisterDialog(true); };
   const openEditLecturer = (l: any) => {
@@ -373,14 +408,17 @@ export default function AdminDepartments() {
 
   const deptCourses = (deptId: string) => allCourses.filter((c: any) => c.department_id === deptId);
   const levelCourses = (levelId: string) => allCourses.filter((c: any) => c.level_id === levelId);
+  const semesterCourses = (semesterId: string) => allCourses.filter((c: any) => c.semester_id === semesterId);
   const deptLevels = (deptId: string) => allLevels.filter((l) => l.department_id === deptId);
+  const levelSemesters = (levelId: string) => allSemesters.filter((s) => s.level_id === levelId);
   const assignFilteredCourses = assignDeptId ? deptCourses(assignDeptId) : allCourses;
   const assignFilteredLecturers = assignDeptId
     ? allLecturers.filter((l: any) => l.department_id === assignDeptId)
     : allLecturers;
 
-  // Levels available for selected dept in course dialog
+  // Levels & semesters available for selected dept/level in course dialog
   const courseDeptLevels = courseDeptId ? deptLevels(courseDeptId) : [];
+  const courseLevelSemesters = courseLevelId ? levelSemesters(courseLevelId) : [];
 
   return (
     <div className="space-y-6">
