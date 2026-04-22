@@ -17,6 +17,7 @@ import { Building2, Users, BookOpen, Plus, ChevronDown, ChevronRight, AlertCircl
 
 type Department = { id: string; name: string; description: string | null };
 type Level = { id: string; name: string; code: string; department_id: string; sort_order: number };
+type Semester = { id: string; name: string; code: string; level_id: string; sort_order: number };
 type Lecturer = { lecturer_id: string; full_name: string; university_id: string; courses: { id: string; name: string; code: string }[] };
 
 export default function AdminDepartments() {
@@ -26,6 +27,7 @@ export default function AdminDepartments() {
   const queryClient = useQueryClient();
   const [expandedDept, setExpandedDept] = useState<string | null>(null);
   const [expandedLevel, setExpandedLevel] = useState<string | null>(null);
+  const [expandedSemester, setExpandedSemester] = useState<string | null>(null);
   const [expandedLecturer, setExpandedLecturer] = useState<string | null>(null);
   
   // Department dialogs
@@ -33,6 +35,14 @@ export default function AdminDepartments() {
   const [editingDept, setEditingDept] = useState<Department | null>(null);
   const [deptName, setDeptName] = useState("");
   const [deptDesc, setDeptDesc] = useState("");
+
+  // Semester dialog
+  const [openSemesterDialog, setOpenSemesterDialog] = useState(false);
+  const [editingSemester, setEditingSemester] = useState<Semester | null>(null);
+  const [semesterName, setSemesterName] = useState("");
+  const [semesterCode, setSemesterCode] = useState("");
+  const [semesterLevelId, setSemesterLevelId] = useState("");
+  const [confirmDeleteSemesterId, setConfirmDeleteSemesterId] = useState<string | null>(null);
   
   // Assign lecturer dialog
   const [openAssignDialog, setOpenAssignDialog] = useState(false);
@@ -48,6 +58,7 @@ export default function AdminDepartments() {
   const [courseDesc, setCourseDesc] = useState("");
   const [courseDeptId, setCourseDeptId] = useState("");
   const [courseLevelId, setCourseLevelId] = useState("");
+  const [courseSemesterId, setCourseSemesterId] = useState("");
   const [confirmDeleteDeptId, setConfirmDeleteDeptId] = useState<string | null>(null);
   const [confirmDeleteCourseId, setConfirmDeleteCourseId] = useState<string | null>(null);
   const [confirmRemoveLecturer, setConfirmRemoveLecturer] = useState<{ courseId: string; lecturerId: string } | null>(null);
