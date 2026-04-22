@@ -842,6 +842,39 @@ export default function AdminDepartments() {
         }}
         confirmLabel={t("common.remove")}
       />
+
+      {/* Semester Dialog */}
+      <Dialog open={openSemesterDialog} onOpenChange={(o) => { if (!o) { setOpenSemesterDialog(false); setEditingSemester(null); } else { setOpenSemesterDialog(o); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingSemester ? t("dept.editSemester") : t("dept.addSemester")}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>{t("dept.semesterName")}</Label>
+              <Input value={semesterName} onChange={(e) => setSemesterName(e.target.value)} placeholder="Semester 1" />
+            </div>
+            <div className="space-y-2">
+              <Label>{t("dept.semesterCode")}</Label>
+              <Input value={semesterCode} onChange={(e) => setSemesterCode(e.target.value)} placeholder="S1" />
+            </div>
+            <Button className="w-full" onClick={() => saveSemesterMutation.mutate()} disabled={!semesterName || !semesterCode || !semesterLevelId || saveSemesterMutation.isPending}>
+              {editingSemester ? t("common.save") : t("dept.addSemester")}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={!!confirmDeleteSemesterId}
+        onOpenChange={(open) => !open && setConfirmDeleteSemesterId(null)}
+        title={t("common.confirmDeleteTitle")}
+        description={t("dept.deleteSemester")}
+        onConfirm={() => {
+          if (confirmDeleteSemesterId) deleteSemesterMutation.mutate(confirmDeleteSemesterId);
+          setConfirmDeleteSemesterId(null);
+        }}
+      />
     </div>
   );
 }
