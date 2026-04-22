@@ -351,7 +351,6 @@ const translations = {
     "dept.filterLevel": "Filter: Level",
     "dept.filterSemester": "Filter: Semester",
     "dept.allDepartments": "All Departments",
-    "dept.allLevels": "All Levels",
     "dept.allSemesters": "All Semesters",
     "dept.clearFilters": "Clear filters",
     "dept.deptName": "Department Name",
