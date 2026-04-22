@@ -17,6 +17,7 @@ import { Building2, Users, BookOpen, Plus, ChevronDown, ChevronRight, AlertCircl
 
 type Department = { id: string; name: string; description: string | null };
 type Level = { id: string; name: string; code: string; department_id: string; sort_order: number };
+type Semester = { id: string; name: string; code: string; level_id: string; sort_order: number };
 type Lecturer = { lecturer_id: string; full_name: string; university_id: string; courses: { id: string; name: string; code: string }[] };
 
 export default function AdminDepartments() {
@@ -26,6 +27,7 @@ export default function AdminDepartments() {
   const queryClient = useQueryClient();
   const [expandedDept, setExpandedDept] = useState<string | null>(null);
   const [expandedLevel, setExpandedLevel] = useState<string | null>(null);
+  const [expandedSemester, setExpandedSemester] = useState<string | null>(null);
   const [expandedLecturer, setExpandedLecturer] = useState<string | null>(null);
   
   // Department dialogs
@@ -33,6 +35,14 @@ export default function AdminDepartments() {
   const [editingDept, setEditingDept] = useState<Department | null>(null);
   const [deptName, setDeptName] = useState("");
   const [deptDesc, setDeptDesc] = useState("");
+
+  // Semester dialog
+  const [openSemesterDialog, setOpenSemesterDialog] = useState(false);
+  const [editingSemester, setEditingSemester] = useState<Semester | null>(null);
+  const [semesterName, setSemesterName] = useState("");
+  const [semesterCode, setSemesterCode] = useState("");
+  const [semesterLevelId, setSemesterLevelId] = useState("");
+  const [confirmDeleteSemesterId, setConfirmDeleteSemesterId] = useState<string | null>(null);
   
   // Assign lecturer dialog
   const [openAssignDialog, setOpenAssignDialog] = useState(false);
@@ -48,6 +58,7 @@ export default function AdminDepartments() {
   const [courseDesc, setCourseDesc] = useState("");
   const [courseDeptId, setCourseDeptId] = useState("");
   const [courseLevelId, setCourseLevelId] = useState("");
+  const [courseSemesterId, setCourseSemesterId] = useState("");
   const [confirmDeleteDeptId, setConfirmDeleteDeptId] = useState<string | null>(null);
   const [confirmDeleteCourseId, setConfirmDeleteCourseId] = useState<string | null>(null);
   const [confirmRemoveLecturer, setConfirmRemoveLecturer] = useState<{ courseId: string; lecturerId: string } | null>(null);
@@ -91,11 +102,21 @@ export default function AdminDepartments() {
     },
   });
 
+  // All semesters
+  const { data: allSemesters = [] } = useQuery<Semester[]>({
+    queryKey: ["all-semesters"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from("semesters").select("*").order("sort_order");
+      if (error) throw error;
+      return (data || []) as Semester[];
+    },
+  });
+
   // All courses
   const { data: allCourses = [] } = useQuery({
     queryKey: ["all-courses-admin"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("courses").select("id, name, code, department_id, level_id, description").order("name");
+      const { data, error } = await supabase.from("courses").select("id, name, code, department_id, level_id, semester_id, description").order("name");
       if (error) throw error;
       return data;
     },
@@ -165,20 +186,29 @@ export default function AdminDepartments() {
       } else {
         const { data: newDept, error } = await supabase.from("departments").insert({ name: deptName, description: deptDesc || null } as any).select("id").single();
         if (error) throw error;
-        // Auto-create the 3 levels for new semester
+        // Auto-create the 3 NTA levels for the new department, plus 2 semesters per level
         if (newDept) {
-          const { error: levelsError } = await supabase.from("levels").insert([
+          const { data: newLevels, error: levelsError } = await supabase.from("levels").insert([
             { department_id: newDept.id, name: "Basic Technician Certificate (NTA LEVEL 4)", code: "BTCCD", sort_order: 1 },
             { department_id: newDept.id, name: "Technician Certificate (NTA LEVEL 5)", code: "TCCD", sort_order: 2 },
             { department_id: newDept.id, name: "Ordinary Diploma (NTA LEVEL 6)", code: "ODCD", sort_order: 3 },
-          ] as any);
+          ] as any).select("id");
           if (levelsError) console.error("Failed to create levels:", levelsError);
+          if (newLevels && newLevels.length > 0) {
+            const semRows = newLevels.flatMap((l: any) => [
+              { level_id: l.id, name: "Semester 1", code: "S1", sort_order: 1 },
+              { level_id: l.id, name: "Semester 2", code: "S2", sort_order: 2 },
+            ]);
+            const { error: semErr } = await (supabase as any).from("semesters").insert(semRows);
+            if (semErr) console.error("Failed to create semesters:", semErr);
+          }
         }
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["departments"] });
       queryClient.invalidateQueries({ queryKey: ["all-levels"] });
+      queryClient.invalidateQueries({ queryKey: ["all-semesters"] });
       toast({ title: t("common.success"), description: editingDept ? t("dept.deptUpdated") : t("dept.deptCreated") });
       resetDeptForm();
     },
@@ -202,10 +232,10 @@ export default function AdminDepartments() {
   const saveCourseMutation = useMutation({
     mutationFn: async () => {
       if (editingCourse) {
-        const { error } = await supabase.from("courses").update({ name: courseName, code: courseCode.toUpperCase(), description: courseDesc || null, department_id: courseDeptId || null, level_id: courseLevelId || null }).eq("id", editingCourse.id);
+        const { error } = await supabase.from("courses").update({ name: courseName, code: courseCode.toUpperCase(), description: courseDesc || null, department_id: courseDeptId || null, level_id: courseLevelId || null, semester_id: courseSemesterId || null } as any).eq("id", editingCourse.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("courses").insert({ name: courseName, code: courseCode.toUpperCase(), description: courseDesc || null, department_id: courseDeptId || null, level_id: courseLevelId || null, created_by: user!.id });
+        const { error } = await supabase.from("courses").insert({ name: courseName, code: courseCode.toUpperCase(), description: courseDesc || null, department_id: courseDeptId || null, level_id: courseLevelId || null, semester_id: courseSemesterId || null, created_by: user!.id } as any);
         if (error) throw error;
       }
     },
@@ -255,6 +285,39 @@ export default function AdminDepartments() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["dept-lecturers-admin"] });
       toast({ title: t("common.success"), description: t("dept.assignmentRemoved") });
+    },
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
+  });
+
+  // Semester mutations
+  const saveSemesterMutation = useMutation({
+    mutationFn: async () => {
+      if (editingSemester) {
+        const { error } = await (supabase as any).from("semesters").update({ name: semesterName, code: semesterCode.toUpperCase(), level_id: semesterLevelId }).eq("id", editingSemester.id);
+        if (error) throw error;
+      } else {
+        const { error } = await (supabase as any).from("semesters").insert({ name: semesterName, code: semesterCode.toUpperCase(), level_id: semesterLevelId, sort_order: 99 });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["all-semesters"] });
+      toast({ title: t("common.success"), description: editingSemester ? t("dept.semesterUpdated") : t("dept.semesterCreated") });
+      setOpenSemesterDialog(false);
+      setEditingSemester(null); setSemesterName(""); setSemesterCode(""); setSemesterLevelId("");
+    },
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
+  });
+
+  const deleteSemesterMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await (supabase as any).from("semesters").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["all-semesters"] });
+      queryClient.invalidateQueries({ queryKey: ["all-courses-admin"] });
+      toast({ title: t("common.success"), description: t("dept.semesterDeleted") });
     },
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
@@ -327,9 +390,11 @@ export default function AdminDepartments() {
   // ─── Form helpers ───
   const resetDeptForm = () => { setOpenDeptDialog(false); setEditingDept(null); setDeptName(""); setDeptDesc(""); };
   const openEditDept = (dept: Department) => { setEditingDept(dept); setDeptName(dept.name); setDeptDesc(dept.description || ""); setOpenDeptDialog(true); };
-  const resetCourseForm = () => { setOpenCourseDialog(false); setEditingCourse(null); setCourseName(""); setCourseCode(""); setCourseDesc(""); setCourseDeptId(""); setCourseLevelId(""); };
-  const openEditCourse = (course: any) => { setEditingCourse(course); setCourseName(course.name); setCourseCode(course.code); setCourseDesc(course.description || ""); setCourseDeptId(course.department_id || ""); setCourseLevelId(course.level_id || ""); setOpenCourseDialog(true); };
-  const openAddCourseForLevel = (deptId: string, levelId: string) => { resetCourseForm(); setCourseDeptId(deptId); setCourseLevelId(levelId); setOpenCourseDialog(true); };
+  const resetCourseForm = () => { setOpenCourseDialog(false); setEditingCourse(null); setCourseName(""); setCourseCode(""); setCourseDesc(""); setCourseDeptId(""); setCourseLevelId(""); setCourseSemesterId(""); };
+  const openEditCourse = (course: any) => { setEditingCourse(course); setCourseName(course.name); setCourseCode(course.code); setCourseDesc(course.description || ""); setCourseDeptId(course.department_id || ""); setCourseLevelId(course.level_id || ""); setCourseSemesterId(course.semester_id || ""); setOpenCourseDialog(true); };
+  const openAddCourseForSemester = (deptId: string, levelId: string, semesterId: string) => { resetCourseForm(); setCourseDeptId(deptId); setCourseLevelId(levelId); setCourseSemesterId(semesterId); setOpenCourseDialog(true); };
+  const openAddSemesterForLevel = (levelId: string) => { setEditingSemester(null); setSemesterName(""); setSemesterCode(""); setSemesterLevelId(levelId); setOpenSemesterDialog(true); };
+  const openEditSemester = (sem: Semester) => { setEditingSemester(sem); setSemesterName(sem.name); setSemesterCode(sem.code); setSemesterLevelId(sem.level_id); setOpenSemesterDialog(true); };
   const openAssignForDept = (deptId: string) => { setAssignDeptId(deptId); setAssignCourseId(""); setAssignLecturerId(""); setOpenAssignDialog(true); };
   const openRegisterForDept = (deptId: string) => { setRegDeptId(deptId); setRegName(""); setRegEmail(""); setRegUniId(""); setRegGender("M"); setRegPhone(""); setOpenRegisterDialog(true); };
   const openEditLecturer = (l: any) => {
@@ -343,14 +408,17 @@ export default function AdminDepartments() {
 
   const deptCourses = (deptId: string) => allCourses.filter((c: any) => c.department_id === deptId);
   const levelCourses = (levelId: string) => allCourses.filter((c: any) => c.level_id === levelId);
+  const semesterCourses = (semesterId: string) => allCourses.filter((c: any) => c.semester_id === semesterId);
   const deptLevels = (deptId: string) => allLevels.filter((l) => l.department_id === deptId);
+  const levelSemesters = (levelId: string) => allSemesters.filter((s) => s.level_id === levelId);
   const assignFilteredCourses = assignDeptId ? deptCourses(assignDeptId) : allCourses;
   const assignFilteredLecturers = assignDeptId
     ? allLecturers.filter((l: any) => l.department_id === assignDeptId)
     : allLecturers;
 
-  // Levels available for selected dept in course dialog
+  // Levels & semesters available for selected dept/level in course dialog
   const courseDeptLevels = courseDeptId ? deptLevels(courseDeptId) : [];
+  const courseLevelSemesters = courseLevelId ? levelSemesters(courseLevelId) : [];
 
   return (
     <div className="space-y-6">
@@ -362,15 +430,15 @@ export default function AdminDepartments() {
         <div className="flex gap-2">
           <Dialog open={openDeptDialog} onOpenChange={(o) => { if (!o) resetDeptForm(); setOpenDeptDialog(o); }}>
             <DialogTrigger asChild>
-              <Button><Plus className="h-4 w-4 mr-2" />{t("dept.addSemester")}</Button>
+              <Button><Plus className="h-4 w-4 mr-2" />{t("dept.addDepartment")}</Button>
             </DialogTrigger>
             <DialogContent>
-              <DialogHeader><DialogTitle>{editingDept ? t("dept.editSemester") : t("dept.addSemester")}</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle>{editingDept ? t("dept.editDepartment") : t("dept.addDepartment")}</DialogTitle></DialogHeader>
               <div className="space-y-4">
-                <div className="space-y-2"><Label>{t("dept.deptName")}</Label><Input value={deptName} onChange={(e) => setDeptName(e.target.value)} placeholder="Semester 1" /></div>
+                <div className="space-y-2"><Label>{t("dept.deptName")}</Label><Input value={deptName} onChange={(e) => setDeptName(e.target.value)} placeholder="Community Development (CD)" /></div>
                 <div className="space-y-2"><Label>{t("courses.description")}</Label><Input value={deptDesc} onChange={(e) => setDeptDesc(e.target.value)} placeholder="Optional description" /></div>
                 <Button className="w-full" onClick={() => saveDeptMutation.mutate()} disabled={!deptName || saveDeptMutation.isPending}>
-                  {editingDept ? t("common.save") : t("dept.addSemester")}
+                  {editingDept ? t("common.save") : t("dept.addDepartment")}
                 </Button>
               </div>
             </DialogContent>
@@ -396,9 +464,18 @@ export default function AdminDepartments() {
             {courseDeptLevels.length > 0 && (
               <div className="space-y-2">
                 <Label>{t("dept.level")}</Label>
-                <Select value={courseLevelId} onValueChange={setCourseLevelId}>
+                <Select value={courseLevelId} onValueChange={(v) => { setCourseLevelId(v); setCourseSemesterId(""); }}>
                   <SelectTrigger><SelectValue placeholder={t("dept.selectLevel")} /></SelectTrigger>
                   <SelectContent>{courseDeptLevels.map((l) => (<SelectItem key={l.id} value={l.id}>{l.code} — {l.name}</SelectItem>))}</SelectContent>
+                </Select>
+              </div>
+            )}
+            {courseLevelSemesters.length > 0 && (
+              <div className="space-y-2">
+                <Label>{t("dept.semester")}</Label>
+                <Select value={courseSemesterId} onValueChange={setCourseSemesterId}>
+                  <SelectTrigger><SelectValue placeholder={t("dept.selectSemester")} /></SelectTrigger>
+                  <SelectContent>{courseLevelSemesters.map((s) => (<SelectItem key={s.id} value={s.id}>{s.code} — {s.name}</SelectItem>))}</SelectContent>
                 </Select>
               </div>
             )}
@@ -543,6 +620,7 @@ export default function AdminDepartments() {
                     <div className="space-y-2">
                       {levels.map((level) => {
                         const lvlCourses = levelCourses(level.id);
+                        const semesters = levelSemesters(level.id);
                         const isLevelExpanded = expandedLevel === level.id;
                         return (
                           <div key={level.id} className="border rounded-lg overflow-hidden">
@@ -558,6 +636,7 @@ export default function AdminDepartments() {
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
+                                <Badge variant="secondary" className="text-xs">{semesters.length} {t("dept.semesters")}</Badge>
                                 <Badge variant="secondary" className="text-xs">{lvlCourses.length} {t("dept.courses")}</Badge>
                                 {isLevelExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
                               </div>
@@ -566,28 +645,71 @@ export default function AdminDepartments() {
                               <div className="px-3 pb-3 bg-muted/20">
                                 <div className="flex items-center justify-between mb-2 pt-2">
                                   <h4 className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                                    <BookOpen className="h-3 w-3" />{t("dept.modulesInLevel")}
+                                    <BookOpen className="h-3 w-3" />{t("dept.semesters")}
                                   </h4>
-                                  <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => openAddCourseForLevel(dept.id, level.id)}>
-                                    <Plus className="h-3 w-3 mr-1" />{t("dept.addCourse")}
+                                  <Button size="sm" variant="outline" className="h-6 text-xs" onClick={(e) => { e.stopPropagation(); openAddSemesterForLevel(level.id); }}>
+                                    <Plus className="h-3 w-3 mr-1" />{t("dept.addSemester")}
                                   </Button>
                                 </div>
-                                {lvlCourses.length === 0 ? (
-                                  <p className="text-xs text-muted-foreground py-2">{t("dept.noCourses")}</p>
+                                {semesters.length === 0 ? (
+                                  <p className="text-xs text-muted-foreground py-2">{t("dept.noSemesters")}</p>
                                 ) : (
-                                  <div className="space-y-1">
-                                    {lvlCourses.map((c: any) => (
-                                      <div key={c.id} className="flex items-center justify-between px-2 py-1.5 rounded-md bg-background border">
-                                        <div>
-                                          <span className="font-mono text-xs text-muted-foreground mr-2">{c.code}</span>
-                                          <span className="text-sm">{c.name}</span>
+                                  <div className="space-y-2">
+                                    {semesters.map((sem) => {
+                                      const semCourses = semesterCourses(sem.id);
+                                      const isSemExpanded = expandedSemester === sem.id;
+                                      return (
+                                        <div key={sem.id} className="border rounded-md overflow-hidden bg-background">
+                                          <div
+                                            className="flex items-center justify-between px-2.5 py-2 cursor-pointer hover:bg-muted/40"
+                                            onClick={() => setExpandedSemester(isSemExpanded ? null : sem.id)}
+                                          >
+                                            <div className="flex items-center gap-2">
+                                              <span className="text-sm font-medium">{sem.name}</span>
+                                              <Badge variant="outline" className="text-[10px]">{sem.code}</Badge>
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                              <Badge variant="secondary" className="text-[10px]">{semCourses.length} {t("dept.courses")}</Badge>
+                                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); openEditSemester(sem); }}>
+                                                <Edit className="h-3 w-3" />
+                                              </Button>
+                                              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={(e) => { e.stopPropagation(); setConfirmDeleteSemesterId(sem.id); }}>
+                                                <Trash2 className="h-3 w-3" />
+                                              </Button>
+                                              {isSemExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                                            </div>
+                                          </div>
+                                          {isSemExpanded && (
+                                            <div className="px-3 pb-3 pt-1 border-t">
+                                              <div className="flex items-center justify-between mb-2">
+                                                <span className="text-[11px] font-medium text-muted-foreground">{t("dept.modulesInSemester")}</span>
+                                                <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => openAddCourseForSemester(dept.id, level.id, sem.id)}>
+                                                  <Plus className="h-3 w-3 mr-1" />{t("dept.addCourse")}
+                                                </Button>
+                                              </div>
+                                              {semCourses.length === 0 ? (
+                                                <p className="text-xs text-muted-foreground py-1">{t("dept.noCourses")}</p>
+                                              ) : (
+                                                <div className="space-y-1">
+                                                  {semCourses.map((c: any) => (
+                                                    <div key={c.id} className="flex items-center justify-between px-2 py-1.5 rounded-md border">
+                                                      <div>
+                                                        <span className="font-mono text-xs text-muted-foreground mr-2">{c.code}</span>
+                                                        <span className="text-sm">{c.name}</span>
+                                                      </div>
+                                                      <div className="flex items-center gap-1">
+                                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditCourse(c)}><Edit className="h-3 w-3" /></Button>
+                                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => setConfirmDeleteCourseId(c.id)}><Trash2 className="h-3 w-3" /></Button>
+                                                      </div>
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              )}
+                                            </div>
+                                          )}
                                         </div>
-                                        <div className="flex items-center gap-1">
-                                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditCourse(c)}><Edit className="h-3 w-3" /></Button>
-                                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => setConfirmDeleteCourseId(c.id)}><Trash2 className="h-3 w-3" /></Button>
-                                        </div>
-                                      </div>
-                                    ))}
+                                      );
+                                    })}
                                   </div>
                                 )}
                               </div>
@@ -719,6 +841,39 @@ export default function AdminDepartments() {
           setConfirmRemoveLecturer(null);
         }}
         confirmLabel={t("common.remove")}
+      />
+
+      {/* Semester Dialog */}
+      <Dialog open={openSemesterDialog} onOpenChange={(o) => { if (!o) { setOpenSemesterDialog(false); setEditingSemester(null); } else { setOpenSemesterDialog(o); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingSemester ? t("dept.editSemester") : t("dept.addSemester")}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>{t("dept.semesterName")}</Label>
+              <Input value={semesterName} onChange={(e) => setSemesterName(e.target.value)} placeholder="Semester 1" />
+            </div>
+            <div className="space-y-2">
+              <Label>{t("dept.semesterCode")}</Label>
+              <Input value={semesterCode} onChange={(e) => setSemesterCode(e.target.value)} placeholder="S1" />
+            </div>
+            <Button className="w-full" onClick={() => saveSemesterMutation.mutate()} disabled={!semesterName || !semesterCode || !semesterLevelId || saveSemesterMutation.isPending}>
+              {editingSemester ? t("common.save") : t("dept.addSemester")}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={!!confirmDeleteSemesterId}
+        onOpenChange={(open) => !open && setConfirmDeleteSemesterId(null)}
+        title={t("common.confirmDeleteTitle")}
+        description={t("dept.deleteSemester")}
+        onConfirm={() => {
+          if (confirmDeleteSemesterId) deleteSemesterMutation.mutate(confirmDeleteSemesterId);
+          setConfirmDeleteSemesterId(null);
+        }}
       />
     </div>
   );
