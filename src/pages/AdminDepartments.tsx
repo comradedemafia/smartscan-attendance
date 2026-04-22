@@ -999,6 +999,64 @@ export default function AdminDepartments() {
           setConfirmDeleteSemesterId(null);
         }}
       />
+
+      {/* Move Course Dialog */}
+      <Dialog open={!!moveCourse && !confirmMove} onOpenChange={(o) => { if (!o) { setMoveCourse(null); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("dept.moveCourseTitle")}</DialogTitle>
+          </DialogHeader>
+          {moveCourse && (
+            <div className="space-y-4">
+              <div className="rounded-md border bg-muted/30 px-3 py-2">
+                <p className="text-xs text-muted-foreground">{t("dept.course")}</p>
+                <p className="text-sm font-medium">
+                  <span className="font-mono text-xs text-muted-foreground mr-2">{moveCourse.code}</span>
+                  {moveCourse.name}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label>{t("auth.department")}</Label>
+                <Select value={moveDeptId} onValueChange={(v) => { setMoveDeptId(v); setMoveLevelId(""); setMoveSemesterId(""); }}>
+                  <SelectTrigger><SelectValue placeholder={t("auth.selectDepartment")} /></SelectTrigger>
+                  <SelectContent>{departments.map((d) => (<SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>))}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>{t("dept.level")}</Label>
+                <Select value={moveLevelId} onValueChange={(v) => { setMoveLevelId(v); setMoveSemesterId(""); }} disabled={!moveDeptId}>
+                  <SelectTrigger><SelectValue placeholder={t("dept.selectLevel")} /></SelectTrigger>
+                  <SelectContent>{moveDeptLevels.map((l) => (<SelectItem key={l.id} value={l.id}>{l.code} — {l.name}</SelectItem>))}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>{t("dept.semester")}</Label>
+                <Select value={moveSemesterId} onValueChange={setMoveSemesterId} disabled={!moveLevelId}>
+                  <SelectTrigger><SelectValue placeholder={t("dept.selectSemester")} /></SelectTrigger>
+                  <SelectContent>{moveLevelSemesters.map((s) => (<SelectItem key={s.id} value={s.id}>{s.code} — {s.name}</SelectItem>))}</SelectContent>
+                </Select>
+              </div>
+              <Button
+                className="w-full"
+                disabled={!moveDeptId || !moveLevelId || !moveSemesterId || moveSemesterId === moveCourse.semester_id}
+                onClick={() => setConfirmMove(true)}
+              >
+                <ArrowRightLeft className="h-4 w-4 mr-2" />{t("dept.moveCourse")}
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={confirmMove}
+        onOpenChange={(open) => !open && setConfirmMove(false)}
+        title={t("dept.moveCourseTitle")}
+        description={t("dept.confirmMoveCourse")}
+        confirmLabel={t("dept.moveCourse")}
+        variant="default"
+        onConfirm={() => moveCourseMutation.mutate()}
+      />
     </div>
   );
 }
