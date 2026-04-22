@@ -232,10 +232,10 @@ export default function AdminDepartments() {
   const saveCourseMutation = useMutation({
     mutationFn: async () => {
       if (editingCourse) {
-        const { error } = await supabase.from("courses").update({ name: courseName, code: courseCode.toUpperCase(), description: courseDesc || null, department_id: courseDeptId || null, level_id: courseLevelId || null }).eq("id", editingCourse.id);
+        const { error } = await supabase.from("courses").update({ name: courseName, code: courseCode.toUpperCase(), description: courseDesc || null, department_id: courseDeptId || null, level_id: courseLevelId || null, semester_id: courseSemesterId || null } as any).eq("id", editingCourse.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("courses").insert({ name: courseName, code: courseCode.toUpperCase(), description: courseDesc || null, department_id: courseDeptId || null, level_id: courseLevelId || null, created_by: user!.id });
+        const { error } = await supabase.from("courses").insert({ name: courseName, code: courseCode.toUpperCase(), description: courseDesc || null, department_id: courseDeptId || null, level_id: courseLevelId || null, semester_id: courseSemesterId || null, created_by: user!.id } as any);
         if (error) throw error;
       }
     },
