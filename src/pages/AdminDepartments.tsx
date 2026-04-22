@@ -430,15 +430,15 @@ export default function AdminDepartments() {
         <div className="flex gap-2">
           <Dialog open={openDeptDialog} onOpenChange={(o) => { if (!o) resetDeptForm(); setOpenDeptDialog(o); }}>
             <DialogTrigger asChild>
-              <Button><Plus className="h-4 w-4 mr-2" />{t("dept.addSemester")}</Button>
+              <Button><Plus className="h-4 w-4 mr-2" />{t("dept.addDepartment")}</Button>
             </DialogTrigger>
             <DialogContent>
-              <DialogHeader><DialogTitle>{editingDept ? t("dept.editSemester") : t("dept.addSemester")}</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle>{editingDept ? t("dept.editDepartment") : t("dept.addDepartment")}</DialogTitle></DialogHeader>
               <div className="space-y-4">
-                <div className="space-y-2"><Label>{t("dept.deptName")}</Label><Input value={deptName} onChange={(e) => setDeptName(e.target.value)} placeholder="Semester 1" /></div>
+                <div className="space-y-2"><Label>{t("dept.deptName")}</Label><Input value={deptName} onChange={(e) => setDeptName(e.target.value)} placeholder="Community Development (CD)" /></div>
                 <div className="space-y-2"><Label>{t("courses.description")}</Label><Input value={deptDesc} onChange={(e) => setDeptDesc(e.target.value)} placeholder="Optional description" /></div>
                 <Button className="w-full" onClick={() => saveDeptMutation.mutate()} disabled={!deptName || saveDeptMutation.isPending}>
-                  {editingDept ? t("common.save") : t("dept.addSemester")}
+                  {editingDept ? t("common.save") : t("dept.addDepartment")}
                 </Button>
               </div>
             </DialogContent>
@@ -464,9 +464,18 @@ export default function AdminDepartments() {
             {courseDeptLevels.length > 0 && (
               <div className="space-y-2">
                 <Label>{t("dept.level")}</Label>
-                <Select value={courseLevelId} onValueChange={setCourseLevelId}>
+                <Select value={courseLevelId} onValueChange={(v) => { setCourseLevelId(v); setCourseSemesterId(""); }}>
                   <SelectTrigger><SelectValue placeholder={t("dept.selectLevel")} /></SelectTrigger>
                   <SelectContent>{courseDeptLevels.map((l) => (<SelectItem key={l.id} value={l.id}>{l.code} — {l.name}</SelectItem>))}</SelectContent>
+                </Select>
+              </div>
+            )}
+            {courseLevelSemesters.length > 0 && (
+              <div className="space-y-2">
+                <Label>{t("dept.semester")}</Label>
+                <Select value={courseSemesterId} onValueChange={setCourseSemesterId}>
+                  <SelectTrigger><SelectValue placeholder={t("dept.selectSemester")} /></SelectTrigger>
+                  <SelectContent>{courseLevelSemesters.map((s) => (<SelectItem key={s.id} value={s.id}>{s.code} — {s.name}</SelectItem>))}</SelectContent>
                 </Select>
               </div>
             )}
