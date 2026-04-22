@@ -102,11 +102,21 @@ export default function AdminDepartments() {
     },
   });
 
+  // All semesters
+  const { data: allSemesters = [] } = useQuery<Semester[]>({
+    queryKey: ["all-semesters"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from("semesters").select("*").order("sort_order");
+      if (error) throw error;
+      return (data || []) as Semester[];
+    },
+  });
+
   // All courses
   const { data: allCourses = [] } = useQuery({
     queryKey: ["all-courses-admin"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("courses").select("id, name, code, department_id, level_id, description").order("name");
+      const { data, error } = await supabase.from("courses").select("id, name, code, department_id, level_id, semester_id, description").order("name");
       if (error) throw error;
       return data;
     },
