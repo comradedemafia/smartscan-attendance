@@ -739,10 +739,10 @@ export default function AdminDepartments() {
                     <p className="text-xs text-muted-foreground py-2">{t("dept.noLevels")}</p>
                   ) : (
                     <div className="space-y-2">
-                      {levels.map((level) => {
+                      {levels.filter((lvl) => isLevelVisible(lvl.id)).map((level) => {
                         const lvlCourses = levelCourses(level.id);
                         const semesters = levelSemesters(level.id);
-                        const isLevelExpanded = expandedLevel === level.id;
+                        const isLevelExpanded = expandedLevel === level.id || filterLevelId === level.id;
                         return (
                           <div key={level.id} className="border rounded-lg overflow-hidden">
                             <div
