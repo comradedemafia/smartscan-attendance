@@ -788,6 +788,8 @@ const translations = {
     "admin.availableCourses": "Moduli Zinazopatikana",
      "admin.allDepartments": "Idara Zote",
     "admin.allSemesters": "Semesta Zote",
+    "admin.selectLevel": "Chagua Level",
+    "admin.allLevels": "Level Zote",
     "admin.lecturerStatus": "Hali ya Wahadhiri",
     "admin.registeredLecturers": "Wahadhiri Waliowekwa",
     "admin.unregisteredLecturers": "Wahadhiri Wasiowekwa",
