@@ -19,6 +19,7 @@ import {
   Users, Search, UserCheck, UserX, BookOpen, Trash2, ChevronDown,
   GraduationCap, UsersRound, UserPlus, Upload, FileSpreadsheet, Mail, IdCard, Settings2,
   ArrowUpDown, ArrowUp, ArrowDown, X, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight,
+  Eye, Pencil, Phone, Calendar, Building2,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
