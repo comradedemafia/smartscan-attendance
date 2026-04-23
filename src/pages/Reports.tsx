@@ -28,6 +28,11 @@ export default function Reports() {
   // Date range filter (applied to course & student tabs)
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
+  // Verification filters (applied to course tab)
+  const [onlyLocationVerified, setOnlyLocationVerified] = useState(false);
+  const [onlyQrVerified, setOnlyQrVerified] = useState(false);
+  // Lecturer filter (admin only) — narrows the module dropdown
+  const [selectedLecturer, setSelectedLecturer] = useState<string>("");
 
   // Departments (admin only)
   const { data: departments = [] } = useQuery({
@@ -51,6 +56,26 @@ export default function Reports() {
       return data || [];
     },
   });
+
+  // Lecturers list (admin only) for lecturer filter
+  const { data: lecturers = [] } = useQuery({
+    queryKey: ["report-lecturers"],
+    enabled: !!user && role === "admin",
+    queryFn: async () => {
+      const { data: roleRows } = await supabase
+        .from("user_roles").select("user_id").eq("role", "lecturer");
+      const ids = (roleRows || []).map((r) => r.user_id);
+      if (!ids.length) return [];
+      const { data } = await supabase
+        .from("profiles").select("id, full_name, university_id").in("id", ids).order("full_name");
+      return data || [];
+    },
+  });
+
+  // Filter modules dropdown by selected lecturer (admin only)
+  const filteredCourses = (courses || []).filter((c: any) =>
+    !selectedLecturer || c.created_by === selectedLecturer
+  );
 
   // Levels
   const { data: levels = [] } = useQuery({
@@ -145,14 +170,20 @@ export default function Reports() {
 
   // Course report data
   const { data: reportData, isLoading } = useQuery({
-    queryKey: ["course-report", selectedCourse, dateFrom, dateTo],
+    queryKey: ["course-report", selectedCourse, dateFrom, dateTo, onlyLocationVerified, onlyQrVerified],
     enabled: !!selectedCourse && activeTab === "course",
     queryFn: async () => {
       let sq = supabase
-        .from("sessions").select("id, title, session_date")
+        .from("sessions").select("id, title, session_date, latitude, longitude, qr_code_secret, qr_expires_at")
         .eq("course_id", selectedCourse).eq("status", "completed");
       if (dateFrom) sq = sq.gte("session_date", dateFrom);
       if (dateTo) sq = sq.lte("session_date", dateTo);
+      if (onlyLocationVerified) {
+        sq = sq.not("latitude", "is", null).not("longitude", "is", null);
+      }
+      if (onlyQrVerified) {
+        sq = sq.not("qr_code_secret", "is", null);
+      }
       const { data: sessions } = await sq.order("session_date", { ascending: true });
 
       if (!sessions?.length) return { sessions: [], students: [], chartData: [] };
@@ -320,6 +351,16 @@ export default function Reports() {
 
   const handleExport = (format: "pdf" | "excel") => {
     const fn = format === "pdf" ? exportToPDF : exportToExcel;
+    const dateRange = (dateFrom || dateTo) ? { from: dateFrom, to: dateTo } : undefined;
+    const courseFilters: string[] = [];
+    if (activeTab === "course") {
+      if (onlyLocationVerified) courseFilters.push(t("reports.locationVerifiedOnly"));
+      if (onlyQrVerified) courseFilters.push(t("reports.qrVerifiedOnly"));
+      if (selectedLecturer) {
+        const lec = lecturers.find((l: any) => l.id === selectedLecturer);
+        if (lec) courseFilters.push(`${t("auth.lecturer")}: ${lec.full_name}`);
+      }
+    }
 
     if (activeTab === "department" && deptReport) {
       fn({
@@ -339,6 +380,8 @@ export default function Reports() {
       fn({
         title: t("reports.byCourse"),
         subtitle: courseName ? `${courseName.code} — ${courseName.name}` : undefined,
+        dateRange,
+        filters: courseFilters,
         columns: [
           { header: t("reports.studentName"), key: "name" },
           { header: t("reports.universityId"), key: "universityId" },
@@ -355,6 +398,7 @@ export default function Reports() {
       fn({
         title: t("reports.studentReport"),
         subtitle: `${studentReport.profile?.full_name} (${studentReport.profile?.university_id})`,
+        dateRange,
         columns: [
           { header: t("courses.code"), key: "courseCode" },
           { header: t("courses.name"), key: "courseName" },
@@ -673,16 +717,89 @@ export default function Reports() {
       {/* ── Course Report Tab ── */}
       {activeTab === "course" && (
         <>
-          <Select value={selectedCourse} onValueChange={setSelectedCourse}>
-            <SelectTrigger className="w-full max-w-xs no-print">
-              <SelectValue placeholder={t("reports.selectCourse")} />
-            </SelectTrigger>
-            <SelectContent>
-              {courses?.map((c) => (
-                <SelectItem key={c.id} value={c.id}>{c.code} — {c.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Card className="no-print">
+            <CardContent className="pt-4 space-y-3">
+              <div className="flex flex-wrap gap-3">
+                {role === "admin" && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">{t("auth.lecturer")}</Label>
+                    <Select
+                      value={selectedLecturer || "all"}
+                      onValueChange={(v) => {
+                        setSelectedLecturer(v === "all" ? "" : v);
+                        setSelectedCourse("");
+                      }}
+                    >
+                      <SelectTrigger className="w-[240px]">
+                        <SelectValue placeholder={t("reports.selectLecturer")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">{t("reports.allLecturers")}</SelectItem>
+                        {lecturers.map((l: any) => (
+                          <SelectItem key={l.id} value={l.id}>
+                            {l.full_name} ({l.university_id})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">{t("reports.selectCourse")}</Label>
+                  <Select value={selectedCourse} onValueChange={setSelectedCourse}>
+                    <SelectTrigger className="w-[280px]">
+                      <SelectValue placeholder={t("reports.selectCourse")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filteredCourses.length === 0 && (
+                        <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                          {t("reports.noData")}
+                        </div>
+                      )}
+                      {filteredCourses.map((c: any) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.code} — {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-4 pt-1">
+                <span className="text-xs font-medium text-muted-foreground">
+                  {t("reports.verificationFilters")}:
+                </span>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={onlyLocationVerified}
+                    onChange={(e) => setOnlyLocationVerified(e.target.checked)}
+                    className="h-4 w-4 accent-primary"
+                  />
+                  {t("reports.locationVerifiedOnly")}
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={onlyQrVerified}
+                    onChange={(e) => setOnlyQrVerified(e.target.checked)}
+                    className="h-4 w-4 accent-primary"
+                  />
+                  {t("reports.qrVerifiedOnly")}
+                </label>
+                {(onlyLocationVerified || onlyQrVerified) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setOnlyLocationVerified(false); setOnlyQrVerified(false); }}
+                  >
+                    <X className="h-3.5 w-3.5 mr-1" />{t("reports.clearFilters")}
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
           {isLoading && <p className="text-muted-foreground">{t("common.loading")}</p>}
 
