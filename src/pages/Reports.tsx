@@ -7,7 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, Users, CalendarCheck, Percent, FileDown, FileSpreadsheet, User, Building2, BookOpen, GraduationCap } from "lucide-react";
+import { BarChart3, Users, CalendarCheck, Percent, FileDown, FileSpreadsheet, User, Building2, BookOpen, GraduationCap, CalendarRange, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { exportToPDF, exportToExcel } from "@/lib/exportReports";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,6 +25,9 @@ export default function Reports() {
   const [selectedLevel, setSelectedLevel] = useState<string>("");
   const [selectedLevelModule, setSelectedLevelModule] = useState<string>("");
   const [activeTab, setActiveTab] = useState(role === "admin" ? "department" : "level");
+  // Date range filter (applied to course & student tabs)
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
 
   // Departments (admin only)
   const { data: departments = [] } = useQuery({
@@ -140,13 +145,15 @@ export default function Reports() {
 
   // Course report data
   const { data: reportData, isLoading } = useQuery({
-    queryKey: ["course-report", selectedCourse],
+    queryKey: ["course-report", selectedCourse, dateFrom, dateTo],
     enabled: !!selectedCourse && activeTab === "course",
     queryFn: async () => {
-      const { data: sessions } = await supabase
+      let sq = supabase
         .from("sessions").select("id, title, session_date")
-        .eq("course_id", selectedCourse).eq("status", "completed")
-        .order("session_date", { ascending: true });
+        .eq("course_id", selectedCourse).eq("status", "completed");
+      if (dateFrom) sq = sq.gte("session_date", dateFrom);
+      if (dateTo) sq = sq.lte("session_date", dateTo);
+      const { data: sessions } = await sq.order("session_date", { ascending: true });
 
       if (!sessions?.length) return { sessions: [], students: [], chartData: [] };
 
@@ -209,7 +216,7 @@ export default function Reports() {
 
   // Individual student report
   const { data: studentReport, isLoading: studentLoading } = useQuery({
-    queryKey: ["student-report", selectedStudent],
+    queryKey: ["student-report", selectedStudent, dateFrom, dateTo],
     enabled: !!selectedStudent && activeTab === "student",
     queryFn: async () => {
       const { data: profile } = await supabase.from("profiles")
@@ -219,8 +226,11 @@ export default function Reports() {
         .select("course_id, courses(id, name, code)").eq("user_id", selectedStudent);
 
       const courseResults = await Promise.all((enrollments || []).map(async (e: any) => {
-        const { data: sessions } = await supabase.from("sessions")
+        let sq = supabase.from("sessions")
           .select("id, title, session_date").eq("course_id", e.course_id).eq("status", "completed");
+        if (dateFrom) sq = sq.gte("session_date", dateFrom);
+        if (dateTo) sq = sq.lte("session_date", dateTo);
+        const { data: sessions } = await sq;
         const sessionIds = (sessions || []).map((s) => s.id);
         const { data: records } = sessionIds.length > 0
           ? await supabase.from("attendance_records").select("session_id")
@@ -384,6 +394,55 @@ export default function Reports() {
           </Button>
         </div>
       </div>
+
+      {/* Date range filter — applies to Course & Student tabs */}
+      {(activeTab === "course" || activeTab === "student") && (
+        <Card className="no-print">
+          <CardContent className="pt-4">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="flex items-center gap-2 mr-2 text-sm font-medium">
+                <CalendarRange className="h-4 w-4 text-primary" />
+                {t("reports.dateRange")}
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">{t("reports.from")}</Label>
+                <Input
+                  type="date"
+                  value={dateFrom}
+                  max={dateTo || undefined}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="w-[170px]"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">{t("reports.to")}</Label>
+                <Input
+                  type="date"
+                  value={dateTo}
+                  min={dateFrom || undefined}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="w-[170px]"
+                />
+              </div>
+              {(dateFrom || dateTo) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setDateFrom(""); setDateTo(""); }}
+                >
+                  <X className="h-3.5 w-3.5 mr-1" />
+                  {t("reports.clearDates")}
+                </Button>
+              )}
+              {(dateFrom || dateTo) && (
+                <Badge variant="secondary" className="ml-auto">
+                  {t("reports.filteredBy")}: {dateFrom || "…"} → {dateTo || "…"}
+                </Badge>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="no-print">
         <TabsList className="flex-wrap">
