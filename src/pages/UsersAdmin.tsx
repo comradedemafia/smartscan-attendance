@@ -685,7 +685,7 @@ export default function UsersAdmin() {
                       <Select value={listLevelId} onValueChange={(v) => { setListLevelId(v); setListCourseId("all"); }}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="all">{t("admin.allDepartments")}</SelectItem>
+                          <SelectItem value="all">{t("admin.selectLevel")}</SelectItem>
                           {(listSemesterId === "all" ? levels : levels.filter((l) => l.department_id === listSemesterId)).map((l) => (
                             <SelectItem key={l.id} value={l.id}>{l.code} — {l.name}</SelectItem>
                           ))}
@@ -985,7 +985,7 @@ export default function UsersAdmin() {
                   <Select value={staffLevelFilter} onValueChange={(v) => { setStaffLevelFilter(v); setStaffPage(1); }}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">{t("admin.allDepartments")}</SelectItem>
+                      <SelectItem value="all">{t("admin.selectLevel")}</SelectItem>
                       {levels.map((l) => (
                         <SelectItem key={l.id} value={l.id}>{l.code} — {l.name}</SelectItem>
                       ))}
