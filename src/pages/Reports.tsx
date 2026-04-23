@@ -25,6 +25,9 @@ export default function Reports() {
   const [selectedLevel, setSelectedLevel] = useState<string>("");
   const [selectedLevelModule, setSelectedLevelModule] = useState<string>("");
   const [activeTab, setActiveTab] = useState(role === "admin" ? "department" : "level");
+  // Date range filter (applied to course & student tabs)
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
 
   // Departments (admin only)
   const { data: departments = [] } = useQuery({
