@@ -28,6 +28,11 @@ export default function Reports() {
   // Date range filter (applied to course & student tabs)
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
+  // Verification filters (applied to course tab)
+  const [onlyLocationVerified, setOnlyLocationVerified] = useState(false);
+  const [onlyQrVerified, setOnlyQrVerified] = useState(false);
+  // Lecturer filter (admin only) — narrows the module dropdown
+  const [selectedLecturer, setSelectedLecturer] = useState<string>("");
 
   // Departments (admin only)
   const { data: departments = [] } = useQuery({
@@ -51,6 +56,26 @@ export default function Reports() {
       return data || [];
     },
   });
+
+  // Lecturers list (admin only) for lecturer filter
+  const { data: lecturers = [] } = useQuery({
+    queryKey: ["report-lecturers"],
+    enabled: !!user && role === "admin",
+    queryFn: async () => {
+      const { data: roleRows } = await supabase
+        .from("user_roles").select("user_id").eq("role", "lecturer");
+      const ids = (roleRows || []).map((r) => r.user_id);
+      if (!ids.length) return [];
+      const { data } = await supabase
+        .from("profiles").select("id, full_name, university_id").in("id", ids).order("full_name");
+      return data || [];
+    },
+  });
+
+  // Filter modules dropdown by selected lecturer (admin only)
+  const filteredCourses = (courses || []).filter((c: any) =>
+    !selectedLecturer || c.created_by === selectedLecturer
+  );
 
   // Levels
   const { data: levels = [] } = useQuery({
