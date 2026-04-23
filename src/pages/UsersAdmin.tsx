@@ -1265,6 +1265,195 @@ export default function UsersAdmin() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── Staff: View dialog ── */}
+      <Dialog open={!!viewStaffId} onOpenChange={(o) => { if (!o) setViewStaffId(null); }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          {(() => {
+            const lec: any = lecturers.find((p) => p.id === viewStaffId);
+            if (!lec) return null;
+            const lecCourseIds = lecturerCoursesMap[lec.id] || [];
+            const lecCourses = courses.filter((c) => lecCourseIds.includes(c.id));
+            const lecLevelIds = [...new Set(lecCourses.map((c) => c.level_id).filter(Boolean))];
+            const lecLevels = levels.filter((l) => lecLevelIds.includes(l.id));
+            const dept = departments.find((d) => d.id === lec.department_id);
+            const joined = lec.created_at ? new Date(lec.created_at).toLocaleDateString() : "—";
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-3">
+                    <div className="rounded-full bg-primary/10 text-primary h-10 w-10 flex items-center justify-center font-semibold">
+                      {lec.full_name?.charAt(0)?.toUpperCase() || "?"}
+                    </div>
+                    <div>
+                      <p className="text-base">{lec.full_name}</p>
+                      <p className="text-xs text-muted-foreground font-normal font-mono">{lec.university_id}</p>
+                    </div>
+                  </DialogTitle>
+                  <DialogDescription>{t("admin.staffRegistrationDetails")}</DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-5">
+                  {/* Personal info */}
+                  <section className="space-y-2">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {t("admin.staffPersonalInfo")}
+                    </h3>
+                    <div className="grid sm:grid-cols-2 gap-3 rounded-lg border p-3">
+                      <InfoRow icon={<IdCard className="h-3.5 w-3.5" />} label={t("admin.staffSortId")} value={lec.university_id} mono />
+                      <InfoRow icon={<Mail className="h-3.5 w-3.5" />} label={t("auth.email")} value={lec.email || "—"} />
+                      <InfoRow icon={<Phone className="h-3.5 w-3.5" />} label={t("admin.staffPhone")} value={lec.phone || "—"} />
+                      <InfoRow
+                        icon={<UserCheck className="h-3.5 w-3.5" />}
+                        label={t("auth.gender")}
+                        value={lec.gender === "M" ? t("auth.male") : lec.gender === "F" ? t("auth.female") : "—"}
+                      />
+                      <InfoRow icon={<Building2 className="h-3.5 w-3.5" />} label={t("admin.staffDepartment")} value={dept?.name || "—"} />
+                      <InfoRow icon={<Calendar className="h-3.5 w-3.5" />} label={t("admin.staffJoined")} value={joined} />
+                    </div>
+                  </section>
+
+                  {/* Assignments */}
+                  <section className="space-y-2">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {t("admin.staffAssignments")}
+                    </h3>
+                    <div className="rounded-lg border p-3 space-y-3">
+                      <div>
+                        <p className="text-xs font-medium mb-1.5 flex items-center gap-1">
+                          <GraduationCap className="h-3.5 w-3.5 text-primary" />
+                          {t("admin.lecturerLevel")}
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {lecLevels.length === 0 ? (
+                            <span className="text-xs text-muted-foreground">{t("admin.noLevelsAssigned")}</span>
+                          ) : (
+                            lecLevels.map((l) => (
+                              <Badge key={l.id} variant="outline" className="text-xs">
+                                {l.code} — {l.name}
+                              </Badge>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium mb-1.5 flex items-center gap-1">
+                          <BookOpen className="h-3.5 w-3.5 text-primary" />
+                          {t("admin.lecturerModules")}
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {lecCourses.length === 0 ? (
+                            <span className="text-xs text-muted-foreground">{t("admin.noModulesAssigned")}</span>
+                          ) : (
+                            lecCourses.map((c) => (
+                              <Badge key={c.id} variant="secondary" className="text-xs">
+                                {c.code} — {c.name}
+                              </Badge>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setViewStaffId(null)}>{t("common.close") || "Close"}</Button>
+                  <Button
+                    onClick={() => {
+                      setEditStaffId(lec.id);
+                      setEditForm({
+                        full_name: lec.full_name || "",
+                        university_id: lec.university_id || "",
+                        email: lec.email || "",
+                        phone: lec.phone || "",
+                        gender: lec.gender || "",
+                      });
+                      setViewStaffId(null);
+                    }}
+                  >
+                    <Pencil className="h-3.5 w-3.5 mr-1.5" />{t("admin.editStaff")}
+                  </Button>
+                </DialogFooter>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Staff: Edit dialog ── */}
+      <Dialog open={!!editStaffId} onOpenChange={(o) => { if (!o) setEditStaffId(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-4 w-4 text-primary" />
+              {t("admin.editStaff")}
+            </DialogTitle>
+            <DialogDescription>{t("admin.staffPersonalInfo")}</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">{t("admin.staffSortName")}</Label>
+              <Input value={editForm.full_name}
+                onChange={(e) => setEditForm((f) => ({ ...f, full_name: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">{t("admin.staffSortId")}</Label>
+              <Input value={editForm.university_id}
+                onChange={(e) => setEditForm((f) => ({ ...f, university_id: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">{t("auth.email")}</Label>
+              <Input type="email" value={editForm.email}
+                onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">{t("admin.staffPhone")}</Label>
+              <Input value={editForm.phone}
+                onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">{t("auth.gender")}</Label>
+              <Select value={editForm.gender || "unset"} onValueChange={(v) => setEditForm((f) => ({ ...f, gender: v === "unset" ? "" : v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unset">—</SelectItem>
+                  <SelectItem value="M">{t("auth.male")}</SelectItem>
+                  <SelectItem value="F">{t("auth.female")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditStaffId(null)} disabled={updateStaffMutation.isPending}>
+              {t("common.cancel")}
+            </Button>
+            <Button onClick={() => updateStaffMutation.mutate()}
+              disabled={updateStaffMutation.isPending || !editForm.full_name || !editForm.university_id}>
+              {updateStaffMutation.isPending ? "…" : t("common.save") || "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Staff: Delete confirmation ── */}
+      <AlertDialog open={!!deleteStaffId} onOpenChange={(o) => { if (!o) setDeleteStaffId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("admin.deleteStaff")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("admin.confirmDeleteStaff")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteStaffId && deleteStaffMutation.mutate(deleteStaffId)}
+            >
+              {t("common.delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
