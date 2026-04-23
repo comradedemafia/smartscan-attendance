@@ -1023,12 +1023,13 @@ export default function UsersAdmin() {
                         {t("admin.staffSortEmail")}
                       </SortableTh>
                       <TableHead>{t("admin.staffTeaching")}</TableHead>
+                      <TableHead className="text-right w-[140px]">{t("admin.staffActions")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {pagedLecturers.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                        <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                           {t("reports.noData")}
                         </TableCell>
                       </TableRow>
@@ -1066,6 +1067,33 @@ export default function UsersAdmin() {
                                 {lecCourses.length === 0 && lecLevels.length === 0 && (
                                   <span className="text-xs text-muted-foreground">—</span>
                                 )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="inline-flex items-center gap-1">
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title={t("admin.viewStaff")}
+                                  onClick={() => setViewStaffId(lec.id)}>
+                                  <Eye className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title={t("admin.editStaff")}
+                                  onClick={() => {
+                                    setEditStaffId(lec.id);
+                                    setEditForm({
+                                      full_name: lec.full_name || "",
+                                      university_id: lec.university_id || "",
+                                      email: lec.email || "",
+                                      phone: lec.phone || "",
+                                      gender: lec.gender || "",
+                                    });
+                                  }}>
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button size="sm" variant="ghost"
+                                  className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  title={t("admin.deleteStaff")}
+                                  onClick={() => setDeleteStaffId(lec.id)}>
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
                               </div>
                             </TableCell>
                           </TableRow>
