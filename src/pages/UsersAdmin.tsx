@@ -57,6 +57,12 @@ export default function UsersAdmin() {
   const [staffPage, setStaffPage] = useState(1);
   const [staffPageSize, setStaffPageSize] = useState(10);
 
+  // Staff view / edit / delete dialogs
+  const [viewStaffId, setViewStaffId] = useState<string | null>(null);
+  const [editStaffId, setEditStaffId] = useState<string | null>(null);
+  const [deleteStaffId, setDeleteStaffId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ full_name: "", university_id: "", email: "", phone: "", gender: "" });
+
   // ─── Students list extra filters ─────────────────────────────────
   const [listSemesterId, setListSemesterId] = useState<string>("all");
   const [listGenderFilter, setListGenderFilter] = useState<string>("all");
@@ -85,7 +91,7 @@ export default function UsersAdmin() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, full_name, university_id, email, gender, department_id")
+        .select("id, full_name, university_id, email, gender, department_id, phone, academic_year, created_at")
         .order("full_name");
       if (error) throw error;
       return data;
