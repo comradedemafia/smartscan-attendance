@@ -145,13 +145,15 @@ export default function Reports() {
 
   // Course report data
   const { data: reportData, isLoading } = useQuery({
-    queryKey: ["course-report", selectedCourse],
+    queryKey: ["course-report", selectedCourse, dateFrom, dateTo],
     enabled: !!selectedCourse && activeTab === "course",
     queryFn: async () => {
-      const { data: sessions } = await supabase
+      let sq = supabase
         .from("sessions").select("id, title, session_date")
-        .eq("course_id", selectedCourse).eq("status", "completed")
-        .order("session_date", { ascending: true });
+        .eq("course_id", selectedCourse).eq("status", "completed");
+      if (dateFrom) sq = sq.gte("session_date", dateFrom);
+      if (dateTo) sq = sq.lte("session_date", dateTo);
+      const { data: sessions } = await sq.order("session_date", { ascending: true });
 
       if (!sessions?.length) return { sessions: [], students: [], chartData: [] };
 
@@ -214,7 +216,7 @@ export default function Reports() {
 
   // Individual student report
   const { data: studentReport, isLoading: studentLoading } = useQuery({
-    queryKey: ["student-report", selectedStudent],
+    queryKey: ["student-report", selectedStudent, dateFrom, dateTo],
     enabled: !!selectedStudent && activeTab === "student",
     queryFn: async () => {
       const { data: profile } = await supabase.from("profiles")
@@ -224,8 +226,11 @@ export default function Reports() {
         .select("course_id, courses(id, name, code)").eq("user_id", selectedStudent);
 
       const courseResults = await Promise.all((enrollments || []).map(async (e: any) => {
-        const { data: sessions } = await supabase.from("sessions")
+        let sq = supabase.from("sessions")
           .select("id, title, session_date").eq("course_id", e.course_id).eq("status", "completed");
+        if (dateFrom) sq = sq.gte("session_date", dateFrom);
+        if (dateTo) sq = sq.lte("session_date", dateTo);
+        const { data: sessions } = await sq;
         const sessionIds = (sessions || []).map((s) => s.id);
         const { data: records } = sessionIds.length > 0
           ? await supabase.from("attendance_records").select("session_id")
