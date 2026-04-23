@@ -275,6 +275,47 @@ export default function UsersAdmin() {
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
+  // ─── Staff mutations ─────────────────────────────────────────────
+  const updateStaffMutation = useMutation({
+    mutationFn: async () => {
+      if (!editStaffId) return;
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          full_name: editForm.full_name,
+          university_id: editForm.university_id,
+          email: editForm.email || null,
+          phone: editForm.phone || null,
+          gender: editForm.gender || null,
+        })
+        .eq("id", editStaffId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["mu-profiles"] });
+      toast({ title: t("common.success"), description: t("admin.staffUpdated") });
+      setEditStaffId(null);
+    },
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
+  });
+
+  const deleteStaffMutation = useMutation({
+    mutationFn: async (staffId: string) => {
+      await supabase.from("course_lecturers").delete().eq("lecturer_id", staffId);
+      await supabase.from("user_roles").delete().eq("user_id", staffId);
+      const { error } = await supabase.from("profiles").delete().eq("id", staffId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["mu-profiles"] });
+      queryClient.invalidateQueries({ queryKey: ["mu-roles"] });
+      queryClient.invalidateQueries({ queryKey: ["mu-course-lecturers"] });
+      toast({ title: t("common.success"), description: t("admin.staffDeleted") });
+      setDeleteStaffId(null);
+    },
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
+  });
+
   // ─── Bulk CSV import — parse + validate + show preview ───────────
   const parseCsv = (text: string): { headers: string[]; rows: Record<string, string>[] } => {
     const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
