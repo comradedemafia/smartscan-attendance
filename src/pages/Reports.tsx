@@ -351,6 +351,16 @@ export default function Reports() {
 
   const handleExport = (format: "pdf" | "excel") => {
     const fn = format === "pdf" ? exportToPDF : exportToExcel;
+    const dateRange = (dateFrom || dateTo) ? { from: dateFrom, to: dateTo } : undefined;
+    const courseFilters: string[] = [];
+    if (activeTab === "course") {
+      if (onlyLocationVerified) courseFilters.push(t("reports.locationVerifiedOnly"));
+      if (onlyQrVerified) courseFilters.push(t("reports.qrVerifiedOnly"));
+      if (selectedLecturer) {
+        const lec = lecturers.find((l: any) => l.id === selectedLecturer);
+        if (lec) courseFilters.push(`${t("auth.lecturer")}: ${lec.full_name}`);
+      }
+    }
 
     if (activeTab === "department" && deptReport) {
       fn({
@@ -370,6 +380,8 @@ export default function Reports() {
       fn({
         title: t("reports.byCourse"),
         subtitle: courseName ? `${courseName.code} — ${courseName.name}` : undefined,
+        dateRange,
+        filters: courseFilters,
         columns: [
           { header: t("reports.studentName"), key: "name" },
           { header: t("reports.universityId"), key: "universityId" },
@@ -386,6 +398,7 @@ export default function Reports() {
       fn({
         title: t("reports.studentReport"),
         subtitle: `${studentReport.profile?.full_name} (${studentReport.profile?.university_id})`,
+        dateRange,
         columns: [
           { header: t("courses.code"), key: "courseCode" },
           { header: t("courses.name"), key: "courseName" },
