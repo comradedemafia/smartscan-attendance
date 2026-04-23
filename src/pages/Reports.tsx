@@ -170,14 +170,20 @@ export default function Reports() {
 
   // Course report data
   const { data: reportData, isLoading } = useQuery({
-    queryKey: ["course-report", selectedCourse, dateFrom, dateTo],
+    queryKey: ["course-report", selectedCourse, dateFrom, dateTo, onlyLocationVerified, onlyQrVerified],
     enabled: !!selectedCourse && activeTab === "course",
     queryFn: async () => {
       let sq = supabase
-        .from("sessions").select("id, title, session_date")
+        .from("sessions").select("id, title, session_date, latitude, longitude, qr_code_secret, qr_expires_at")
         .eq("course_id", selectedCourse).eq("status", "completed");
       if (dateFrom) sq = sq.gte("session_date", dateFrom);
       if (dateTo) sq = sq.lte("session_date", dateTo);
+      if (onlyLocationVerified) {
+        sq = sq.not("latitude", "is", null).not("longitude", "is", null);
+      }
+      if (onlyQrVerified) {
+        sq = sq.not("qr_code_secret", "is", null);
+      }
       const { data: sessions } = await sq.order("session_date", { ascending: true });
 
       if (!sessions?.length) return { sessions: [], students: [], chartData: [] };
