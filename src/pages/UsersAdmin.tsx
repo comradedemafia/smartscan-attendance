@@ -1358,7 +1358,7 @@ export default function UsersAdmin() {
                 </div>
 
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => setViewStaffId(null)}>{t("common.close") || "Close"}</Button>
+                  <Button variant="outline" onClick={() => setViewStaffId(null)}>{t("common.cancel")}</Button>
                   <Button
                     onClick={() => {
                       setEditStaffId(lec.id);
@@ -1430,7 +1430,7 @@ export default function UsersAdmin() {
             </Button>
             <Button onClick={() => updateStaffMutation.mutate()}
               disabled={updateStaffMutation.isPending || !editForm.full_name || !editForm.university_id}>
-              {updateStaffMutation.isPending ? "…" : t("common.save") || "Save"}
+              {updateStaffMutation.isPending ? "…" : t("common.save")}
             </Button>
           </DialogFooter>
         </DialogContent>
