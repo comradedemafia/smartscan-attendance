@@ -194,6 +194,8 @@ const translations = {
     "admin.availableCourses": "Available Modules",
      "admin.allDepartments": "All Departments",
     "admin.allSemesters": "All Semesters",
+    "admin.selectLevel": "Select Level",
+    "admin.allLevels": "All Levels",
     "admin.lecturerStatus": "Lecturer Status",
     "admin.registeredLecturers": "Assigned Lecturers",
     "admin.unregisteredLecturers": "Unassigned Lecturers",
