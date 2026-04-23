@@ -1559,12 +1559,12 @@ function LecturerRow({ lec, levels, coursesList, t }: {
   );
 }
 
-function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function InfoRow({ icon, label, value, mono }: { icon: React.ReactNode; label: string; value: string; mono?: boolean }) {
   return (
     <div className="flex items-center gap-2 rounded-md bg-muted/30 px-2 py-1.5">
       <span className="text-muted-foreground">{icon}</span>
       <span className="text-muted-foreground">{label}:</span>
-      <span className="font-medium truncate">{value}</span>
+      <span className={cn("font-medium truncate", mono && "font-mono text-xs")}>{value}</span>
     </div>
   );
 }
