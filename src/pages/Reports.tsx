@@ -717,16 +717,89 @@ export default function Reports() {
       {/* ── Course Report Tab ── */}
       {activeTab === "course" && (
         <>
-          <Select value={selectedCourse} onValueChange={setSelectedCourse}>
-            <SelectTrigger className="w-full max-w-xs no-print">
-              <SelectValue placeholder={t("reports.selectCourse")} />
-            </SelectTrigger>
-            <SelectContent>
-              {courses?.map((c) => (
-                <SelectItem key={c.id} value={c.id}>{c.code} — {c.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Card className="no-print">
+            <CardContent className="pt-4 space-y-3">
+              <div className="flex flex-wrap gap-3">
+                {role === "admin" && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">{t("auth.lecturer")}</Label>
+                    <Select
+                      value={selectedLecturer || "all"}
+                      onValueChange={(v) => {
+                        setSelectedLecturer(v === "all" ? "" : v);
+                        setSelectedCourse("");
+                      }}
+                    >
+                      <SelectTrigger className="w-[240px]">
+                        <SelectValue placeholder={t("reports.selectLecturer")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">{t("reports.allLecturers")}</SelectItem>
+                        {lecturers.map((l: any) => (
+                          <SelectItem key={l.id} value={l.id}>
+                            {l.full_name} ({l.university_id})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">{t("reports.selectCourse")}</Label>
+                  <Select value={selectedCourse} onValueChange={setSelectedCourse}>
+                    <SelectTrigger className="w-[280px]">
+                      <SelectValue placeholder={t("reports.selectCourse")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filteredCourses.length === 0 && (
+                        <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                          {t("reports.noData")}
+                        </div>
+                      )}
+                      {filteredCourses.map((c: any) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.code} — {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-4 pt-1">
+                <span className="text-xs font-medium text-muted-foreground">
+                  {t("reports.verificationFilters")}:
+                </span>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={onlyLocationVerified}
+                    onChange={(e) => setOnlyLocationVerified(e.target.checked)}
+                    className="h-4 w-4 accent-primary"
+                  />
+                  {t("reports.locationVerifiedOnly")}
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={onlyQrVerified}
+                    onChange={(e) => setOnlyQrVerified(e.target.checked)}
+                    className="h-4 w-4 accent-primary"
+                  />
+                  {t("reports.qrVerifiedOnly")}
+                </label>
+                {(onlyLocationVerified || onlyQrVerified) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setOnlyLocationVerified(false); setOnlyQrVerified(false); }}
+                  >
+                    <X className="h-3.5 w-3.5 mr-1" />{t("reports.clearFilters")}
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
           {isLoading && <p className="text-muted-foreground">{t("common.loading")}</p>}
 
