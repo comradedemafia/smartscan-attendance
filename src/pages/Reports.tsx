@@ -395,6 +395,55 @@ export default function Reports() {
         </div>
       </div>
 
+      {/* Date range filter — applies to Course & Student tabs */}
+      {(activeTab === "course" || activeTab === "student") && (
+        <Card className="no-print">
+          <CardContent className="pt-4">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="flex items-center gap-2 mr-2 text-sm font-medium">
+                <CalendarRange className="h-4 w-4 text-primary" />
+                {t("reports.dateRange")}
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">{t("reports.from")}</Label>
+                <Input
+                  type="date"
+                  value={dateFrom}
+                  max={dateTo || undefined}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="w-[170px]"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">{t("reports.to")}</Label>
+                <Input
+                  type="date"
+                  value={dateTo}
+                  min={dateFrom || undefined}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="w-[170px]"
+                />
+              </div>
+              {(dateFrom || dateTo) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setDateFrom(""); setDateTo(""); }}
+                >
+                  <X className="h-3.5 w-3.5 mr-1" />
+                  {t("reports.clearDates")}
+                </Button>
+              )}
+              {(dateFrom || dateTo) && (
+                <Badge variant="secondary" className="ml-auto">
+                  {t("reports.filteredBy")}: {dateFrom || "…"} → {dateTo || "…"}
+                </Badge>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Tabs value={activeTab} onValueChange={setActiveTab} className="no-print">
         <TabsList className="flex-wrap">
           {role === "admin" && <TabsTrigger value="department">{t("reports.byDepartment")}</TabsTrigger>}
