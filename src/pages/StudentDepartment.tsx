@@ -306,6 +306,21 @@ export default function StudentDepartment() {
                   ))}
                 </SelectContent>
               </Select>
+              <Select value={selectedSemesterId} onValueChange={setSelectedSemesterId}>
+                <SelectTrigger className="w-[180px] h-8 text-xs">
+                  <SelectValue placeholder={t("dept.selectSemesterFilter")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("dept.allSemesters")}</SelectItem>
+                  {semesters
+                    .filter((s: any) => selectedLevelId === "all" || s.level_id === selectedLevelId)
+                    .map((sem: any) => (
+                      <SelectItem key={sem.id} value={sem.id}>
+                        {sem.name} ({sem.code})
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardContent>
