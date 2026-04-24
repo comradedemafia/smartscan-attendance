@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { BookOpen, LogIn, LogOut, GraduationCap, Calendar, CheckCircle2, Filter, Users } from "lucide-react";
+import { BookOpen, LogIn, LogOut, GraduationCap, Calendar, CheckCircle2, Filter, Users, ChevronDown, ChevronRight, Building2, Star, Lock } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function StudentDepartment() {
@@ -21,6 +21,9 @@ export default function StudentDepartment() {
   const [selectedLevelId, setSelectedLevelId] = useState<string | "all">("all");
   const [selectedSemesterId, setSelectedSemesterId] = useState<string | "all">("all");
   const [confirmLeaveId, setConfirmLeaveId] = useState<string | null>(null);
+  const [deptExpanded, setDeptExpanded] = useState(true);
+  const [expandedLevels, setExpandedLevels] = useState<Set<string>>(new Set());
+  const [expandedSemesters, setExpandedSemesters] = useState<Set<string>>(new Set());
 
   // Get student profile with department info
   const { data: studentProfile } = useQuery({
@@ -60,7 +63,7 @@ export default function StudentDepartment() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("courses")
-        .select("id, name, code, level_id, semester_id, description")
+        .select("id, name, code, level_id, semester_id, description, is_core, selection_deadline")
         .eq("department_id", departmentId)
         .order("code");
       if (error) throw error;
