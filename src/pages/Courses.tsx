@@ -217,6 +217,24 @@ export default function Courses() {
           <div>
             <p className="text-xs font-mono text-muted-foreground">{course.code}</p>
             <CardTitle className="text-base mt-1">{course.name}</CardTitle>
+            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+              {course.is_core ? (
+                <Badge variant="default" className="text-[10px] gap-1"><Star className="h-3 w-3" />{t("courses.coreShort")}</Badge>
+              ) : (
+                <Badge variant="secondary" className="text-[10px]">{t("courses.optionalShort")}</Badge>
+              )}
+              {!course.is_core && course.selection_deadline && (
+                (() => {
+                  const closed = new Date(course.selection_deadline) <= new Date();
+                  return (
+                    <Badge variant="outline" className="text-[10px] gap-1">
+                      {closed ? <Lock className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
+                      {closed ? t("courses.selectionClosed") : new Date(course.selection_deadline).toLocaleString()}
+                    </Badge>
+                  );
+                })()
+              )}
+            </div>
           </div>
           {(isAdmin || (isLecturer && course.created_by === user?.id)) && (
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -244,13 +262,33 @@ export default function Courses() {
               </Button>
             )}
             {isStudent && (
-              myEnrollments.includes(course.id) ? (
-                <Badge variant="secondary" className="text-xs">✓ {t("courses.enrolled")}</Badge>
-              ) : (
-                <Button size="sm" onClick={() => enrollMutation.mutate(course.id)} disabled={enrollMutation.isPending}>
-                  <LogIn className="h-3.5 w-3.5 mr-1" />{t("courses.joinCourse")}
-                </Button>
-              )
+              (() => {
+                const enrolled = myEnrollments.includes(course.id);
+                const deadlinePassed = course.selection_deadline && new Date(course.selection_deadline) <= new Date();
+                if (course.is_core) {
+                  return <Badge variant="default" className="text-xs gap-1"><Star className="h-3 w-3" />{t("courses.compulsoryNotice").split(' — ')[0]}</Badge>;
+                }
+                if (enrolled) {
+                  return (
+                    <div className="flex items-center gap-1">
+                      <Badge variant="secondary" className="text-xs">✓ {t("courses.selected")}</Badge>
+                      {!deadlinePassed && (
+                        <Button size="sm" variant="ghost" onClick={() => unenrollMutation.mutate(course.id)} disabled={unenrollMutation.isPending}>
+                          <LogOut className="h-3.5 w-3.5 mr-1" />{t("courses.unenroll")}
+                        </Button>
+                      )}
+                    </div>
+                  );
+                }
+                if (deadlinePassed) {
+                  return <Badge variant="outline" className="text-xs gap-1"><Lock className="h-3 w-3" />{t("courses.selectionClosed")}</Badge>;
+                }
+                return (
+                  <Button size="sm" onClick={() => enrollMutation.mutate(course.id)} disabled={enrollMutation.isPending}>
+                    <LogIn className="h-3.5 w-3.5 mr-1" />{t("courses.joinCourse")}
+                  </Button>
+                );
+              })()
             )}
           </div>
         </div>
