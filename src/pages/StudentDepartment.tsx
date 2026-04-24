@@ -164,6 +164,43 @@ export default function StudentDepartment() {
     }
   }, [levels, studentProfile?.study_year]);
 
+  // Auto-expand the student's level and its semesters once loaded
+  useEffect(() => {
+    if (levels.length > 0 && studentProfile?.study_year && expandedLevels.size === 0) {
+      const matched = levels.find((l) => l.sort_order === studentProfile.study_year);
+      if (matched) {
+        setExpandedLevels(new Set([matched.id]));
+      } else {
+        setExpandedLevels(new Set([levels[0].id]));
+      }
+    }
+  }, [levels, studentProfile?.study_year]);
+
+  useEffect(() => {
+    if (semesters.length > 0 && expandedSemesters.size === 0) {
+      // Expand all semesters belonging to currently expanded levels by default
+      const ids = (semesters as any[])
+        .filter((s) => expandedLevels.has(s.level_id))
+        .map((s) => s.id);
+      if (ids.length > 0) setExpandedSemesters(new Set(ids));
+    }
+  }, [semesters, expandedLevels]);
+
+  const toggleLevel = (id: string) => {
+    setExpandedLevels((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+  const toggleSemester = (id: string) => {
+    setExpandedSemesters((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
   const dept = studentProfile?.departments as any;
 
   if (!dept) {
