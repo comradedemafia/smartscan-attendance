@@ -320,133 +320,52 @@ export default function StudentDepartment() {
             <Badge variant="outline" className="text-xs font-mono">
               {level.code}
             </Badge>
+            <Badge variant="secondary" className="text-xs">{level.totalCourses}</Badge>
           </h2>
-          {level.courses.length === 0 ? (
+          {level.totalCourses === 0 ? (
             <Card>
               <CardContent className="py-6 text-center">
                 <p className="text-sm text-muted-foreground">{t("dept.noModulesInLevel")}</p>
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {level.courses.map((course) => {
-                const isEnrolled = myEnrollments.includes(course.id);
-                return (
-                  <Card
-                    key={course.id}
-                    className={`transition-all ${isEnrolled ? "border-primary/40 bg-primary/5" : ""}`}
-                  >
-                    <CardContent className="p-4 space-y-3">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <Badge variant="outline" className="text-xs font-mono">
-                            {course.code}
-                          </Badge>
-                          {isEnrolled && (
-                            <CheckCircle2 className="h-4 w-4 text-primary" />
-                          )}
-                        </div>
-                        <p className="text-sm font-medium leading-tight">{course.name}</p>
-                        {course.description && (
-                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                            {course.description}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Users className="h-3.5 w-3.5" />
-                        <span>{enrollmentCounts[course.id] || 0} {t("dept.studentsEnrolled")}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {isEnrolled ? (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-xs flex-1"
-                              onClick={() => navigate("/sessions")}
-                            >
-                              <Calendar className="h-3.5 w-3.5 mr-1" />
-                              {t("dept.sessions")}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-xs text-destructive"
-                              onClick={() => setConfirmLeaveId(course.id)}
-                              disabled={unenrollMutation.isPending}
-                            >
-                              <LogOut className="h-3.5 w-3.5 mr-1" />
-                              {t("dept.leave")}
-                            </Button>
-                          </>
-                        ) : (
-                          <Button
-                            size="sm"
-                            className="text-xs w-full"
-                            onClick={() => enrollMutation.mutate(course.id)}
-                            disabled={enrollMutation.isPending}
-                          >
-                            <LogIn className="h-3.5 w-3.5 mr-1" />
-                            {t("courses.joinCourse")}
-                          </Button>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+            <div className="space-y-4">
+              {level.semesters.map((sem: any) => (
+                <div key={sem.id}>
+                  <h3 className="text-sm font-semibold mb-2 flex items-center gap-2 text-muted-foreground">
+                    <Calendar className="h-4 w-4" />
+                    {sem.name}
+                    <Badge variant="outline" className="text-[10px] font-mono">{sem.code}</Badge>
+                    <Badge variant="secondary" className="text-[10px]">{sem.courses.length}</Badge>
+                  </h3>
+                  {sem.courses.length === 0 ? (
+                    <p className="text-xs text-muted-foreground pl-6">{t("dept.noModulesInLevel")}</p>
+                  ) : (
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {sem.courses.map((course: any) => renderCourseCard(course))}
+                    </div>
+                  )}
+                </div>
+              ))}
+              {level.coursesNoSemester.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold mb-2 text-muted-foreground">{t("dept.otherModules")}</h3>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {level.coursesNoSemester.map((course: any) => renderCourseCard(course))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
       ))}
 
-      {/* Unassigned modules */}
-      {unassignedCourses.length > 0 && (
+      {/* Unassigned modules (no level set) */}
+      {unassignedCourses.length > 0 && selectedSemesterId === "all" && (
         <div>
           <h2 className="text-lg font-semibold mb-3">{t("dept.otherModules")}</h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {unassignedCourses.map((course) => {
-              const isEnrolled = myEnrollments.includes(course.id);
-              return (
-                <Card
-                  key={course.id}
-                  className={`transition-all ${isEnrolled ? "border-primary/40 bg-primary/5" : ""}`}
-                >
-                  <CardContent className="p-4 space-y-3">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <Badge variant="outline" className="text-xs font-mono">
-                          {course.code}
-                        </Badge>
-                        {isEnrolled && <CheckCircle2 className="h-4 w-4 text-primary" />}
-                      </div>
-                      <p className="text-sm font-medium">{course.name}</p>
-                    </div>
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Users className="h-3.5 w-3.5" />
-                      <span>{enrollmentCounts[course.id] || 0} {t("dept.studentsEnrolled")}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {isEnrolled ? (
-                        <>
-                          <Button size="sm" variant="outline" className="text-xs flex-1" onClick={() => navigate("/sessions")}>
-                            <Calendar className="h-3.5 w-3.5 mr-1" />{t("dept.sessions")}
-                          </Button>
-                          <Button size="sm" variant="ghost" className="text-xs text-destructive" onClick={() => setConfirmLeaveId(course.id)} disabled={unenrollMutation.isPending}>
-                            <LogOut className="h-3.5 w-3.5 mr-1" />{t("dept.leave")}
-                          </Button>
-                        </>
-                      ) : (
-                        <Button size="sm" className="text-xs w-full" onClick={() => enrollMutation.mutate(course.id)} disabled={enrollMutation.isPending}>
-                          <LogIn className="h-3.5 w-3.5 mr-1" />{t("courses.joinCourse")}
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+            {unassignedCourses.map((course) => renderCourseCard(course))}
           </div>
         </div>
       )}
