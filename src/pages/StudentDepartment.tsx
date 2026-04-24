@@ -179,6 +179,46 @@ export default function StudentDepartment() {
     );
   }
 
+  const renderCourseCard = (course: any) => {
+    const isEnrolled = myEnrollments.includes(course.id);
+    return (
+      <Card key={course.id} className={`transition-all ${isEnrolled ? "border-primary/40 bg-primary/5" : ""}`}>
+        <CardContent className="p-4 space-y-3">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <Badge variant="outline" className="text-xs font-mono">{course.code}</Badge>
+              {isEnrolled && <CheckCircle2 className="h-4 w-4 text-primary" />}
+            </div>
+            <p className="text-sm font-medium leading-tight">{course.name}</p>
+            {course.description && (
+              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{course.description}</p>
+            )}
+          </div>
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Users className="h-3.5 w-3.5" />
+            <span>{enrollmentCounts[course.id] || 0} {t("dept.studentsEnrolled")}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {isEnrolled ? (
+              <>
+                <Button size="sm" variant="outline" className="text-xs flex-1" onClick={() => navigate("/sessions")}>
+                  <Calendar className="h-3.5 w-3.5 mr-1" />{t("dept.sessions")}
+                </Button>
+                <Button size="sm" variant="ghost" className="text-xs text-destructive" onClick={() => setConfirmLeaveId(course.id)} disabled={unenrollMutation.isPending}>
+                  <LogOut className="h-3.5 w-3.5 mr-1" />{t("dept.leave")}
+                </Button>
+              </>
+            ) : (
+              <Button size="sm" className="text-xs w-full" onClick={() => enrollMutation.mutate(course.id)} disabled={enrollMutation.isPending}>
+                <LogIn className="h-3.5 w-3.5 mr-1" />{t("courses.joinCourse")}
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
   // Filter levels based on selection
   const filteredLevels = selectedLevelId === "all"
     ? levels
