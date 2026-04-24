@@ -60,13 +60,31 @@ export default function StudentDepartment() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("courses")
-        .select("id, name, code, level_id, description")
+        .select("id, name, code, level_id, semester_id, description")
         .eq("department_id", departmentId)
         .order("code");
       if (error) throw error;
       return data;
     },
     enabled: !!departmentId,
+  });
+
+  // Get semesters for this department's levels
+  const { data: semesters = [] } = useQuery({
+    queryKey: ["dept-semesters", departmentId],
+    queryFn: async () => {
+      if (!departmentId) return [];
+      const levelIds = (levels || []).map((l) => l.id);
+      if (levelIds.length === 0) return [];
+      const { data, error } = await (supabase as any)
+        .from("semesters")
+        .select("id, name, code, level_id, sort_order")
+        .in("level_id", levelIds)
+        .order("sort_order");
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!departmentId && levels.length > 0,
   });
 
   // Get student's enrollments
