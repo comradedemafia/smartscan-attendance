@@ -169,8 +169,10 @@ export type Database = {
           department_id: string | null
           description: string | null
           id: string
+          is_core: boolean
           level_id: string | null
           name: string
+          selection_deadline: string | null
           semester_id: string | null
           updated_at: string
         }
@@ -181,8 +183,10 @@ export type Database = {
           department_id?: string | null
           description?: string | null
           id?: string
+          is_core?: boolean
           level_id?: string | null
           name: string
+          selection_deadline?: string | null
           semester_id?: string | null
           updated_at?: string
         }
@@ -193,8 +197,10 @@ export type Database = {
           department_id?: string | null
           description?: string | null
           id?: string
+          is_core?: boolean
           level_id?: string | null
           name?: string
+          selection_deadline?: string | null
           semester_id?: string | null
           updated_at?: string
         }

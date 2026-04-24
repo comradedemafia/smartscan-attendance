@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useToast } from "@/hooks/use-toast";
-import { BookOpen, Plus, Trash2, Edit, Users, LogIn, LogOut, UserCog, Building2, ChevronDown, ChevronRight, GraduationCap } from "lucide-react";
+import { BookOpen, Plus, Trash2, Edit, Users, LogIn, LogOut, UserCog, Building2, ChevronDown, ChevronRight, GraduationCap, Lock, Star, Clock } from "lucide-react";
 
 type Level = { id: string; name: string; code: string; department_id: string; sort_order: number };
 
@@ -32,6 +32,8 @@ export default function Courses() {
   const [courseDesc, setCourseDesc] = useState("");
   const [courseDeptId, setCourseDeptId] = useState("");
   const [courseLevelId, setCourseLevelId] = useState("");
+  const [courseIsCore, setCourseIsCore] = useState(true);
+  const [courseSelectionDeadline, setCourseSelectionDeadline] = useState("");
   const [expandedDept, setExpandedDept] = useState<string | null>(null);
   const [expandedLevel, setExpandedLevel] = useState<string | null>(null);
 
@@ -145,6 +147,8 @@ export default function Courses() {
       const { data: newCourse, error } = await supabase.from("courses").insert({
         code: courseCode.toUpperCase(), name: courseName, description: courseDesc || null,
         department_id: deptId, level_id: courseLevelId || null, created_by: user!.id,
+        is_core: courseIsCore,
+        selection_deadline: !courseIsCore && courseSelectionDeadline ? new Date(courseSelectionDeadline).toISOString() : null,
       }).select("id").single();
       if (error) throw error;
       if (isLecturer && newCourse) {
@@ -164,6 +168,8 @@ export default function Courses() {
       const { error } = await supabase.from("courses").update({
         code: courseCode.toUpperCase(), name: courseName, description: courseDesc || null,
         department_id: courseDeptId || null, level_id: courseLevelId || null,
+        is_core: courseIsCore,
+        selection_deadline: !courseIsCore && courseSelectionDeadline ? new Date(courseSelectionDeadline).toISOString() : null,
       }).eq("id", editingCourse.id);
       if (error) throw error;
     },
@@ -187,8 +193,18 @@ export default function Courses() {
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
-  const resetForm = () => { setOpen(false); setEditingCourse(null); setCourseCode(""); setCourseName(""); setCourseDesc(""); setCourseDeptId(""); setCourseLevelId(""); };
-  const openEditCourse = (course: any) => { setEditingCourse(course); setCourseCode(course.code); setCourseName(course.name); setCourseDesc(course.description || ""); setCourseDeptId(course.department_id || ""); setCourseLevelId(course.level_id || ""); setOpen(true); };
+  const resetForm = () => { setOpen(false); setEditingCourse(null); setCourseCode(""); setCourseName(""); setCourseDesc(""); setCourseDeptId(""); setCourseLevelId(""); setCourseIsCore(true); setCourseSelectionDeadline(""); };
+  const openEditCourse = (course: any) => {
+    setEditingCourse(course);
+    setCourseCode(course.code);
+    setCourseName(course.name);
+    setCourseDesc(course.description || "");
+    setCourseDeptId(course.department_id || "");
+    setCourseLevelId(course.level_id || "");
+    setCourseIsCore(course.is_core ?? true);
+    setCourseSelectionDeadline(course.selection_deadline ? new Date(course.selection_deadline).toISOString().slice(0, 16) : "");
+    setOpen(true);
+  };
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); if (!courseCode.trim() || !courseName.trim()) return; editingCourse ? updateCourseMutation.mutate() : createCourseMutation.mutate(); };
 
   const deptLevels = (deptId: string) => allLevels.filter((l) => l.department_id === deptId);
@@ -201,6 +217,24 @@ export default function Courses() {
           <div>
             <p className="text-xs font-mono text-muted-foreground">{course.code}</p>
             <CardTitle className="text-base mt-1">{course.name}</CardTitle>
+            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+              {course.is_core ? (
+                <Badge variant="default" className="text-[10px] gap-1"><Star className="h-3 w-3" />{t("courses.coreShort")}</Badge>
+              ) : (
+                <Badge variant="secondary" className="text-[10px]">{t("courses.optionalShort")}</Badge>
+              )}
+              {!course.is_core && course.selection_deadline && (
+                (() => {
+                  const closed = new Date(course.selection_deadline) <= new Date();
+                  return (
+                    <Badge variant="outline" className="text-[10px] gap-1">
+                      {closed ? <Lock className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
+                      {closed ? t("courses.selectionClosed") : new Date(course.selection_deadline).toLocaleString()}
+                    </Badge>
+                  );
+                })()
+              )}
+            </div>
           </div>
           {(isAdmin || (isLecturer && course.created_by === user?.id)) && (
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -228,13 +262,33 @@ export default function Courses() {
               </Button>
             )}
             {isStudent && (
-              myEnrollments.includes(course.id) ? (
-                <Badge variant="secondary" className="text-xs">✓ {t("courses.enrolled")}</Badge>
-              ) : (
-                <Button size="sm" onClick={() => enrollMutation.mutate(course.id)} disabled={enrollMutation.isPending}>
-                  <LogIn className="h-3.5 w-3.5 mr-1" />{t("courses.joinCourse")}
-                </Button>
-              )
+              (() => {
+                const enrolled = myEnrollments.includes(course.id);
+                const deadlinePassed = course.selection_deadline && new Date(course.selection_deadline) <= new Date();
+                if (course.is_core) {
+                  return <Badge variant="default" className="text-xs gap-1"><Star className="h-3 w-3" />{t("courses.compulsoryNotice").split(' — ')[0]}</Badge>;
+                }
+                if (enrolled) {
+                  return (
+                    <div className="flex items-center gap-1">
+                      <Badge variant="secondary" className="text-xs">✓ {t("courses.selected")}</Badge>
+                      {!deadlinePassed && (
+                        <Button size="sm" variant="ghost" onClick={() => unenrollMutation.mutate(course.id)} disabled={unenrollMutation.isPending}>
+                          <LogOut className="h-3.5 w-3.5 mr-1" />{t("courses.unenroll")}
+                        </Button>
+                      )}
+                    </div>
+                  );
+                }
+                if (deadlinePassed) {
+                  return <Badge variant="outline" className="text-xs gap-1"><Lock className="h-3 w-3" />{t("courses.selectionClosed")}</Badge>;
+                }
+                return (
+                  <Button size="sm" onClick={() => enrollMutation.mutate(course.id)} disabled={enrollMutation.isPending}>
+                    <LogIn className="h-3.5 w-3.5 mr-1" />{t("courses.joinCourse")}
+                  </Button>
+                );
+              })()
             )}
           </div>
         </div>
@@ -439,6 +493,27 @@ export default function Courses() {
                   <Label>{t("courses.description")}</Label>
                   <Textarea value={courseDesc} onChange={(e) => setCourseDesc(e.target.value)} placeholder="Optional description" />
                 </div>
+                <div className="space-y-2">
+                  <Label>{t("courses.moduleType")}</Label>
+                  <Select value={courseIsCore ? "core" : "optional"} onValueChange={(v) => setCourseIsCore(v === "core")}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="core">⭐ {t("courses.core")}</SelectItem>
+                      <SelectItem value="optional">{t("courses.optional")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {!courseIsCore && (
+                  <div className="space-y-2">
+                    <Label>{t("courses.selectionDeadline")}</Label>
+                    <Input
+                      type="datetime-local"
+                      value={courseSelectionDeadline}
+                      onChange={(e) => setCourseSelectionDeadline(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">{t("courses.selectionDeadlineHint")}</p>
+                  </div>
+                )}
                 <Button type="submit" className="w-full" disabled={createCourseMutation.isPending || updateCourseMutation.isPending}>
                   {editingCourse ? t("common.save") : t("courses.create")}
                 </Button>
