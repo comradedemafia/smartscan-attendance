@@ -331,31 +331,29 @@ export default function StudentDepartment() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight font-['Space_Grotesk']">
-          {t("dept.myModules")}
+          {t("dept.myDepartmentTitle") || "My Department"}
         </h1>
         <p className="text-muted-foreground">
           {profile?.full_name} • {dept.name}
         </p>
       </div>
 
-      {/* Department info + Level filter */}
-      <Card className="bg-primary/5 border-primary/20">
-        <CardContent className="py-4">
+      {/* Filters */}
+      <Card>
+        <CardContent className="py-3">
           <div className="flex items-center justify-between flex-wrap gap-3">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <GraduationCap className="h-4 w-4" />
-              <span>{dept.name}</span>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Badge variant="secondary">
+                {myEnrollments.length} {t("dept.modulesJoined")}
+              </Badge>
               {studentProfile?.academic_year && (
                 <span className="flex items-center gap-1">
                   <Calendar className="h-3.5 w-3.5" />
                   {studentProfile.academic_year}
                 </span>
               )}
-              <Badge variant="secondary">
-                {myEnrollments.length} {t("dept.modulesJoined")}
-              </Badge>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Filter className="h-4 w-4 text-muted-foreground" />
               <Select value={selectedLevelId} onValueChange={setSelectedLevelId}>
                 <SelectTrigger className="w-[180px] h-8 text-xs">
@@ -390,64 +388,109 @@ export default function StudentDepartment() {
         </CardContent>
       </Card>
 
-      {/* Modules by Level */}
-      {coursesByLevel.map((level) => (
-        <div key={level.id}>
-          <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
-            <BookOpen className="h-5 w-5 text-primary" />
-            {level.name}
-            <Badge variant="outline" className="text-xs font-mono">
-              {level.code}
-            </Badge>
-            <Badge variant="secondary" className="text-xs">{level.totalCourses}</Badge>
-          </h2>
-          {level.totalCourses === 0 ? (
-            <Card>
-              <CardContent className="py-6 text-center">
-                <p className="text-sm text-muted-foreground">{t("dept.noModulesInLevel")}</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {level.semesters.map((sem: any) => (
-                <div key={sem.id}>
-                  <h3 className="text-sm font-semibold mb-2 flex items-center gap-2 text-muted-foreground">
-                    <Calendar className="h-4 w-4" />
-                    {sem.name}
-                    <Badge variant="outline" className="text-[10px] font-mono">{sem.code}</Badge>
-                    <Badge variant="secondary" className="text-[10px]">{sem.courses.length}</Badge>
-                  </h3>
-                  {sem.courses.length === 0 ? (
-                    <p className="text-xs text-muted-foreground pl-6">{t("dept.noModulesInLevel")}</p>
-                  ) : (
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                      {sem.courses.map((course: any) => renderCourseCard(course))}
+      {/* Department card (collapsible) */}
+      <Card className="border-primary/20">
+        <button
+          type="button"
+          onClick={() => setDeptExpanded((v) => !v)}
+          className="w-full flex items-center gap-3 p-4 hover:bg-muted/40 transition-colors text-left"
+        >
+          {deptExpanded ? <ChevronDown className="h-5 w-5 text-primary" /> : <ChevronRight className="h-5 w-5 text-primary" />}
+          <Building2 className="h-5 w-5 text-primary" />
+          <div className="flex-1">
+            <h2 className="text-base font-semibold leading-tight">{dept.name}</h2>
+            {dept.description && <p className="text-xs text-muted-foreground line-clamp-1">{dept.description}</p>}
+          </div>
+          <Badge variant="secondary" className="text-xs">
+            {courses.length} {t("dept.modules") || "modules"}
+          </Badge>
+        </button>
+
+        {deptExpanded && (
+          <CardContent className="pt-0 pb-4 space-y-3">
+            {coursesByLevel.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-6">{t("dept.noLevels")}</p>
+            )}
+
+            {coursesByLevel.map((level) => {
+              const isLevelOpen = expandedLevels.has(level.id);
+              return (
+                <div key={level.id} className="border rounded-lg overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => toggleLevel(level.id)}
+                    className="w-full flex items-center gap-2 p-3 bg-muted/30 hover:bg-muted/50 transition-colors text-left"
+                  >
+                    {isLevelOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    <GraduationCap className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-semibold flex-1">{level.name}</span>
+                    <Badge variant="outline" className="text-[10px] font-mono">{level.code}</Badge>
+                    <Badge variant="secondary" className="text-[10px]">{level.totalCourses}</Badge>
+                  </button>
+
+                  {isLevelOpen && (
+                    <div className="p-3 space-y-3">
+                      {level.totalCourses === 0 ? (
+                        <p className="text-xs text-muted-foreground text-center py-3">{t("dept.noModulesInLevel")}</p>
+                      ) : (
+                        <>
+                          {level.semesters.map((sem: any) => {
+                            const isSemOpen = expandedSemesters.has(sem.id);
+                            return (
+                              <div key={sem.id} className="border rounded-md">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleSemester(sem.id)}
+                                  className="w-full flex items-center gap-2 p-2 hover:bg-muted/40 transition-colors text-left"
+                                >
+                                  {isSemOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                                  <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                                  <span className="text-xs font-semibold flex-1">{sem.name}</span>
+                                  <Badge variant="outline" className="text-[10px] font-mono">{sem.code}</Badge>
+                                  <Badge variant="secondary" className="text-[10px]">{sem.courses.length}</Badge>
+                                </button>
+                                {isSemOpen && (
+                                  <div className="p-2">
+                                    {sem.courses.length === 0 ? (
+                                      <p className="text-xs text-muted-foreground text-center py-2">{t("dept.noModulesInLevel")}</p>
+                                    ) : (
+                                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                        {sem.courses.map((course: any) => renderCourseCard(course))}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                          {level.coursesNoSemester.length > 0 && (
+                            <div>
+                              <h4 className="text-xs font-semibold mb-2 text-muted-foreground px-1">{t("dept.otherModules")}</h4>
+                              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                {level.coursesNoSemester.map((course: any) => renderCourseCard(course))}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
-              ))}
-              {level.coursesNoSemester.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-semibold mb-2 text-muted-foreground">{t("dept.otherModules")}</h3>
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {level.coursesNoSemester.map((course: any) => renderCourseCard(course))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      ))}
+              );
+            })}
 
-      {/* Unassigned modules (no level set) */}
-      {unassignedCourses.length > 0 && selectedSemesterId === "all" && (
-        <div>
-          <h2 className="text-lg font-semibold mb-3">{t("dept.otherModules")}</h2>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {unassignedCourses.map((course) => renderCourseCard(course))}
-          </div>
-        </div>
-      )}
+            {/* Unassigned modules (no level set) */}
+            {unassignedCourses.length > 0 && selectedSemesterId === "all" && (
+              <div className="border rounded-lg p-3">
+                <h3 className="text-sm font-semibold mb-3">{t("dept.otherModules")}</h3>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {unassignedCourses.map((course) => renderCourseCard(course))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        )}
+      </Card>
 
       {courses.length === 0 && (
         <Card>
