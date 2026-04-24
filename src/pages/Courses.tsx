@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useToast } from "@/hooks/use-toast";
-import { BookOpen, Plus, Trash2, Edit, Users, LogIn, LogOut, UserCog, Building2, ChevronDown, ChevronRight, GraduationCap } from "lucide-react";
+import { BookOpen, Plus, Trash2, Edit, Users, LogIn, LogOut, UserCog, Building2, ChevronDown, ChevronRight, GraduationCap, Lock, Star, Clock } from "lucide-react";
 
 type Level = { id: string; name: string; code: string; department_id: string; sort_order: number };
 
@@ -32,6 +32,8 @@ export default function Courses() {
   const [courseDesc, setCourseDesc] = useState("");
   const [courseDeptId, setCourseDeptId] = useState("");
   const [courseLevelId, setCourseLevelId] = useState("");
+  const [courseIsCore, setCourseIsCore] = useState(true);
+  const [courseSelectionDeadline, setCourseSelectionDeadline] = useState("");
   const [expandedDept, setExpandedDept] = useState<string | null>(null);
   const [expandedLevel, setExpandedLevel] = useState<string | null>(null);
 
