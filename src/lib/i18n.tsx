@@ -112,7 +112,6 @@ const translations = {
     "dashboard.optionalNotSelected": "Optional — not selected",
     "dashboard.noModulesEnrolled": "No modules yet.",
     "dept.semesterFilter": "Semester",
-    "dept.allSemesters": "All Semesters",
     "dept.selectSemesterFilter": "Filter by semester",
 
     // Sessions
