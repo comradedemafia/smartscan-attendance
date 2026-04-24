@@ -221,12 +221,32 @@ export default function StudentDepartment() {
 
   const renderCourseCard = (course: any) => {
     const isEnrolled = myEnrollments.includes(course.id);
+    const isCore = course.is_core !== false; // default true
+    const deadline = course.selection_deadline ? new Date(course.selection_deadline) : null;
+    const deadlinePassed = !!deadline && deadline.getTime() <= Date.now();
+    const lockedOptional = !isCore && deadlinePassed;
     return (
       <Card key={course.id} className={`transition-all ${isEnrolled ? "border-primary/40 bg-primary/5" : ""}`}>
         <CardContent className="p-4 space-y-3">
           <div>
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               <Badge variant="outline" className="text-xs font-mono">{course.code}</Badge>
+              {isCore ? (
+                <Badge variant="default" className="text-[10px] gap-1">
+                  <Star className="h-3 w-3" />
+                  {t("courses.core") || "Core"}
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="text-[10px]">
+                  {t("courses.optional") || "Optional"}
+                </Badge>
+              )}
+              {lockedOptional && (
+                <Badge variant="outline" className="text-[10px] gap-1 text-destructive border-destructive/40">
+                  <Lock className="h-3 w-3" />
+                  {t("courses.selectionClosed") || "Selection closed"}
+                </Badge>
+              )}
               {isEnrolled && <CheckCircle2 className="h-4 w-4 text-primary" />}
             </div>
             <p className="text-sm font-medium leading-tight">{course.name}</p>
@@ -239,17 +259,21 @@ export default function StudentDepartment() {
             <span>{enrollmentCounts[course.id] || 0} {t("dept.studentsEnrolled")}</span>
           </div>
           <div className="flex items-center gap-2">
-            {isEnrolled ? (
+            {isCore ? (
+              <Button size="sm" variant="outline" className="text-xs flex-1" onClick={() => navigate("/sessions")}>
+                <Calendar className="h-3.5 w-3.5 mr-1" />{t("dept.sessions")}
+              </Button>
+            ) : isEnrolled ? (
               <>
                 <Button size="sm" variant="outline" className="text-xs flex-1" onClick={() => navigate("/sessions")}>
                   <Calendar className="h-3.5 w-3.5 mr-1" />{t("dept.sessions")}
                 </Button>
-                <Button size="sm" variant="ghost" className="text-xs text-destructive" onClick={() => setConfirmLeaveId(course.id)} disabled={unenrollMutation.isPending}>
+                <Button size="sm" variant="ghost" className="text-xs text-destructive" onClick={() => setConfirmLeaveId(course.id)} disabled={unenrollMutation.isPending || lockedOptional}>
                   <LogOut className="h-3.5 w-3.5 mr-1" />{t("dept.leave")}
                 </Button>
               </>
             ) : (
-              <Button size="sm" className="text-xs w-full" onClick={() => enrollMutation.mutate(course.id)} disabled={enrollMutation.isPending}>
+              <Button size="sm" className="text-xs w-full" onClick={() => enrollMutation.mutate(course.id)} disabled={enrollMutation.isPending || lockedOptional}>
                 <LogIn className="h-3.5 w-3.5 mr-1" />{t("courses.joinCourse")}
               </Button>
             )}
