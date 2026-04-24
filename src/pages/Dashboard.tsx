@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { BookOpen, Calendar, Users, TrendingUp, Clock, Building2, Plus, GraduationCap, ChevronDown, ChevronRight, CalendarPlus, ArrowRight, Shield, ShieldCheck, ShieldOff, AlertTriangle } from "lucide-react";
+import { BookOpen, Calendar, Users, TrendingUp, Clock, Building2, Plus, GraduationCap, ChevronDown, ChevronRight, CalendarPlus, ArrowRight, Shield, ShieldCheck, ShieldOff, AlertTriangle, Star, Lock } from "lucide-react";
 import SendNotification from "@/components/SendNotification";
 import AnalyticsDashboard from "@/components/AnalyticsDashboard";
 import { supabase } from "@/integrations/supabase/client";
@@ -83,7 +83,7 @@ export default function Dashboard() {
         // Lecturer sees only modules they created
         const { data, error } = await supabase
           .from("courses")
-          .select("id, code, name, description, created_by, department_id, level_id, departments(name)")
+          .select("id, code, name, description, created_by, department_id, level_id, is_core, selection_deadline, departments(name)")
           .eq("created_by", user!.id);
         if (error) throw error;
         return data || [];
@@ -91,7 +91,7 @@ export default function Dashboard() {
       if (isStudent) {
         const { data, error } = await supabase
           .from("course_enrollments")
-          .select("course_id, courses(id, code, name, description, level_id, departments(name))")
+          .select("course_id, courses(id, code, name, description, level_id, is_core, selection_deadline, departments(name))")
           .eq("user_id", user!.id);
         if (error) throw error;
         return (data || []).map((r: any) => r.courses).filter(Boolean);
@@ -110,6 +110,22 @@ export default function Dashboard() {
       if (error) throw error;
       return data || [];
     },
+  });
+
+  // Student-only: fetch all OPTIONAL modules in their department so we can show "not selected" status
+  const { data: studentOptionalModules = [] } = useQuery({
+    queryKey: ["student-optional-modules", userProfile?.department_id],
+    queryFn: async () => {
+      if (!userProfile?.department_id) return [];
+      const { data, error } = await supabase
+        .from("courses")
+        .select("id, code, name, level_id, selection_deadline, is_core")
+        .eq("department_id", userProfile.department_id)
+        .eq("is_core", false);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: isStudent && !!userProfile?.department_id,
   });
 
   // Fetch ALL courses for session creation (not filtered by lecturer assignment)
@@ -373,6 +389,67 @@ export default function Dashboard() {
             <Button onClick={() => navigate("/my-department")} className="gap-1">
               {t("dept.goToModules")} <ArrowRight className="h-4 w-4" />
             </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* My Enrollment Status (student) */}
+      {isStudent && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <BookOpen className="h-5 w-5 text-primary" />
+              {t("dashboard.myEnrollmentStatus")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {(() => {
+              const enrolledCore = (courses || []).filter((c: any) => c.is_core);
+              const enrolledOptional = (courses || []).filter((c: any) => c.is_core === false);
+              const enrolledOptIds = new Set(enrolledOptional.map((c: any) => c.id));
+              const notSelectedOptional = studentOptionalModules.filter((c: any) => !enrolledOptIds.has(c.id));
+              const total = enrolledCore.length + enrolledOptional.length + notSelectedOptional.length;
+              if (total === 0) {
+                return <p className="text-sm text-muted-foreground">{t("dashboard.noModulesEnrolled")}</p>;
+              }
+              const renderRow = (c: any, status: "core" | "selected" | "not_selected") => {
+                const deadlinePassed = c.selection_deadline && new Date(c.selection_deadline) <= new Date();
+                return (
+                  <div key={`${status}-${c.id}`} className="flex items-center justify-between gap-2 py-2 border-b last:border-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Badge variant="outline" className="text-[10px] font-mono shrink-0">{c.code}</Badge>
+                      <span className="text-sm truncate">{c.name}</span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {status === "core" && (
+                        <Badge variant="default" className="text-[10px] gap-1"><Star className="h-3 w-3" />{t("dashboard.coreAutoEnrolled")}</Badge>
+                      )}
+                      {status === "selected" && (
+                        <Badge variant="secondary" className="text-[10px]">✓ {t("dashboard.optionalSelected")}</Badge>
+                      )}
+                      {status === "not_selected" && (
+                        <Badge variant="outline" className="text-[10px] gap-1">
+                          {deadlinePassed ? <Lock className="h-3 w-3" /> : null}
+                          {t("dashboard.optionalNotSelected")}
+                        </Badge>
+                      )}
+                      {c.selection_deadline && status !== "core" && (
+                        <span className="text-[10px] text-muted-foreground hidden sm:inline">
+                          · {new Date(c.selection_deadline).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              };
+              return (
+                <div className="space-y-0">
+                  {enrolledCore.map((c: any) => renderRow(c, "core"))}
+                  {enrolledOptional.map((c: any) => renderRow(c, "selected"))}
+                  {notSelectedOptional.map((c: any) => renderRow(c, "not_selected"))}
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
       )}

@@ -19,6 +19,7 @@ export default function StudentDepartment() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [selectedLevelId, setSelectedLevelId] = useState<string | "all">("all");
+  const [selectedSemesterId, setSelectedSemesterId] = useState<string | "all">("all");
   const [confirmLeaveId, setConfirmLeaveId] = useState<string | null>(null);
 
   // Get student profile with department info
@@ -59,13 +60,31 @@ export default function StudentDepartment() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("courses")
-        .select("id, name, code, level_id, description")
+        .select("id, name, code, level_id, semester_id, description")
         .eq("department_id", departmentId)
         .order("code");
       if (error) throw error;
       return data;
     },
     enabled: !!departmentId,
+  });
+
+  // Get semesters for this department's levels
+  const { data: semesters = [] } = useQuery({
+    queryKey: ["dept-semesters", departmentId],
+    queryFn: async () => {
+      if (!departmentId) return [];
+      const levelIds = (levels || []).map((l) => l.id);
+      if (levelIds.length === 0) return [];
+      const { data, error } = await (supabase as any)
+        .from("semesters")
+        .select("id, name, code, level_id, sort_order")
+        .in("level_id", levelIds)
+        .order("sort_order");
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!departmentId && levels.length > 0,
   });
 
   // Get student's enrollments
@@ -160,16 +179,84 @@ export default function StudentDepartment() {
     );
   }
 
+  const renderCourseCard = (course: any) => {
+    const isEnrolled = myEnrollments.includes(course.id);
+    return (
+      <Card key={course.id} className={`transition-all ${isEnrolled ? "border-primary/40 bg-primary/5" : ""}`}>
+        <CardContent className="p-4 space-y-3">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <Badge variant="outline" className="text-xs font-mono">{course.code}</Badge>
+              {isEnrolled && <CheckCircle2 className="h-4 w-4 text-primary" />}
+            </div>
+            <p className="text-sm font-medium leading-tight">{course.name}</p>
+            {course.description && (
+              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{course.description}</p>
+            )}
+          </div>
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Users className="h-3.5 w-3.5" />
+            <span>{enrollmentCounts[course.id] || 0} {t("dept.studentsEnrolled")}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {isEnrolled ? (
+              <>
+                <Button size="sm" variant="outline" className="text-xs flex-1" onClick={() => navigate("/sessions")}>
+                  <Calendar className="h-3.5 w-3.5 mr-1" />{t("dept.sessions")}
+                </Button>
+                <Button size="sm" variant="ghost" className="text-xs text-destructive" onClick={() => setConfirmLeaveId(course.id)} disabled={unenrollMutation.isPending}>
+                  <LogOut className="h-3.5 w-3.5 mr-1" />{t("dept.leave")}
+                </Button>
+              </>
+            ) : (
+              <Button size="sm" className="text-xs w-full" onClick={() => enrollMutation.mutate(course.id)} disabled={enrollMutation.isPending}>
+                <LogIn className="h-3.5 w-3.5 mr-1" />{t("courses.joinCourse")}
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
   // Filter levels based on selection
   const filteredLevels = selectedLevelId === "all"
     ? levels
     : levels.filter((l) => l.id === selectedLevelId);
 
-  // Group courses by level
-  const coursesByLevel = filteredLevels.map((level) => ({
-    ...level,
-    courses: courses.filter((c) => c.level_id === level.id),
-  }));
+  // Filter semesters by selected level (and by selected semester)
+  const visibleSemesterIds = new Set(
+    semesters
+      .filter((s: any) =>
+        (selectedLevelId === "all" || s.level_id === selectedLevelId) &&
+        (selectedSemesterId === "all" || s.id === selectedSemesterId)
+      )
+      .map((s: any) => s.id)
+  );
+
+  const filterCourse = (c: any) => {
+    if (selectedSemesterId !== "all") {
+      return c.semester_id === selectedSemesterId;
+    }
+    return true;
+  };
+
+  // Group courses by Level → Semester
+  const coursesByLevel = filteredLevels.map((level) => {
+    const levelSemesters = semesters
+      .filter((s: any) => s.level_id === level.id)
+      .filter((s: any) => selectedSemesterId === "all" || s.id === selectedSemesterId);
+    const levelCourses = courses.filter((c) => c.level_id === level.id).filter(filterCourse);
+    return {
+      ...level,
+      semesters: levelSemesters.map((s: any) => ({
+        ...s,
+        courses: levelCourses.filter((c) => c.semester_id === s.id),
+      })),
+      coursesNoSemester: levelCourses.filter((c) => !c.semester_id),
+      totalCourses: levelCourses.length,
+    };
+  });
 
   // Courses without a level (only show when "all" is selected)
   const unassignedCourses = selectedLevelId === "all"
@@ -219,6 +306,21 @@ export default function StudentDepartment() {
                   ))}
                 </SelectContent>
               </Select>
+              <Select value={selectedSemesterId} onValueChange={setSelectedSemesterId}>
+                <SelectTrigger className="w-[180px] h-8 text-xs">
+                  <SelectValue placeholder={t("dept.selectSemesterFilter")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("dept.allSemesters")}</SelectItem>
+                  {semesters
+                    .filter((s: any) => selectedLevelId === "all" || s.level_id === selectedLevelId)
+                    .map((sem: any) => (
+                      <SelectItem key={sem.id} value={sem.id}>
+                        {sem.name} ({sem.code})
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardContent>
@@ -233,133 +335,52 @@ export default function StudentDepartment() {
             <Badge variant="outline" className="text-xs font-mono">
               {level.code}
             </Badge>
+            <Badge variant="secondary" className="text-xs">{level.totalCourses}</Badge>
           </h2>
-          {level.courses.length === 0 ? (
+          {level.totalCourses === 0 ? (
             <Card>
               <CardContent className="py-6 text-center">
                 <p className="text-sm text-muted-foreground">{t("dept.noModulesInLevel")}</p>
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {level.courses.map((course) => {
-                const isEnrolled = myEnrollments.includes(course.id);
-                return (
-                  <Card
-                    key={course.id}
-                    className={`transition-all ${isEnrolled ? "border-primary/40 bg-primary/5" : ""}`}
-                  >
-                    <CardContent className="p-4 space-y-3">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <Badge variant="outline" className="text-xs font-mono">
-                            {course.code}
-                          </Badge>
-                          {isEnrolled && (
-                            <CheckCircle2 className="h-4 w-4 text-primary" />
-                          )}
-                        </div>
-                        <p className="text-sm font-medium leading-tight">{course.name}</p>
-                        {course.description && (
-                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                            {course.description}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Users className="h-3.5 w-3.5" />
-                        <span>{enrollmentCounts[course.id] || 0} {t("dept.studentsEnrolled")}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {isEnrolled ? (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-xs flex-1"
-                              onClick={() => navigate("/sessions")}
-                            >
-                              <Calendar className="h-3.5 w-3.5 mr-1" />
-                              {t("dept.sessions")}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-xs text-destructive"
-                              onClick={() => setConfirmLeaveId(course.id)}
-                              disabled={unenrollMutation.isPending}
-                            >
-                              <LogOut className="h-3.5 w-3.5 mr-1" />
-                              {t("dept.leave")}
-                            </Button>
-                          </>
-                        ) : (
-                          <Button
-                            size="sm"
-                            className="text-xs w-full"
-                            onClick={() => enrollMutation.mutate(course.id)}
-                            disabled={enrollMutation.isPending}
-                          >
-                            <LogIn className="h-3.5 w-3.5 mr-1" />
-                            {t("courses.joinCourse")}
-                          </Button>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+            <div className="space-y-4">
+              {level.semesters.map((sem: any) => (
+                <div key={sem.id}>
+                  <h3 className="text-sm font-semibold mb-2 flex items-center gap-2 text-muted-foreground">
+                    <Calendar className="h-4 w-4" />
+                    {sem.name}
+                    <Badge variant="outline" className="text-[10px] font-mono">{sem.code}</Badge>
+                    <Badge variant="secondary" className="text-[10px]">{sem.courses.length}</Badge>
+                  </h3>
+                  {sem.courses.length === 0 ? (
+                    <p className="text-xs text-muted-foreground pl-6">{t("dept.noModulesInLevel")}</p>
+                  ) : (
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {sem.courses.map((course: any) => renderCourseCard(course))}
+                    </div>
+                  )}
+                </div>
+              ))}
+              {level.coursesNoSemester.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold mb-2 text-muted-foreground">{t("dept.otherModules")}</h3>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {level.coursesNoSemester.map((course: any) => renderCourseCard(course))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
       ))}
 
-      {/* Unassigned modules */}
-      {unassignedCourses.length > 0 && (
+      {/* Unassigned modules (no level set) */}
+      {unassignedCourses.length > 0 && selectedSemesterId === "all" && (
         <div>
           <h2 className="text-lg font-semibold mb-3">{t("dept.otherModules")}</h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {unassignedCourses.map((course) => {
-              const isEnrolled = myEnrollments.includes(course.id);
-              return (
-                <Card
-                  key={course.id}
-                  className={`transition-all ${isEnrolled ? "border-primary/40 bg-primary/5" : ""}`}
-                >
-                  <CardContent className="p-4 space-y-3">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <Badge variant="outline" className="text-xs font-mono">
-                          {course.code}
-                        </Badge>
-                        {isEnrolled && <CheckCircle2 className="h-4 w-4 text-primary" />}
-                      </div>
-                      <p className="text-sm font-medium">{course.name}</p>
-                    </div>
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Users className="h-3.5 w-3.5" />
-                      <span>{enrollmentCounts[course.id] || 0} {t("dept.studentsEnrolled")}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {isEnrolled ? (
-                        <>
-                          <Button size="sm" variant="outline" className="text-xs flex-1" onClick={() => navigate("/sessions")}>
-                            <Calendar className="h-3.5 w-3.5 mr-1" />{t("dept.sessions")}
-                          </Button>
-                          <Button size="sm" variant="ghost" className="text-xs text-destructive" onClick={() => setConfirmLeaveId(course.id)} disabled={unenrollMutation.isPending}>
-                            <LogOut className="h-3.5 w-3.5 mr-1" />{t("dept.leave")}
-                          </Button>
-                        </>
-                      ) : (
-                        <Button size="sm" className="text-xs w-full" onClick={() => enrollMutation.mutate(course.id)} disabled={enrollMutation.isPending}>
-                          <LogIn className="h-3.5 w-3.5 mr-1" />{t("courses.joinCourse")}
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+            {unassignedCourses.map((course) => renderCourseCard(course))}
           </div>
         </div>
       )}

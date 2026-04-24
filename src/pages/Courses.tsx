@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useToast } from "@/hooks/use-toast";
-import { BookOpen, Plus, Trash2, Edit, Users, LogIn, LogOut, UserCog, Building2, ChevronDown, ChevronRight, GraduationCap, Lock, Star, Clock } from "lucide-react";
+import { BookOpen, Plus, Trash2, Edit, Users, LogIn, LogOut, UserCog, Building2, ChevronDown, ChevronRight, GraduationCap, Lock, Star, Clock, Bell, Unlock, AlertTriangle } from "lucide-react";
 
 type Level = { id: string; name: string; code: string; department_id: string; sort_order: number };
 
@@ -36,6 +36,8 @@ export default function Courses() {
   const [courseSelectionDeadline, setCourseSelectionDeadline] = useState("");
   const [expandedDept, setExpandedDept] = useState<string | null>(null);
   const [expandedLevel, setExpandedLevel] = useState<string | null>(null);
+  const [forceCloseId, setForceCloseId] = useState<string | null>(null);
+  const [forceOpenId, setForceOpenId] = useState<string | null>(null);
 
   const isAdmin = role === "admin";
   const isLecturer = role === "lecturer";
@@ -193,6 +195,47 @@ export default function Courses() {
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
+  const forceCloseMutation = useMutation({
+    mutationFn: async (id: string) => {
+      // Set deadline to 1 second ago — effectively closes selection
+      const past = new Date(Date.now() - 1000).toISOString();
+      const { error } = await supabase.from("courses").update({ selection_deadline: past }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
+      toast({ title: t("common.success"), description: t("courses.selectionClosedNow") });
+    },
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
+  });
+
+  const forceOpenMutation = useMutation({
+    mutationFn: async (id: string) => {
+      // Extend deadline by 7 days from now
+      const future = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      const { error } = await supabase.from("courses").update({ selection_deadline: future }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
+      toast({ title: t("common.success"), description: t("courses.selectionReopened") });
+    },
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
+  });
+
+  // Optional modules with deadlines closing within next 3 days (admin/lecturer alert)
+  const upcomingClosures = useMemo(() => {
+    if (!canCreate) return [];
+    const now = Date.now();
+    const threeDays = 3 * 24 * 60 * 60 * 1000;
+    return (courses || []).filter((c: any) =>
+      c.is_core === false &&
+      c.selection_deadline &&
+      new Date(c.selection_deadline).getTime() > now &&
+      new Date(c.selection_deadline).getTime() - now <= threeDays
+    );
+  }, [courses, canCreate]);
+
   const resetForm = () => { setOpen(false); setEditingCourse(null); setCourseCode(""); setCourseName(""); setCourseDesc(""); setCourseDeptId(""); setCourseLevelId(""); setCourseIsCore(true); setCourseSelectionDeadline(""); };
   const openEditCourse = (course: any) => {
     setEditingCourse(course);
@@ -250,6 +293,22 @@ export default function Courses() {
       </CardHeader>
       <CardContent>
         {course.description && <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{course.description}</p>}
+        {(isAdmin || (isLecturer && course.created_by === user?.id)) && course.is_core === false && (
+          <div className="flex items-center gap-1 mb-2">
+            {(() => {
+              const closed = course.selection_deadline && new Date(course.selection_deadline) <= new Date();
+              return closed ? (
+                <Button size="sm" variant="outline" className="h-7 text-[11px] gap-1" onClick={() => setForceOpenId(course.id)}>
+                  <Unlock className="h-3 w-3" />{t("courses.forceOpen")}
+                </Button>
+              ) : (
+                <Button size="sm" variant="outline" className="h-7 text-[11px] gap-1 text-destructive" onClick={() => setForceCloseId(course.id)}>
+                  <Lock className="h-3 w-3" />{t("courses.forceClose")}
+                </Button>
+              );
+            })()}
+          </div>
+        )}
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <Users className="h-3.5 w-3.5" />
@@ -523,6 +582,36 @@ export default function Courses() {
         )}
       </div>
 
+      {canCreate && upcomingClosures.length > 0 && (
+        <Card className="border-amber-500/40 bg-amber-500/5">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <div className="h-9 w-9 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
+                <Bell className="h-4 w-4 text-amber-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold mb-2">{t("courses.upcomingClosures")}</p>
+                <div className="flex flex-wrap gap-2">
+                  {upcomingClosures.map((c: any) => {
+                    const ms = new Date(c.selection_deadline).getTime() - Date.now();
+                    const days = Math.floor(ms / (24 * 60 * 60 * 1000));
+                    const hours = Math.floor(ms / (60 * 60 * 1000));
+                    const label = days >= 1 ? `${days} ${t("courses.daysLeft")}` : `${hours} ${t("courses.hoursLeft")}`;
+                    return (
+                      <Badge key={c.id} variant="outline" className="text-xs gap-1 border-amber-500/40">
+                        <AlertTriangle className="h-3 w-3 text-amber-600" />
+                        <span className="font-mono">{c.code}</span>
+                        <span className="text-muted-foreground">· {label}</span>
+                      </Badge>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {isLoading ? (
         <p className="text-muted-foreground">{t("common.loading")}</p>
       ) : isAdmin ? (
@@ -540,6 +629,22 @@ export default function Courses() {
           if (deleteCourseId) deleteCourseMutation.mutate(deleteCourseId);
           setDeleteCourseId(null);
         }}
+      />
+      <ConfirmDialog
+        open={!!forceCloseId}
+        onOpenChange={(open) => !open && setForceCloseId(null)}
+        title={t("courses.forceClose")}
+        description={t("courses.confirmForceClose")}
+        onConfirm={() => { if (forceCloseId) forceCloseMutation.mutate(forceCloseId); setForceCloseId(null); }}
+        confirmLabel={t("courses.forceClose")}
+      />
+      <ConfirmDialog
+        open={!!forceOpenId}
+        onOpenChange={(open) => !open && setForceOpenId(null)}
+        title={t("courses.forceOpen")}
+        description={t("courses.confirmForceOpen")}
+        onConfirm={() => { if (forceOpenId) forceOpenMutation.mutate(forceOpenId); setForceOpenId(null); }}
+        confirmLabel={t("courses.forceOpen")}
       />
     </div>
   );
