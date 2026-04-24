@@ -582,6 +582,36 @@ export default function Courses() {
         )}
       </div>
 
+      {canCreate && upcomingClosures.length > 0 && (
+        <Card className="border-amber-500/40 bg-amber-500/5">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <div className="h-9 w-9 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
+                <Bell className="h-4 w-4 text-amber-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold mb-2">{t("courses.upcomingClosures")}</p>
+                <div className="flex flex-wrap gap-2">
+                  {upcomingClosures.map((c: any) => {
+                    const ms = new Date(c.selection_deadline).getTime() - Date.now();
+                    const days = Math.floor(ms / (24 * 60 * 60 * 1000));
+                    const hours = Math.floor(ms / (60 * 60 * 1000));
+                    const label = days >= 1 ? `${days} ${t("courses.daysLeft")}` : `${hours} ${t("courses.hoursLeft")}`;
+                    return (
+                      <Badge key={c.id} variant="outline" className="text-xs gap-1 border-amber-500/40">
+                        <AlertTriangle className="h-3 w-3 text-amber-600" />
+                        <span className="font-mono">{c.code}</span>
+                        <span className="text-muted-foreground">· {label}</span>
+                      </Badge>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {isLoading ? (
         <p className="text-muted-foreground">{t("common.loading")}</p>
       ) : isAdmin ? (
