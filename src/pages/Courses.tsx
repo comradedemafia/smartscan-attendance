@@ -195,6 +195,47 @@ export default function Courses() {
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
+  const forceCloseMutation = useMutation({
+    mutationFn: async (id: string) => {
+      // Set deadline to 1 second ago — effectively closes selection
+      const past = new Date(Date.now() - 1000).toISOString();
+      const { error } = await supabase.from("courses").update({ selection_deadline: past }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
+      toast({ title: t("common.success"), description: t("courses.selectionClosedNow") });
+    },
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
+  });
+
+  const forceOpenMutation = useMutation({
+    mutationFn: async (id: string) => {
+      // Extend deadline by 7 days from now
+      const future = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      const { error } = await supabase.from("courses").update({ selection_deadline: future }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
+      toast({ title: t("common.success"), description: t("courses.selectionReopened") });
+    },
+    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
+  });
+
+  // Optional modules with deadlines closing within next 3 days (admin/lecturer alert)
+  const upcomingClosures = useMemo(() => {
+    if (!canCreate) return [];
+    const now = Date.now();
+    const threeDays = 3 * 24 * 60 * 60 * 1000;
+    return (courses || []).filter((c: any) =>
+      c.is_core === false &&
+      c.selection_deadline &&
+      new Date(c.selection_deadline).getTime() > now &&
+      new Date(c.selection_deadline).getTime() - now <= threeDays
+    );
+  }, [courses, canCreate]);
+
   const resetForm = () => { setOpen(false); setEditingCourse(null); setCourseCode(""); setCourseName(""); setCourseDesc(""); setCourseDeptId(""); setCourseLevelId(""); setCourseIsCore(true); setCourseSelectionDeadline(""); };
   const openEditCourse = (course: any) => {
     setEditingCourse(course);
