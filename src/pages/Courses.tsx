@@ -493,6 +493,27 @@ export default function Courses() {
                   <Label>{t("courses.description")}</Label>
                   <Textarea value={courseDesc} onChange={(e) => setCourseDesc(e.target.value)} placeholder="Optional description" />
                 </div>
+                <div className="space-y-2">
+                  <Label>{t("courses.moduleType")}</Label>
+                  <Select value={courseIsCore ? "core" : "optional"} onValueChange={(v) => setCourseIsCore(v === "core")}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="core">⭐ {t("courses.core")}</SelectItem>
+                      <SelectItem value="optional">{t("courses.optional")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {!courseIsCore && (
+                  <div className="space-y-2">
+                    <Label>{t("courses.selectionDeadline")}</Label>
+                    <Input
+                      type="datetime-local"
+                      value={courseSelectionDeadline}
+                      onChange={(e) => setCourseSelectionDeadline(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">{t("courses.selectionDeadlineHint")}</p>
+                  </div>
+                )}
                 <Button type="submit" className="w-full" disabled={createCourseMutation.isPending || updateCourseMutation.isPending}>
                   {editingCourse ? t("common.save") : t("courses.create")}
                 </Button>
