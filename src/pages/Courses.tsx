@@ -147,6 +147,8 @@ export default function Courses() {
       const { data: newCourse, error } = await supabase.from("courses").insert({
         code: courseCode.toUpperCase(), name: courseName, description: courseDesc || null,
         department_id: deptId, level_id: courseLevelId || null, created_by: user!.id,
+        is_core: courseIsCore,
+        selection_deadline: !courseIsCore && courseSelectionDeadline ? new Date(courseSelectionDeadline).toISOString() : null,
       }).select("id").single();
       if (error) throw error;
       if (isLecturer && newCourse) {
@@ -166,6 +168,8 @@ export default function Courses() {
       const { error } = await supabase.from("courses").update({
         code: courseCode.toUpperCase(), name: courseName, description: courseDesc || null,
         department_id: courseDeptId || null, level_id: courseLevelId || null,
+        is_core: courseIsCore,
+        selection_deadline: !courseIsCore && courseSelectionDeadline ? new Date(courseSelectionDeadline).toISOString() : null,
       }).eq("id", editingCourse.id);
       if (error) throw error;
     },
@@ -189,8 +193,18 @@ export default function Courses() {
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
-  const resetForm = () => { setOpen(false); setEditingCourse(null); setCourseCode(""); setCourseName(""); setCourseDesc(""); setCourseDeptId(""); setCourseLevelId(""); };
-  const openEditCourse = (course: any) => { setEditingCourse(course); setCourseCode(course.code); setCourseName(course.name); setCourseDesc(course.description || ""); setCourseDeptId(course.department_id || ""); setCourseLevelId(course.level_id || ""); setOpen(true); };
+  const resetForm = () => { setOpen(false); setEditingCourse(null); setCourseCode(""); setCourseName(""); setCourseDesc(""); setCourseDeptId(""); setCourseLevelId(""); setCourseIsCore(true); setCourseSelectionDeadline(""); };
+  const openEditCourse = (course: any) => {
+    setEditingCourse(course);
+    setCourseCode(course.code);
+    setCourseName(course.name);
+    setCourseDesc(course.description || "");
+    setCourseDeptId(course.department_id || "");
+    setCourseLevelId(course.level_id || "");
+    setCourseIsCore(course.is_core ?? true);
+    setCourseSelectionDeadline(course.selection_deadline ? new Date(course.selection_deadline).toISOString().slice(0, 16) : "");
+    setOpen(true);
+  };
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); if (!courseCode.trim() || !courseName.trim()) return; editingCourse ? updateCourseMutation.mutate() : createCourseMutation.mutate(); };
 
   const deptLevels = (deptId: string) => allLevels.filter((l) => l.department_id === deptId);
