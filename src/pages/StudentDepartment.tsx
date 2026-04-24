@@ -184,11 +184,39 @@ export default function StudentDepartment() {
     ? levels
     : levels.filter((l) => l.id === selectedLevelId);
 
-  // Group courses by level
-  const coursesByLevel = filteredLevels.map((level) => ({
-    ...level,
-    courses: courses.filter((c) => c.level_id === level.id),
-  }));
+  // Filter semesters by selected level (and by selected semester)
+  const visibleSemesterIds = new Set(
+    semesters
+      .filter((s: any) =>
+        (selectedLevelId === "all" || s.level_id === selectedLevelId) &&
+        (selectedSemesterId === "all" || s.id === selectedSemesterId)
+      )
+      .map((s: any) => s.id)
+  );
+
+  const filterCourse = (c: any) => {
+    if (selectedSemesterId !== "all") {
+      return c.semester_id === selectedSemesterId;
+    }
+    return true;
+  };
+
+  // Group courses by Level → Semester
+  const coursesByLevel = filteredLevels.map((level) => {
+    const levelSemesters = semesters
+      .filter((s: any) => s.level_id === level.id)
+      .filter((s: any) => selectedSemesterId === "all" || s.id === selectedSemesterId);
+    const levelCourses = courses.filter((c) => c.level_id === level.id).filter(filterCourse);
+    return {
+      ...level,
+      semesters: levelSemesters.map((s: any) => ({
+        ...s,
+        courses: levelCourses.filter((c) => c.semester_id === s.id),
+      })),
+      coursesNoSemester: levelCourses.filter((c) => !c.semester_id),
+      totalCourses: levelCourses.length,
+    };
+  });
 
   // Courses without a level (only show when "all" is selected)
   const unassignedCourses = selectedLevelId === "all"
