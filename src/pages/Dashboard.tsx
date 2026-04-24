@@ -83,7 +83,7 @@ export default function Dashboard() {
         // Lecturer sees only modules they created
         const { data, error } = await supabase
           .from("courses")
-          .select("id, code, name, description, created_by, department_id, level_id, departments(name)")
+          .select("id, code, name, description, created_by, department_id, level_id, is_core, selection_deadline, departments(name)")
           .eq("created_by", user!.id);
         if (error) throw error;
         return data || [];
@@ -91,7 +91,7 @@ export default function Dashboard() {
       if (isStudent) {
         const { data, error } = await supabase
           .from("course_enrollments")
-          .select("course_id, courses(id, code, name, description, level_id, departments(name))")
+          .select("course_id, courses(id, code, name, description, level_id, is_core, selection_deadline, departments(name))")
           .eq("user_id", user!.id);
         if (error) throw error;
         return (data || []).map((r: any) => r.courses).filter(Boolean);
