@@ -600,6 +600,22 @@ export default function Courses() {
           setDeleteCourseId(null);
         }}
       />
+      <ConfirmDialog
+        open={!!forceCloseId}
+        onOpenChange={(open) => !open && setForceCloseId(null)}
+        title={t("courses.forceClose")}
+        description={t("courses.confirmForceClose")}
+        onConfirm={() => { if (forceCloseId) forceCloseMutation.mutate(forceCloseId); setForceCloseId(null); }}
+        confirmLabel={t("courses.forceClose")}
+      />
+      <ConfirmDialog
+        open={!!forceOpenId}
+        onOpenChange={(open) => !open && setForceOpenId(null)}
+        title={t("courses.forceOpen")}
+        description={t("courses.confirmForceOpen")}
+        onConfirm={() => { if (forceOpenId) forceOpenMutation.mutate(forceOpenId); setForceOpenId(null); }}
+        confirmLabel={t("courses.forceOpen")}
+      />
     </div>
   );
 }
