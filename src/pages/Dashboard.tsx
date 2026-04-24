@@ -112,6 +112,22 @@ export default function Dashboard() {
     },
   });
 
+  // Student-only: fetch all OPTIONAL modules in their department so we can show "not selected" status
+  const { data: studentOptionalModules = [] } = useQuery({
+    queryKey: ["student-optional-modules", userProfile?.department_id],
+    queryFn: async () => {
+      if (!userProfile?.department_id) return [];
+      const { data, error } = await supabase
+        .from("courses")
+        .select("id, code, name, level_id, selection_deadline, is_core")
+        .eq("department_id", userProfile.department_id)
+        .eq("is_core", false);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: isStudent && !!userProfile?.department_id,
+  });
+
   // Fetch ALL courses for session creation (not filtered by lecturer assignment)
   const { data: allCoursesForSession = [] } = useQuery({
     queryKey: ["all-courses-for-session", userProfile?.department_id],
