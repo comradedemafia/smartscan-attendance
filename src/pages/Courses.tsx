@@ -293,6 +293,22 @@ export default function Courses() {
       </CardHeader>
       <CardContent>
         {course.description && <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{course.description}</p>}
+        {(isAdmin || (isLecturer && course.created_by === user?.id)) && course.is_core === false && (
+          <div className="flex items-center gap-1 mb-2">
+            {(() => {
+              const closed = course.selection_deadline && new Date(course.selection_deadline) <= new Date();
+              return closed ? (
+                <Button size="sm" variant="outline" className="h-7 text-[11px] gap-1" onClick={() => setForceOpenId(course.id)}>
+                  <Unlock className="h-3 w-3" />{t("courses.forceOpen")}
+                </Button>
+              ) : (
+                <Button size="sm" variant="outline" className="h-7 text-[11px] gap-1 text-destructive" onClick={() => setForceCloseId(course.id)}>
+                  <Lock className="h-3 w-3" />{t("courses.forceClose")}
+                </Button>
+              );
+            })()}
+          </div>
+        )}
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <Users className="h-3.5 w-3.5" />
