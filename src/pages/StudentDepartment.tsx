@@ -19,6 +19,7 @@ export default function StudentDepartment() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [selectedLevelId, setSelectedLevelId] = useState<string | "all">("all");
+  const [selectedSemesterId, setSelectedSemesterId] = useState<string | "all">("all");
   const [confirmLeaveId, setConfirmLeaveId] = useState<string | null>(null);
 
   // Get student profile with department info
