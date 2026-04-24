@@ -393,6 +393,67 @@ export default function Dashboard() {
         </Card>
       )}
 
+      {/* My Enrollment Status (student) */}
+      {isStudent && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <BookOpen className="h-5 w-5 text-primary" />
+              {t("dashboard.myEnrollmentStatus")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {(() => {
+              const enrolledCore = (courses || []).filter((c: any) => c.is_core);
+              const enrolledOptional = (courses || []).filter((c: any) => c.is_core === false);
+              const enrolledOptIds = new Set(enrolledOptional.map((c: any) => c.id));
+              const notSelectedOptional = studentOptionalModules.filter((c: any) => !enrolledOptIds.has(c.id));
+              const total = enrolledCore.length + enrolledOptional.length + notSelectedOptional.length;
+              if (total === 0) {
+                return <p className="text-sm text-muted-foreground">{t("dashboard.noModulesEnrolled")}</p>;
+              }
+              const renderRow = (c: any, status: "core" | "selected" | "not_selected") => {
+                const deadlinePassed = c.selection_deadline && new Date(c.selection_deadline) <= new Date();
+                return (
+                  <div key={`${status}-${c.id}`} className="flex items-center justify-between gap-2 py-2 border-b last:border-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Badge variant="outline" className="text-[10px] font-mono shrink-0">{c.code}</Badge>
+                      <span className="text-sm truncate">{c.name}</span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {status === "core" && (
+                        <Badge variant="default" className="text-[10px] gap-1"><Star className="h-3 w-3" />{t("dashboard.coreAutoEnrolled")}</Badge>
+                      )}
+                      {status === "selected" && (
+                        <Badge variant="secondary" className="text-[10px]">✓ {t("dashboard.optionalSelected")}</Badge>
+                      )}
+                      {status === "not_selected" && (
+                        <Badge variant="outline" className="text-[10px] gap-1">
+                          {deadlinePassed ? <Lock className="h-3 w-3" /> : null}
+                          {t("dashboard.optionalNotSelected")}
+                        </Badge>
+                      )}
+                      {c.selection_deadline && status !== "core" && (
+                        <span className="text-[10px] text-muted-foreground hidden sm:inline">
+                          · {new Date(c.selection_deadline).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              };
+              return (
+                <div className="space-y-0">
+                  {enrolledCore.map((c: any) => renderRow(c, "core"))}
+                  {enrolledOptional.map((c: any) => renderRow(c, "selected"))}
+                  {notSelectedOptional.map((c: any) => renderRow(c, "not_selected"))}
+                </div>
+              );
+            })()}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Courses grouped by Level */}
       <div>
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
