@@ -7,9 +7,10 @@ import { useI18n } from "@/lib/i18n";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { BookOpen, LogIn, LogOut, GraduationCap, Calendar, CheckCircle2, Filter, Users, ChevronDown, ChevronRight, Building2, Star, Lock } from "lucide-react";
+import { BookOpen, LogIn, LogOut, GraduationCap, Calendar, CheckCircle2, Filter, Users, ChevronDown, ChevronRight, Building2, Star, Lock, Search, Clock } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function StudentDepartment() {
