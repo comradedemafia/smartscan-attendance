@@ -228,6 +228,30 @@ export type Database = {
           },
         ]
       }
+      deadline_reminders_sent: {
+        Row: {
+          course_id: string
+          id: string
+          sent_at: string
+          threshold: string
+          user_id: string
+        }
+        Insert: {
+          course_id: string
+          id?: string
+          sent_at?: string
+          threshold: string
+          user_id: string
+        }
+        Update: {
+          course_id?: string
+          id?: string
+          sent_at?: string
+          threshold?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       departments: {
         Row: {
           created_at: string
@@ -249,6 +273,45 @@ export type Database = {
           id?: string
           name?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      enrollment_audit_log: {
+        Row: {
+          action: string
+          course_id: string
+          created_at: string
+          deadline_status: string | null
+          id: string
+          module_type: string
+          performed_by: string | null
+          reason: string | null
+          selection_deadline: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          course_id: string
+          created_at?: string
+          deadline_status?: string | null
+          id?: string
+          module_type: string
+          performed_by?: string | null
+          reason?: string | null
+          selection_deadline?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          course_id?: string
+          created_at?: string
+          deadline_status?: string | null
+          id?: string
+          module_type?: string
+          performed_by?: string | null
+          reason?: string | null
+          selection_deadline?: string | null
+          user_id?: string
         }
         Relationships: []
       }

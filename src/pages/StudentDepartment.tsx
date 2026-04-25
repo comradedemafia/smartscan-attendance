@@ -7,9 +7,10 @@ import { useI18n } from "@/lib/i18n";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { BookOpen, LogIn, LogOut, GraduationCap, Calendar, CheckCircle2, Filter, Users, ChevronDown, ChevronRight, Building2, Star, Lock } from "lucide-react";
+import { BookOpen, LogIn, LogOut, GraduationCap, Calendar, CheckCircle2, Filter, Users, ChevronDown, ChevronRight, Building2, Star, Lock, Search, Clock } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function StudentDepartment() {
@@ -24,6 +25,14 @@ export default function StudentDepartment() {
   const [deptExpanded, setDeptExpanded] = useState(true);
   const [expandedLevels, setExpandedLevels] = useState<Set<string>>(new Set());
   const [expandedSemesters, setExpandedSemesters] = useState<Set<string>>(new Set());
+  const [searchTerm, setSearchTerm] = useState("");
+  const [nowTick, setNowTick] = useState(() => Date.now());
+
+  // Tick every second so countdowns update live
+  useEffect(() => {
+    const id = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   // Get student profile with department info
   const { data: studentProfile } = useQuery({
@@ -186,6 +195,21 @@ export default function StudentDepartment() {
     }
   }, [semesters, expandedLevels]);
 
+  // When user is searching, auto-expand levels & semesters that contain matches
+  useEffect(() => {
+    if (!searchTerm.trim()) return;
+    const q = searchTerm.trim().toLowerCase();
+    const matchingCourses = courses.filter(
+      (c) =>
+        (c.name || "").toLowerCase().includes(q) ||
+        (c.code || "").toLowerCase().includes(q)
+    );
+    const levelIds = new Set(matchingCourses.map((c) => c.level_id).filter(Boolean) as string[]);
+    const semIds = new Set(matchingCourses.map((c) => c.semester_id).filter(Boolean) as string[]);
+    if (levelIds.size) setExpandedLevels((prev) => new Set([...prev, ...levelIds]));
+    if (semIds.size) setExpandedSemesters((prev) => new Set([...prev, ...semIds]));
+  }, [searchTerm, courses]);
+
   const toggleLevel = (id: string) => {
     setExpandedLevels((prev) => {
       const next = new Set(prev);
@@ -223,8 +247,37 @@ export default function StudentDepartment() {
     const isEnrolled = myEnrollments.includes(course.id);
     const isCore = course.is_core !== false; // default true
     const deadline = course.selection_deadline ? new Date(course.selection_deadline) : null;
-    const deadlinePassed = !!deadline && deadline.getTime() <= Date.now();
+    const deadlinePassed = !!deadline && deadline.getTime() <= nowTick;
     const lockedOptional = !isCore && deadlinePassed;
+
+    // Live countdown for optional modules with a deadline
+    let countdown: string | null = null;
+    let urgency: "ok" | "warn" | "critical" = "ok";
+    if (!isCore && deadline && !deadlinePassed) {
+      const ms = deadline.getTime() - nowTick;
+      const totalSec = Math.floor(ms / 1000);
+      const days = Math.floor(totalSec / 86400);
+      const hours = Math.floor((totalSec % 86400) / 3600);
+      const minutes = Math.floor((totalSec % 3600) / 60);
+      const seconds = totalSec % 60;
+      const dShort = t("courses.daysShort") || "d";
+      const hShort = t("courses.hoursShort") || "h";
+      const mShort = t("courses.minutesShort") || "m";
+      const sShort = t("courses.secondsShort") || "s";
+      if (days > 0) countdown = `${days}${dShort} ${hours}${hShort}`;
+      else if (hours > 0) countdown = `${hours}${hShort} ${minutes}${mShort}`;
+      else if (minutes > 0) countdown = `${minutes}${mShort} ${seconds}${sShort}`;
+      else countdown = `${seconds}${sShort}`;
+      if (ms <= 30 * 60 * 1000) urgency = "critical";
+      else if (ms <= 24 * 60 * 60 * 1000) urgency = "warn";
+    }
+    const urgencyClass =
+      urgency === "critical"
+        ? "text-destructive border-destructive/40 animate-pulse"
+        : urgency === "warn"
+          ? "text-amber-600 border-amber-500/40 dark:text-amber-400"
+          : "text-muted-foreground border-muted-foreground/30";
+
     return (
       <Card key={course.id} className={`transition-all ${isEnrolled ? "border-primary/40 bg-primary/5" : ""}`}>
         <CardContent className="p-4 space-y-3">
@@ -254,6 +307,12 @@ export default function StudentDepartment() {
               <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{course.description}</p>
             )}
           </div>
+          {countdown && (
+            <div className={`flex items-center gap-1.5 text-[11px] font-medium border rounded-md px-2 py-1 ${urgencyClass}`}>
+              <Clock className="h-3.5 w-3.5" />
+              <span>{t("courses.timeLeft") || "Time left"}: <span className="font-mono">{countdown}</span></span>
+            </div>
+          )}
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <Users className="h-3.5 w-3.5" />
             <span>{enrollmentCounts[course.id] || 0} {t("dept.studentsEnrolled")}</span>
@@ -300,7 +359,13 @@ export default function StudentDepartment() {
 
   const filterCourse = (c: any) => {
     if (selectedSemesterId !== "all") {
-      return c.semester_id === selectedSemesterId;
+      if (c.semester_id !== selectedSemesterId) return false;
+    }
+    if (searchTerm.trim()) {
+      const q = searchTerm.trim().toLowerCase();
+      const inName = (c.name || "").toLowerCase().includes(q);
+      const inCode = (c.code || "").toLowerCase().includes(q);
+      if (!inName && !inCode) return false;
     }
     return true;
   };
@@ -341,6 +406,16 @@ export default function StudentDepartment() {
       {/* Filters */}
       <Card>
         <CardContent className="py-3">
+          <div className="space-y-3">
+          <div className="relative">
+            <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <Input
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder={t("dept.searchPlaceholder") || "Search modules…"}
+              className="pl-9 h-9 text-sm"
+            />
+          </div>
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Badge variant="secondary">
@@ -385,6 +460,7 @@ export default function StudentDepartment() {
               </Select>
             </div>
           </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -410,6 +486,9 @@ export default function StudentDepartment() {
           <CardContent className="pt-0 pb-4 space-y-3">
             {coursesByLevel.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-6">{t("dept.noLevels")}</p>
+            )}
+            {searchTerm.trim() && coursesByLevel.every((l) => l.totalCourses === 0) && unassignedCourses.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-6">{t("dept.noSearchResults") || "No modules match your search."}</p>
             )}
 
             {coursesByLevel.map((level) => {

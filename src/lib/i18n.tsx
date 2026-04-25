@@ -466,6 +466,13 @@ const translations = {
     "dept.studentsEnrolled": "students enrolled",
     "dept.myDepartmentTitle": "My Department",
     "dept.modules": "modules",
+    "dept.searchPlaceholder": "Search modules by name or code…",
+    "dept.noSearchResults": "No modules match your search.",
+    "courses.timeLeft": "Time left",
+    "courses.daysShort": "d",
+    "courses.hoursShort": "h",
+    "courses.minutesShort": "m",
+    "courses.secondsShort": "s",
 
     // Subjects
     "subjects.title": "Subjects",
@@ -1104,6 +1111,13 @@ const translations = {
     "dept.studentsEnrolled": "wanafunzi wamejisajili",
     "dept.myDepartmentTitle": "Idara Yangu",
     "dept.modules": "moduli",
+    "dept.searchPlaceholder": "Tafuta moduli kwa jina au msimbo…",
+    "dept.noSearchResults": "Hakuna moduli zinazolingana na utafutaji wako.",
+    "courses.timeLeft": "Muda uliobaki",
+    "courses.daysShort": "s",
+    "courses.hoursShort": "saa",
+    "courses.minutesShort": "dak",
+    "courses.secondsShort": "sek",
 
     // Subjects
     "subjects.title": "Masomo",
