@@ -344,7 +344,13 @@ export default function StudentDepartment() {
 
   const filterCourse = (c: any) => {
     if (selectedSemesterId !== "all") {
-      return c.semester_id === selectedSemesterId;
+      if (c.semester_id !== selectedSemesterId) return false;
+    }
+    if (searchTerm.trim()) {
+      const q = searchTerm.trim().toLowerCase();
+      const inName = (c.name || "").toLowerCase().includes(q);
+      const inCode = (c.code || "").toLowerCase().includes(q);
+      if (!inName && !inCode) return false;
     }
     return true;
   };
