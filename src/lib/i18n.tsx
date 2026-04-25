@@ -466,6 +466,13 @@ const translations = {
     "dept.studentsEnrolled": "students enrolled",
     "dept.myDepartmentTitle": "My Department",
     "dept.modules": "modules",
+    "dept.searchPlaceholder": "Search modules by name or code…",
+    "dept.noSearchResults": "No modules match your search.",
+    "courses.timeLeft": "Time left",
+    "courses.daysShort": "d",
+    "courses.hoursShort": "h",
+    "courses.minutesShort": "m",
+    "courses.secondsShort": "s",
 
     // Subjects
     "subjects.title": "Subjects",
