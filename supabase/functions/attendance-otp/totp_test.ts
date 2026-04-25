@@ -4,6 +4,10 @@ import {
   generateTOTP,
   generateTOTPAt,
   verifyTOTP,
+  verifyTOTPDetailed,
+  TOTP_TIME_STEP,
+  TOTP_DIGITS,
+  TOTP_WINDOW,
 } from "./index.ts";
 
 // RFC 6238 reference secret "12345678901234567890" base32-encoded
@@ -65,4 +69,32 @@ Deno.test("verifyTOTP accepts the previous time-step (clock drift -30s)", async 
   const prevCounter = (Math.floor(Date.now() / 1000 / 30)) - 1;
   const prevCode = await generateTOTPAt(secret, prevCounter, 6);
   assertEquals(await verifyTOTP(secret, prevCode), true);
+});
+
+Deno.test("verifyTOTPDetailed reports matched offset and counter", async () => {
+  const secret = "JBSWY3DPEHPK3PXP";
+  const baseCounter = Math.floor(Date.now() / 1000 / TOTP_TIME_STEP);
+
+  const currentCode = await generateTOTPAt(secret, baseCounter, TOTP_DIGITS);
+  const currentResult = await verifyTOTPDetailed(secret, currentCode);
+  assertEquals(currentResult.valid, true);
+  assertEquals(currentResult.offset, 0);
+  assertEquals(currentResult.counter, baseCounter);
+
+  const prevCode = await generateTOTPAt(secret, baseCounter - 1, TOTP_DIGITS);
+  const prevResult = await verifyTOTPDetailed(secret, prevCode);
+  assertEquals(prevResult.valid, true);
+  assertEquals(prevResult.offset, -1);
+  assertEquals(prevResult.counter, baseCounter - 1);
+
+  const bad = await verifyTOTPDetailed(secret, "000000");
+  assertEquals(bad.valid, false);
+  assertEquals(bad.offset, null);
+  assertEquals(bad.counter, null);
+});
+
+Deno.test("Configurable TOTP env defaults are sane", () => {
+  assert(TOTP_TIME_STEP >= 5 && TOTP_TIME_STEP <= 300);
+  assert(TOTP_DIGITS >= 6 && TOTP_DIGITS <= 8);
+  assert(TOTP_WINDOW >= 0 && TOTP_WINDOW <= 5);
 });
