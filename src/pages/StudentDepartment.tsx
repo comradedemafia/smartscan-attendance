@@ -391,6 +391,16 @@ export default function StudentDepartment() {
       {/* Filters */}
       <Card>
         <CardContent className="py-3">
+          <div className="space-y-3">
+          <div className="relative">
+            <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <Input
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder={t("dept.searchPlaceholder") || "Search modules…"}
+              className="pl-9 h-9 text-sm"
+            />
+          </div>
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Badge variant="secondary">
@@ -434,6 +444,7 @@ export default function StudentDepartment() {
                 </SelectContent>
               </Select>
             </div>
+          </div>
           </div>
         </CardContent>
       </Card>
