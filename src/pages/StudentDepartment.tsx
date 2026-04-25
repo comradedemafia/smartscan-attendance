@@ -25,6 +25,14 @@ export default function StudentDepartment() {
   const [deptExpanded, setDeptExpanded] = useState(true);
   const [expandedLevels, setExpandedLevels] = useState<Set<string>>(new Set());
   const [expandedSemesters, setExpandedSemesters] = useState<Set<string>>(new Set());
+  const [searchTerm, setSearchTerm] = useState("");
+  const [nowTick, setNowTick] = useState(() => Date.now());
+
+  // Tick every second so countdowns update live
+  useEffect(() => {
+    const id = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   // Get student profile with department info
   const { data: studentProfile } = useQuery({
