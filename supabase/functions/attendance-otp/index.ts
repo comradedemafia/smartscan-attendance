@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 // Base32 decoding for TOTP
-function base32Decode(str: string): Uint8Array {
+export function base32Decode(str: string): Uint8Array<ArrayBuffer> {
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
   const cleaned = str.replace(/=+$/, "").toUpperCase();
   let bits = 0;
@@ -23,10 +23,16 @@ function base32Decode(str: string): Uint8Array {
       bits -= 8;
     }
   }
-  return new Uint8Array(output);
+  // Allocate a fresh ArrayBuffer (not SharedArrayBuffer) so the result is
+  // unambiguously a `Uint8Array<ArrayBuffer>` and satisfies WebCrypto's
+  // `BufferSource` typing under strict TS settings.
+  const buf = new ArrayBuffer(output.length);
+  const view = new Uint8Array(buf);
+  view.set(output);
+  return view;
 }
 
-async function generateTOTP(secret: string, timeStep = 30, digits = 6): Promise<string> {
+export async function generateTOTP(secret: string, timeStep = 30, digits = 6): Promise<string> {
   const key = base32Decode(secret);
   const counter = Math.floor(Date.now() / 1000 / timeStep);
   const counterBytes = new Uint8Array(8);
@@ -37,7 +43,7 @@ async function generateTOTP(secret: string, timeStep = 30, digits = 6): Promise<
   }
 
   const cryptoKey = await crypto.subtle.importKey(
-    "raw", key as BufferSource, { name: "HMAC", hash: "SHA-1" }, false, ["sign"]
+    "raw", key, { name: "HMAC", hash: "SHA-1" }, false, ["sign"]
   );
   const hmac = new Uint8Array(await crypto.subtle.sign("HMAC", cryptoKey, counterBytes));
 
@@ -50,7 +56,33 @@ async function generateTOTP(secret: string, timeStep = 30, digits = 6): Promise<
   return code.toString().padStart(digits, "0");
 }
 
-async function verifyTOTP(secret: string, token: string): Promise<boolean> {
+// Deterministic helper for tests: generate TOTP at a specific counter value
+// (so tests don't depend on wall-clock time).
+export async function generateTOTPAt(
+  secret: string,
+  counter: number,
+  digits = 6,
+): Promise<string> {
+  const key = base32Decode(secret);
+  const counterBytes = new Uint8Array(8);
+  let tmp = counter;
+  for (let i = 7; i >= 0; i--) {
+    counterBytes[i] = tmp & 0xff;
+    tmp = Math.floor(tmp / 256);
+  }
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw", key, { name: "HMAC", hash: "SHA-1" }, false, ["sign"],
+  );
+  const hmac = new Uint8Array(await crypto.subtle.sign("HMAC", cryptoKey, counterBytes));
+  const offset = hmac[hmac.length - 1] & 0x0f;
+  const code = ((hmac[offset] & 0x7f) << 24 |
+    (hmac[offset + 1] & 0xff) << 16 |
+    (hmac[offset + 2] & 0xff) << 8 |
+    (hmac[offset + 3] & 0xff)) % Math.pow(10, digits);
+  return code.toString().padStart(digits, "0");
+}
+
+export async function verifyTOTP(secret: string, token: string): Promise<boolean> {
   for (const offset of [0, -1, 1]) {
     const timeStep = 30;
     const counter = Math.floor(Date.now() / 1000 / timeStep) + offset;
@@ -63,7 +95,7 @@ async function verifyTOTP(secret: string, token: string): Promise<boolean> {
 
     const key = base32Decode(secret);
     const cryptoKey = await crypto.subtle.importKey(
-      "raw", key as BufferSource, { name: "HMAC", hash: "SHA-1" }, false, ["sign"]
+      "raw", key, { name: "HMAC", hash: "SHA-1" }, false, ["sign"]
     );
     const hmac = new Uint8Array(await crypto.subtle.sign("HMAC", cryptoKey, counterBytes));
     const off = hmac[hmac.length - 1] & 0x0f;
