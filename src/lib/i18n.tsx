@@ -1111,6 +1111,13 @@ const translations = {
     "dept.studentsEnrolled": "wanafunzi wamejisajili",
     "dept.myDepartmentTitle": "Idara Yangu",
     "dept.modules": "moduli",
+    "dept.searchPlaceholder": "Tafuta moduli kwa jina au msimbo…",
+    "dept.noSearchResults": "Hakuna moduli zinazolingana na utafutaji wako.",
+    "courses.timeLeft": "Muda uliobaki",
+    "courses.daysShort": "s",
+    "courses.hoursShort": "saa",
+    "courses.minutesShort": "dak",
+    "courses.secondsShort": "sek",
 
     // Subjects
     "subjects.title": "Masomo",
