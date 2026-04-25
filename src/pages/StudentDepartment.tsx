@@ -487,6 +487,9 @@ export default function StudentDepartment() {
             {coursesByLevel.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-6">{t("dept.noLevels")}</p>
             )}
+            {searchTerm.trim() && coursesByLevel.every((l) => l.totalCourses === 0) && unassignedCourses.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-6">{t("dept.noSearchResults") || "No modules match your search."}</p>
+            )}
 
             {coursesByLevel.map((level) => {
               const isLevelOpen = expandedLevels.has(level.id);
