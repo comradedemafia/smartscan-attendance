@@ -438,6 +438,63 @@ export type Database = {
           },
         ]
       }
+      otp_replay_guard: {
+        Row: {
+          counter: number
+          created_at: string
+          id: string
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          counter: number
+          created_at?: string
+          id?: string
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          counter?: number
+          created_at?: string
+          id?: string
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      otp_verification_log: {
+        Row: {
+          created_at: string
+          failure_reason: string | null
+          id: string
+          ip_address: string | null
+          matched_offset: number | null
+          session_id: string | null
+          success: boolean
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          failure_reason?: string | null
+          id?: string
+          ip_address?: string | null
+          matched_offset?: number | null
+          session_id?: string | null
+          success: boolean
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          failure_reason?: string | null
+          id?: string
+          ip_address?: string | null
+          matched_offset?: number | null
+          session_id?: string | null
+          success?: boolean
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           academic_year: string | null

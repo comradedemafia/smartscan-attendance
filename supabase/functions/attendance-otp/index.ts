@@ -6,6 +6,19 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// ─── Configurable TOTP settings (via env vars) ─────────────────────────────
+// Defaults match RFC 6238 + Google Authenticator: 30s step, 6 digits, ±1 window.
+function getIntEnv(name: string, fallback: number, min: number, max: number): number {
+  const raw = Deno.env.get(name);
+  if (!raw) return fallback;
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < min || n > max) return fallback;
+  return n;
+}
+export const TOTP_TIME_STEP = getIntEnv("TOTP_TIME_STEP", 30, 5, 300);
+export const TOTP_DIGITS = getIntEnv("TOTP_DIGITS", 6, 6, 8);
+export const TOTP_WINDOW = getIntEnv("TOTP_WINDOW", 1, 0, 5);
+
 // Base32 decoding for TOTP
 export function base32Decode(str: string): Uint8Array<ArrayBuffer> {
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
@@ -32,7 +45,11 @@ export function base32Decode(str: string): Uint8Array<ArrayBuffer> {
   return view;
 }
 
-export async function generateTOTP(secret: string, timeStep = 30, digits = 6): Promise<string> {
+export async function generateTOTP(
+  secret: string,
+  timeStep: number = TOTP_TIME_STEP,
+  digits: number = TOTP_DIGITS,
+): Promise<string> {
   const key = base32Decode(secret);
   const counter = Math.floor(Date.now() / 1000 / timeStep);
   const counterBytes = new Uint8Array(8);
@@ -61,7 +78,7 @@ export async function generateTOTP(secret: string, timeStep = 30, digits = 6): P
 export async function generateTOTPAt(
   secret: string,
   counter: number,
-  digits = 6,
+  digits: number = TOTP_DIGITS,
 ): Promise<string> {
   const key = base32Decode(secret);
   const counterBytes = new Uint8Array(8);
@@ -82,10 +99,22 @@ export async function generateTOTPAt(
   return code.toString().padStart(digits, "0");
 }
 
-export async function verifyTOTP(secret: string, token: string): Promise<boolean> {
-  for (const offset of [0, -1, 1]) {
-    const timeStep = 30;
-    const counter = Math.floor(Date.now() / 1000 / timeStep) + offset;
+// Returns the matched offset if valid, otherwise null.
+// Also returns the absolute counter that matched (for replay protection).
+export async function verifyTOTPDetailed(
+  secret: string,
+  token: string,
+  timeStep: number = TOTP_TIME_STEP,
+  digits: number = TOTP_DIGITS,
+  window: number = TOTP_WINDOW,
+): Promise<{ valid: boolean; offset: number | null; counter: number | null }> {
+  const offsets: number[] = [0];
+  for (let i = 1; i <= window; i++) {
+    offsets.push(-i, i);
+  }
+  const baseCounter = Math.floor(Date.now() / 1000 / timeStep);
+  for (const offset of offsets) {
+    const counter = baseCounter + offset;
     const counterBytes = new Uint8Array(8);
     let tmp = counter;
     for (let i = 7; i >= 0; i--) {
@@ -102,10 +131,18 @@ export async function verifyTOTP(secret: string, token: string): Promise<boolean
     const code = ((hmac[off] & 0x7f) << 24 |
       (hmac[off + 1] & 0xff) << 16 |
       (hmac[off + 2] & 0xff) << 8 |
-      (hmac[off + 3] & 0xff)) % 1000000;
-    if (code.toString().padStart(6, "0") === token) return true;
+      (hmac[off + 3] & 0xff)) % Math.pow(10, digits);
+    if (code.toString().padStart(digits, "0") === token) {
+      return { valid: true, offset, counter };
+    }
   }
-  return false;
+  return { valid: false, offset: null, counter: null };
+}
+
+// Backwards-compatible boolean wrapper
+export async function verifyTOTP(secret: string, token: string): Promise<boolean> {
+  const r = await verifyTOTPDetailed(secret, token);
+  return r.valid;
 }
 
 // Calculate distance between two GPS points using Haversine formula (returns meters)
@@ -172,6 +209,32 @@ Deno.serve(async (req) => {
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
     const body = await req.json();
     const action = body?.action;
+
+    // Best-effort client IP for audit logging
+    const clientIp =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      req.headers.get("x-real-ip") ||
+      null;
+
+    const logOtpAttempt = async (
+      success: boolean,
+      session_id: string | null,
+      offset: number | null,
+      failure_reason: string | null,
+    ) => {
+      try {
+        await adminClient.from("otp_verification_log").insert({
+          user_id: user.id,
+          session_id,
+          success,
+          matched_offset: offset,
+          failure_reason,
+          ip_address: clientIp,
+        });
+      } catch (e) {
+        console.error("otp log insert failed", e);
+      }
+    };
 
     // ─── INITIATE: After QR scan, validate QR, GPS, and check TOTP status ───
     if (action === "initiate") {
@@ -285,6 +348,7 @@ Deno.serve(async (req) => {
       }
 
       if (typeof code !== "string" || code.length !== 6 || !/^\d{6}$/.test(code)) {
+        await logOtpAttempt(false, session_id ?? null, null, "INVALID_FORMAT");
         return new Response(JSON.stringify({ error: "Invalid OTP format" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -298,6 +362,7 @@ Deno.serve(async (req) => {
         .single();
 
       if (!session || session.status !== "active") {
+        await logOtpAttempt(false, session_id, null, "SESSION_INACTIVE");
         return new Response(JSON.stringify({ error: "Session not active" }), {
           status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -306,6 +371,7 @@ Deno.serve(async (req) => {
       // Re-validate GPS location
       const locationCheck = validateLocation(session, latitude, longitude);
       if (!locationCheck.valid) {
+        await logOtpAttempt(false, session_id, null, "OUTSIDE_RADIUS");
         return new Response(JSON.stringify({ error: "OUTSIDE_RADIUS", distance: locationCheck.distance }), {
           status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -320,6 +386,7 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (existing) {
+        await logOtpAttempt(false, session_id, null, "DUPLICATE");
         return new Response(JSON.stringify({ error: "DUPLICATE" }), {
           status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -333,16 +400,45 @@ Deno.serve(async (req) => {
         .single();
 
       if (!profile?.totp_secret) {
+        await logOtpAttempt(false, session_id, null, "TOTP_NOT_SETUP");
         return new Response(JSON.stringify({ error: "TOTP not set up" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      const valid = await verifyTOTP(profile.totp_secret, code);
-      if (!valid) {
+      const result = await verifyTOTPDetailed(profile.totp_secret, code);
+      if (!result.valid || result.counter === null) {
+        await logOtpAttempt(false, session_id, null, "INVALID_OTP");
         return new Response(JSON.stringify({ error: "INVALID_OTP" }), {
           status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
+      }
+
+      // ─── Replay protection: reject reused (session, user, counter) ─────
+      const { error: replayErr } = await adminClient
+        .from("otp_replay_guard")
+        .insert({
+          session_id,
+          user_id: user.id,
+          counter: result.counter,
+        });
+
+      if (replayErr) {
+        // Unique-violation = code already used for this session+counter
+        const isUnique = (replayErr as { code?: string }).code === "23505";
+        await logOtpAttempt(
+          false,
+          session_id,
+          result.offset,
+          isUnique ? "REPLAY_DETECTED" : "REPLAY_GUARD_ERROR",
+        );
+        return new Response(
+          JSON.stringify({ error: isUnique ? "REPLAY_DETECTED" : "REPLAY_GUARD_ERROR" }),
+          {
+            status: isUnique ? 409 : 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
       }
 
       // Record attendance with GPS coordinates
@@ -358,11 +454,13 @@ Deno.serve(async (req) => {
 
       if (insertError) {
         console.error("Attendance insert error:", insertError);
+        await logOtpAttempt(false, session_id, result.offset, "ATTENDANCE_INSERT_FAILED");
         return new Response(JSON.stringify({ error: "Failed to record attendance" }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
+      await logOtpAttempt(true, session_id, result.offset, null);
       return new Response(JSON.stringify({ success: true }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
