@@ -210,6 +210,32 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const action = body?.action;
 
+    // Best-effort client IP for audit logging
+    const clientIp =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      req.headers.get("x-real-ip") ||
+      null;
+
+    const logOtpAttempt = async (
+      success: boolean,
+      session_id: string | null,
+      offset: number | null,
+      failure_reason: string | null,
+    ) => {
+      try {
+        await adminClient.from("otp_verification_log").insert({
+          user_id: user.id,
+          session_id,
+          success,
+          matched_offset: offset,
+          failure_reason,
+          ip_address: clientIp,
+        });
+      } catch (e) {
+        console.error("otp log insert failed", e);
+      }
+    };
+
     // ─── INITIATE: After QR scan, validate QR, GPS, and check TOTP status ───
     if (action === "initiate") {
       const { session_id, secret, latitude, longitude } = body;
@@ -322,6 +348,7 @@ Deno.serve(async (req) => {
       }
 
       if (typeof code !== "string" || code.length !== 6 || !/^\d{6}$/.test(code)) {
+        await logOtpAttempt(false, session_id ?? null, null, "INVALID_FORMAT");
         return new Response(JSON.stringify({ error: "Invalid OTP format" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -335,6 +362,7 @@ Deno.serve(async (req) => {
         .single();
 
       if (!session || session.status !== "active") {
+        await logOtpAttempt(false, session_id, null, "SESSION_INACTIVE");
         return new Response(JSON.stringify({ error: "Session not active" }), {
           status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -343,6 +371,7 @@ Deno.serve(async (req) => {
       // Re-validate GPS location
       const locationCheck = validateLocation(session, latitude, longitude);
       if (!locationCheck.valid) {
+        await logOtpAttempt(false, session_id, null, "OUTSIDE_RADIUS");
         return new Response(JSON.stringify({ error: "OUTSIDE_RADIUS", distance: locationCheck.distance }), {
           status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -357,6 +386,7 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (existing) {
+        await logOtpAttempt(false, session_id, null, "DUPLICATE");
         return new Response(JSON.stringify({ error: "DUPLICATE" }), {
           status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -370,16 +400,45 @@ Deno.serve(async (req) => {
         .single();
 
       if (!profile?.totp_secret) {
+        await logOtpAttempt(false, session_id, null, "TOTP_NOT_SETUP");
         return new Response(JSON.stringify({ error: "TOTP not set up" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      const valid = await verifyTOTP(profile.totp_secret, code);
-      if (!valid) {
+      const result = await verifyTOTPDetailed(profile.totp_secret, code);
+      if (!result.valid || result.counter === null) {
+        await logOtpAttempt(false, session_id, null, "INVALID_OTP");
         return new Response(JSON.stringify({ error: "INVALID_OTP" }), {
           status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
+      }
+
+      // ─── Replay protection: reject reused (session, user, counter) ─────
+      const { error: replayErr } = await adminClient
+        .from("otp_replay_guard")
+        .insert({
+          session_id,
+          user_id: user.id,
+          counter: result.counter,
+        });
+
+      if (replayErr) {
+        // Unique-violation = code already used for this session+counter
+        const isUnique = (replayErr as { code?: string }).code === "23505";
+        await logOtpAttempt(
+          false,
+          session_id,
+          result.offset,
+          isUnique ? "REPLAY_DETECTED" : "REPLAY_GUARD_ERROR",
+        );
+        return new Response(
+          JSON.stringify({ error: isUnique ? "REPLAY_DETECTED" : "REPLAY_GUARD_ERROR" }),
+          {
+            status: isUnique ? 409 : 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
       }
 
       // Record attendance with GPS coordinates
@@ -395,11 +454,13 @@ Deno.serve(async (req) => {
 
       if (insertError) {
         console.error("Attendance insert error:", insertError);
+        await logOtpAttempt(false, session_id, result.offset, "ATTENDANCE_INSERT_FAILED");
         return new Response(JSON.stringify({ error: "Failed to record attendance" }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
+      await logOtpAttempt(true, session_id, result.offset, null);
       return new Response(JSON.stringify({ success: true }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
