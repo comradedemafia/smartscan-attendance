@@ -1,0 +1,48 @@
+name: Edge Functions Type Check & Tests
+
+on:
+  push:
+    paths:
+      - "supabase/functions/**"
+      - ".github/workflows/edge-functions-typecheck.yml"
+  pull_request:
+    paths:
+      - "supabase/functions/**"
+      - ".github/workflows/edge-functions-typecheck.yml"
+
+jobs:
+  typecheck:
+    name: Deno type-check & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+
+      # Type-check every edge function entrypoint and any test file.
+      # `deno check` runs the TS compiler without executing the code,
+      # which catches errors like TS2769 (the SharedArrayBuffer issue)
+      # before deployment.
+      - name: Type-check all edge functions
+        run: |
+          set -e
+          shopt -s nullglob
+          files=(supabase/functions/*/index.ts supabase/functions/*/*_test.ts supabase/functions/*/*.test.ts)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No edge function files found."
+            exit 0
+          fi
+          echo "Checking: ${files[@]}"
+          deno check "${files[@]}"
+
+      - name: Run edge function tests
+        run: |
+          if compgen -G "supabase/functions/*/*_test.ts" > /dev/null \
+             || compgen -G "supabase/functions/*/*.test.ts" > /dev/null; then
+            deno test --allow-net --allow-env supabase/functions/
+          else
+            echo "No edge function tests found."
+          fi
