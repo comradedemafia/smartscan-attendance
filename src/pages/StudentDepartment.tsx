@@ -195,6 +195,21 @@ export default function StudentDepartment() {
     }
   }, [semesters, expandedLevels]);
 
+  // When user is searching, auto-expand levels & semesters that contain matches
+  useEffect(() => {
+    if (!searchTerm.trim()) return;
+    const q = searchTerm.trim().toLowerCase();
+    const matchingCourses = courses.filter(
+      (c) =>
+        (c.name || "").toLowerCase().includes(q) ||
+        (c.code || "").toLowerCase().includes(q)
+    );
+    const levelIds = new Set(matchingCourses.map((c) => c.level_id).filter(Boolean) as string[]);
+    const semIds = new Set(matchingCourses.map((c) => c.semester_id).filter(Boolean) as string[]);
+    if (levelIds.size) setExpandedLevels((prev) => new Set([...prev, ...levelIds]));
+    if (semIds.size) setExpandedSemesters((prev) => new Set([...prev, ...semIds]));
+  }, [searchTerm, courses]);
+
   const toggleLevel = (id: string) => {
     setExpandedLevels((prev) => {
       const next = new Set(prev);
