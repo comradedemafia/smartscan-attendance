@@ -232,8 +232,37 @@ export default function StudentDepartment() {
     const isEnrolled = myEnrollments.includes(course.id);
     const isCore = course.is_core !== false; // default true
     const deadline = course.selection_deadline ? new Date(course.selection_deadline) : null;
-    const deadlinePassed = !!deadline && deadline.getTime() <= Date.now();
+    const deadlinePassed = !!deadline && deadline.getTime() <= nowTick;
     const lockedOptional = !isCore && deadlinePassed;
+
+    // Live countdown for optional modules with a deadline
+    let countdown: string | null = null;
+    let urgency: "ok" | "warn" | "critical" = "ok";
+    if (!isCore && deadline && !deadlinePassed) {
+      const ms = deadline.getTime() - nowTick;
+      const totalSec = Math.floor(ms / 1000);
+      const days = Math.floor(totalSec / 86400);
+      const hours = Math.floor((totalSec % 86400) / 3600);
+      const minutes = Math.floor((totalSec % 3600) / 60);
+      const seconds = totalSec % 60;
+      const dShort = t("courses.daysShort") || "d";
+      const hShort = t("courses.hoursShort") || "h";
+      const mShort = t("courses.minutesShort") || "m";
+      const sShort = t("courses.secondsShort") || "s";
+      if (days > 0) countdown = `${days}${dShort} ${hours}${hShort}`;
+      else if (hours > 0) countdown = `${hours}${hShort} ${minutes}${mShort}`;
+      else if (minutes > 0) countdown = `${minutes}${mShort} ${seconds}${sShort}`;
+      else countdown = `${seconds}${sShort}`;
+      if (ms <= 30 * 60 * 1000) urgency = "critical";
+      else if (ms <= 24 * 60 * 60 * 1000) urgency = "warn";
+    }
+    const urgencyClass =
+      urgency === "critical"
+        ? "text-destructive border-destructive/40 animate-pulse"
+        : urgency === "warn"
+          ? "text-amber-600 border-amber-500/40 dark:text-amber-400"
+          : "text-muted-foreground border-muted-foreground/30";
+
     return (
       <Card key={course.id} className={`transition-all ${isEnrolled ? "border-primary/40 bg-primary/5" : ""}`}>
         <CardContent className="p-4 space-y-3">
@@ -263,6 +292,12 @@ export default function StudentDepartment() {
               <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{course.description}</p>
             )}
           </div>
+          {countdown && (
+            <div className={`flex items-center gap-1.5 text-[11px] font-medium border rounded-md px-2 py-1 ${urgencyClass}`}>
+              <Clock className="h-3.5 w-3.5" />
+              <span>{t("courses.timeLeft") || "Time left"}: <span className="font-mono">{countdown}</span></span>
+            </div>
+          )}
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <Users className="h-3.5 w-3.5" />
             <span>{enrollmentCounts[course.id] || 0} {t("dept.studentsEnrolled")}</span>
