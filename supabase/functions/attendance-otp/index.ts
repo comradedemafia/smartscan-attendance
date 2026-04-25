@@ -6,6 +6,19 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// ─── Configurable TOTP settings (via env vars) ─────────────────────────────
+// Defaults match RFC 6238 + Google Authenticator: 30s step, 6 digits, ±1 window.
+function getIntEnv(name: string, fallback: number, min: number, max: number): number {
+  const raw = Deno.env.get(name);
+  if (!raw) return fallback;
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < min || n > max) return fallback;
+  return n;
+}
+export const TOTP_TIME_STEP = getIntEnv("TOTP_TIME_STEP", 30, 5, 300);
+export const TOTP_DIGITS = getIntEnv("TOTP_DIGITS", 6, 6, 8);
+export const TOTP_WINDOW = getIntEnv("TOTP_WINDOW", 1, 0, 5);
+
 // Base32 decoding for TOTP
 export function base32Decode(str: string): Uint8Array<ArrayBuffer> {
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
@@ -32,7 +45,11 @@ export function base32Decode(str: string): Uint8Array<ArrayBuffer> {
   return view;
 }
 
-export async function generateTOTP(secret: string, timeStep = 30, digits = 6): Promise<string> {
+export async function generateTOTP(
+  secret: string,
+  timeStep: number = TOTP_TIME_STEP,
+  digits: number = TOTP_DIGITS,
+): Promise<string> {
   const key = base32Decode(secret);
   const counter = Math.floor(Date.now() / 1000 / timeStep);
   const counterBytes = new Uint8Array(8);
@@ -61,7 +78,7 @@ export async function generateTOTP(secret: string, timeStep = 30, digits = 6): P
 export async function generateTOTPAt(
   secret: string,
   counter: number,
-  digits = 6,
+  digits: number = TOTP_DIGITS,
 ): Promise<string> {
   const key = base32Decode(secret);
   const counterBytes = new Uint8Array(8);
@@ -82,10 +99,22 @@ export async function generateTOTPAt(
   return code.toString().padStart(digits, "0");
 }
 
-export async function verifyTOTP(secret: string, token: string): Promise<boolean> {
-  for (const offset of [0, -1, 1]) {
-    const timeStep = 30;
-    const counter = Math.floor(Date.now() / 1000 / timeStep) + offset;
+// Returns the matched offset if valid, otherwise null.
+// Also returns the absolute counter that matched (for replay protection).
+export async function verifyTOTPDetailed(
+  secret: string,
+  token: string,
+  timeStep: number = TOTP_TIME_STEP,
+  digits: number = TOTP_DIGITS,
+  window: number = TOTP_WINDOW,
+): Promise<{ valid: boolean; offset: number | null; counter: number | null }> {
+  const offsets: number[] = [0];
+  for (let i = 1; i <= window; i++) {
+    offsets.push(-i, i);
+  }
+  const baseCounter = Math.floor(Date.now() / 1000 / timeStep);
+  for (const offset of offsets) {
+    const counter = baseCounter + offset;
     const counterBytes = new Uint8Array(8);
     let tmp = counter;
     for (let i = 7; i >= 0; i--) {
@@ -102,10 +131,18 @@ export async function verifyTOTP(secret: string, token: string): Promise<boolean
     const code = ((hmac[off] & 0x7f) << 24 |
       (hmac[off + 1] & 0xff) << 16 |
       (hmac[off + 2] & 0xff) << 8 |
-      (hmac[off + 3] & 0xff)) % 1000000;
-    if (code.toString().padStart(6, "0") === token) return true;
+      (hmac[off + 3] & 0xff)) % Math.pow(10, digits);
+    if (code.toString().padStart(digits, "0") === token) {
+      return { valid: true, offset, counter };
+    }
   }
-  return false;
+  return { valid: false, offset: null, counter: null };
+}
+
+// Backwards-compatible boolean wrapper
+export async function verifyTOTP(secret: string, token: string): Promise<boolean> {
+  const r = await verifyTOTPDetailed(secret, token);
+  return r.valid;
 }
 
 // Calculate distance between two GPS points using Haversine formula (returns meters)
