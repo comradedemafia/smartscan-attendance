@@ -27,6 +27,7 @@ import {
   GraduationCap,
   Bell,
   FileText,
+  ShieldCheck,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -72,6 +73,7 @@ export default function AppLayout() {
     { to: "/users", icon: Users, label: t("nav.users"), roles: ["admin"] },
     { to: "/excuses", icon: FileText, label: t("excuse.title"), roles: ["admin", "lecturer", "student"] },
     { to: "/notifications", icon: Bell, label: t("notify.history"), roles: ["admin", "lecturer", "student"] },
+    { to: "/otp-audit", icon: ShieldCheck, label: t("otpAudit.title"), roles: ["admin"] },
     { to: "/settings", icon: Settings, label: t("nav.settings"), roles: ["admin", "lecturer", "student"] },
   ];
 
