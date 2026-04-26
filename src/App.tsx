@@ -26,6 +26,7 @@ import StudentDepartment from "@/pages/StudentDepartment";
 import AdminDepartments from "@/pages/AdminDepartments";
 import Notifications from "@/pages/Notifications";
 import Excuses from "@/pages/Excuses";
+import AdminOtpAuditLog from "@/pages/AdminOtpAuditLog";
 
 const queryClient = new QueryClient();
 
@@ -78,6 +79,7 @@ const App = () => (
                   <Route path="/departments" element={<AdminDepartments />} />
                   <Route path="/notifications" element={<Notifications />} />
                   <Route path="/excuses" element={<Excuses />} />
+                  <Route path="/otp-audit" element={<AdminOtpAuditLog />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>

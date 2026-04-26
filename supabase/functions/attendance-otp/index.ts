@@ -415,6 +415,10 @@ Deno.serve(async (req) => {
       }
 
       // ─── Replay protection: reject reused (session, user, counter) ─────
+      // The (session_id, user_id, counter) UNIQUE constraint guarantees that
+      // a given OTP can only be accepted once. We map PostgreSQL error
+      // 23505 (unique_violation) deterministically to a stable client
+      // contract: HTTP 409 + { error: "REPLAY_DETECTED", code: "REPLAY_DETECTED" }.
       const { error: replayErr } = await adminClient
         .from("otp_replay_guard")
         .insert({
@@ -424,18 +428,32 @@ Deno.serve(async (req) => {
         });
 
       if (replayErr) {
-        // Unique-violation = code already used for this session+counter
-        const isUnique = (replayErr as { code?: string }).code === "23505";
+        const pgCode = (replayErr as { code?: string }).code;
+        const isReplay = pgCode === "23505";
         await logOtpAttempt(
           false,
           session_id,
           result.offset,
-          isUnique ? "REPLAY_DETECTED" : "REPLAY_GUARD_ERROR",
+          isReplay ? "REPLAY_DETECTED" : "REPLAY_GUARD_ERROR",
         );
+        if (isReplay) {
+          // Stable client contract for replay
+          return new Response(
+            JSON.stringify({
+              error: "REPLAY_DETECTED",
+              code: "REPLAY_DETECTED",
+              message: "This OTP code has already been used for this session.",
+            }),
+            {
+              status: 409,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+          );
+        }
         return new Response(
-          JSON.stringify({ error: isUnique ? "REPLAY_DETECTED" : "REPLAY_GUARD_ERROR" }),
+          JSON.stringify({ error: "REPLAY_GUARD_ERROR", code: "REPLAY_GUARD_ERROR" }),
           {
-            status: isUnique ? 409 : 500,
+            status: 500,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           },
         );

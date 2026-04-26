@@ -8,10 +8,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { useToast } from "@/hooks/use-toast";
-import { QrCode, CheckCircle2, XCircle, Camera, ShieldAlert, Settings, KeyRound, WifiOff, Wifi, Upload } from "lucide-react";
+import { QrCode, CheckCircle2, XCircle, Camera, ShieldAlert, Settings, KeyRound, WifiOff, Wifi, Upload, ShieldOff } from "lucide-react";
 import { Html5Qrcode } from "html5-qrcode";
 import { Badge } from "@/components/ui/badge";
 import { z } from "zod";
+import { useOtpBruteForceGuard } from "@/hooks/useOtpBruteForceGuard";
 
 const qrPayloadSchema = z.object({
   session_id: z.string().uuid(),
@@ -61,6 +62,8 @@ export default function ScanQR() {
   const [pendingSecret, setPendingSecret] = useState<string | null>(null);
   const [otpCode, setOtpCode] = useState("");
 
+  // Brute-force soft-guard based on user's own audit log
+  const otpGuard = useOtpBruteForceGuard(pendingSessionId);
 
   // After QR scan — validate
   const initiateMutation = useMutation({
@@ -98,6 +101,9 @@ export default function ScanQR() {
   // Verify TOTP and record attendance
   const verifyMutation = useMutation({
     mutationFn: async () => {
+      if (otpGuard.blocked) {
+        throw new Error("RATE_LIMITED");
+      }
       const { data, error } = await supabase.functions.invoke("attendance-otp", {
         body: {
           action: "verify-scan-totp",
@@ -113,16 +119,34 @@ export default function ScanQR() {
       setScanStep("verified");
       setResult("success");
       toast({ title: t("qr.success"), description: t("otp.verified") });
+      otpGuard.refresh();
     },
     onError: (e: any) => {
-      if (e.message === "INVALID_OTP") {
+      if (e.message === "RATE_LIMITED") {
+        toast({
+          title: t("otp.tooManyAttempts") || "Too many attempts",
+          description: t("otp.cooldownDesc") || "Please wait before trying again.",
+          variant: "destructive",
+        });
+      } else if (e.message === "INVALID_OTP") {
         toast({ title: t("otp.invalidCode"), variant: "destructive" });
+        otpGuard.refresh();
+      } else if (e.message === "REPLAY_DETECTED") {
+        setResult("duplicate");
+        setScanStep("scan");
+        toast({
+          title: t("otp.replayTitle") || "Code already used",
+          description: t("otp.replayDesc") || "This OTP code has already been used for this session.",
+          variant: "destructive",
+        });
+        otpGuard.refresh();
       } else if (e.message === "DUPLICATE") {
         setResult("duplicate");
         setScanStep("scan");
         toast({ title: t("qr.alreadyScanned"), variant: "destructive" });
       } else {
         toast({ title: t("common.error"), description: e.message, variant: "destructive" });
+        otpGuard.refresh();
       }
     },
   });
@@ -297,6 +321,34 @@ export default function ScanQR() {
                 </div>
               </div>
 
+              {/* Brute-force soft-guard indicator */}
+              {otpGuard.blocked ? (
+                <div className="flex items-start gap-3 p-3 rounded-lg border border-destructive/40 bg-destructive/10 text-destructive">
+                  <ShieldOff className="h-5 w-5 mt-0.5 shrink-0" />
+                  <div className="text-sm">
+                    <p className="font-medium">
+                      {t("otp.tooManyAttempts") || "Too many failed attempts"}
+                    </p>
+                    <p className="text-xs opacity-90">
+                      {(t("otp.tryAgainIn") || "Try again in")}{" "}
+                      <span className="font-mono">{otpGuard.cooldownSecondsLeft}s</span>
+                    </p>
+                  </div>
+                </div>
+              ) : otpGuard.recentFailures >= 3 ? (
+                <div className="flex items-start gap-3 p-3 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400">
+                  <ShieldAlert className="h-5 w-5 mt-0.5 shrink-0" />
+                  <div className="text-sm">
+                    <p className="font-medium">
+                      {t("otp.warningAttempts") || "Multiple failed attempts detected"}
+                    </p>
+                    <p className="text-xs opacity-90">
+                      {otpGuard.recentFailures}/{5} {t("otp.failuresWindow") || "failures in last 5 min"}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+
               <div className="flex justify-center">
                 <InputOTP maxLength={6} value={otpCode} onChange={setOtpCode}>
                   <InputOTPGroup>
@@ -314,9 +366,13 @@ export default function ScanQR() {
                 className="w-full"
                 size="lg"
                 onClick={() => verifyMutation.mutate()}
-                disabled={otpCode.length !== 6 || verifyMutation.isPending}
+                disabled={otpCode.length !== 6 || verifyMutation.isPending || otpGuard.blocked}
               >
-                {verifyMutation.isPending ? t("common.loading") : t("otp.verify")}
+                {otpGuard.blocked
+                  ? `${t("otp.waitSeconds") || "Wait"} ${otpGuard.cooldownSecondsLeft}s`
+                  : verifyMutation.isPending
+                    ? t("common.loading")
+                    : t("otp.verify")}
               </Button>
 
               <Button variant="ghost" className="w-full" onClick={resetToScan}>
