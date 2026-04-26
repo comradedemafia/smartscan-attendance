@@ -381,7 +381,7 @@ const translations = {
     "auth.phone": "Phone Number (0XXXXXXXXX)",
 
     // Departments
-    "dept.myDepartment": "Community Development (CD)",
+    "dept.myDepartment": "My Department",
     "dept.noDepartment": "No department assigned. Please contact admin.",
     "dept.departments": "Departments",
     "dept.adminDesc": "Manage departments, levels, semesters, and modules. Assign lecturers and monitor teaching activity.",
@@ -1026,7 +1026,7 @@ const translations = {
     "auth.phone": "Namba ya Simu (+255)",
 
     // Departments
-    "dept.myDepartment": "Community Development (CD)",
+    "dept.myDepartment": "Idara Yangu",
     "dept.noDepartment": "Huna idara iliyowekwa. Wasiliana na msimamizi.",
     "dept.departments": "Idara",
     "dept.adminDesc": "Simamia idara, ngazi, semesta, na moduli. Weka wahadhiri na fuatilia ufundishaji.",
