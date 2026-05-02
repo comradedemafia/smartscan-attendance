@@ -365,11 +365,25 @@ export default function Auth() {
                 </>
               )}
 
-              <div className="space-y-2">
-                <Label htmlFor="email">{t("auth.email")}</Label>
-                <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@university.ac.tz" />
-                {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
-              </div>
+              {isLogin ? (
+                <div className="space-y-2">
+                  <Label htmlFor="loginId">{t("auth.loginIdLabel")}</Label>
+                  <Input
+                    id="loginId"
+                    value={loginId}
+                    onChange={(e) => setLoginId(e.target.value)}
+                    placeholder={t("auth.loginIdPlaceholder")}
+                    autoComplete="username"
+                  />
+                  {errors.loginId && <p className="text-sm text-destructive">{errors.loginId}</p>}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="email">{t("auth.email")}</Label>
+                  <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@university.ac.tz" />
+                  {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="password">{t("auth.password")}</Label>
