@@ -25,6 +25,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import AddLecturerDialog from "@/components/AddLecturerDialog";
 
 export default function UsersAdmin() {
   const { t } = useI18n();
@@ -960,13 +961,18 @@ export default function UsersAdmin() {
         <TabsContent value="staff" className="space-y-5 mt-5">
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <GraduationCap className="h-4 w-4" />
-                {t("admin.staffTable")}
-              </CardTitle>
-              <CardDescription>
-                {t("admin.lecturerLevel")} · {t("admin.lecturerModules")}
-              </CardDescription>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <GraduationCap className="h-4 w-4" />
+                    {t("admin.staffTable")}
+                  </CardTitle>
+                  <CardDescription>
+                    {t("admin.lecturerLevel")} · {t("admin.lecturerModules")}
+                  </CardDescription>
+                </div>
+                <AddLecturerDialog departments={departments} levels={levels} />
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Search & filters */}

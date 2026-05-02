@@ -505,6 +505,7 @@ export type Database = {
           full_name: string
           gender: string | null
           id: string
+          must_change_password: boolean
           phone: string | null
           study_year: number | null
           totp_secret: string | null
@@ -520,6 +521,7 @@ export type Database = {
           full_name: string
           gender?: string | null
           id: string
+          must_change_password?: boolean
           phone?: string | null
           study_year?: number | null
           totp_secret?: string | null
@@ -535,6 +537,7 @@ export type Database = {
           full_name?: string
           gender?: string | null
           id?: string
+          must_change_password?: boolean
           phone?: string | null
           study_year?: number | null
           totp_secret?: string | null
@@ -680,6 +683,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      email_for_login_id: { Args: { _login_id: string }; Returns: string }
       get_2fa_stats: {
         Args: never
         Returns: {

@@ -32,9 +32,16 @@ import {
 } from "@/components/ui/pagination";
 import { ShieldCheck, ShieldAlert, Filter, Eraser } from "lucide-react";
 import { format } from "date-fns";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const PAGE_SIZE = 25;
 type SuccessFilter = "all" | "success" | "failure";
+type SortDir = "newest" | "oldest";
 
 export default function AdminOtpAuditLog() {
   const { role } = useAuth();
@@ -42,12 +49,13 @@ export default function AdminOtpAuditLog() {
   const [userId, setUserId] = useState("");
   const [sessionId, setSessionId] = useState("");
   const [successFilter, setSuccessFilter] = useState<SuccessFilter>("all");
+  const [sortDir, setSortDir] = useState<SortDir>("newest");
   const [page, setPage] = useState(1);
 
   const isAdmin = role === "admin";
 
   const { data, isLoading } = useQuery({
-    queryKey: ["otp-audit-log", userId, sessionId, successFilter, page],
+    queryKey: ["otp-audit-log", userId, sessionId, successFilter, sortDir, page],
     enabled: isAdmin,
     queryFn: async () => {
       let query = supabase
@@ -56,7 +64,7 @@ export default function AdminOtpAuditLog() {
           "id, user_id, session_id, success, matched_offset, failure_reason, ip_address, created_at",
           { count: "exact" },
         )
-        .order("created_at", { ascending: false })
+        .order("created_at", { ascending: sortDir === "oldest" })
         .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
       if (userId.trim()) query = query.eq("user_id", userId.trim());
@@ -80,6 +88,7 @@ export default function AdminOtpAuditLog() {
     setUserId("");
     setSessionId("");
     setSuccessFilter("all");
+    setSortDir("newest");
     setPage(1);
   };
 
@@ -157,6 +166,23 @@ export default function AdminOtpAuditLog() {
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">
+              {t("otpAudit.sortBy")}
+            </label>
+            <Select
+              value={sortDir}
+              onValueChange={(v: SortDir) => { setSortDir(v); setPage(1); }}
+            >
+              <SelectTrigger className="h-9 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest">{t("otpAudit.sortNewest")}</SelectItem>
+                <SelectItem value="oldest">{t("otpAudit.sortOldest")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="flex items-end">
             <Button
               variant="outline"
@@ -174,6 +200,7 @@ export default function AdminOtpAuditLog() {
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
+          <TooltipProvider>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -225,19 +252,46 @@ export default function AdminOtpAuditLog() {
                         {row.session_id ? `${row.session_id.slice(0, 8)}…` : "—"}
                       </TableCell>
                       <TableCell className="text-xs">
-                        {row.failure_reason ?? "—"}
+                        {row.failure_reason ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="cursor-help underline decoration-dotted">
+                                {row.failure_reason.length > 24
+                                  ? row.failure_reason.slice(0, 24) + "…"
+                                  : row.failure_reason}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs break-all">
+                              {row.failure_reason}
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : "—"}
                       </TableCell>
                       <TableCell className="text-right font-mono text-xs">
                         {row.matched_offset ?? "—"}
                       </TableCell>
                       <TableCell className="font-mono text-[11px] text-muted-foreground">
-                        {row.ip_address ?? "—"}
+                        {row.ip_address ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="cursor-help underline decoration-dotted">
+                                {row.ip_address.length > 16
+                                  ? row.ip_address.slice(0, 16) + "…"
+                                  : row.ip_address}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs break-all">
+                              {row.ip_address}
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : "—"}
                       </TableCell>
                     </TableRow>
                   ))
                 )}
               </TableBody>
             </Table>
+          </TooltipProvider>
           </div>
         </CardContent>
       </Card>

@@ -27,13 +27,17 @@ import AdminDepartments from "@/pages/AdminDepartments";
 import Notifications from "@/pages/Notifications";
 import Excuses from "@/pages/Excuses";
 import AdminOtpAuditLog from "@/pages/AdminOtpAuditLog";
+import MustChangePassword from "@/pages/MustChangePassword";
 
 const queryClient = new QueryClient();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, profile } = useAuth();
   if (loading) return <div className="flex h-screen items-center justify-center text-muted-foreground">Loading...</div>;
   if (!user) return <Navigate to="/auth" replace />;
+  if (profile?.must_change_password && window.location.pathname !== "/change-password") {
+    return <Navigate to="/change-password" replace />;
+  }
   return <>{children}</>;
 }
 
@@ -56,6 +60,14 @@ const App = () => (
               <Routes>
                 <Route path="/auth" element={<AuthRoute />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
+                <Route
+                  path="/change-password"
+                  element={
+                    <ProtectedRoute>
+                      <MustChangePassword />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route
                   element={
                     <ProtectedRoute>

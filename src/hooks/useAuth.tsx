@@ -8,8 +8,15 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   role: AppRole | null;
-  profile: { university_id: string; full_name: string; email: string; avatar_url?: string | null } | null;
+  profile: {
+    university_id: string;
+    full_name: string;
+    email: string;
+    avatar_url?: string | null;
+    must_change_password?: boolean;
+  } | null;
   loading: boolean;
+  refreshProfile: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (
     email: string,
@@ -42,7 +49,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const [roleRes, profileRes] = await Promise.all([
         supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
-        supabase.from("profiles").select("university_id, full_name, email, avatar_url").eq("id", userId).maybeSingle(),
+        supabase
+          .from("profiles")
+          .select("university_id, full_name, email, avatar_url, must_change_password")
+          .eq("id", userId)
+          .maybeSingle(),
       ]);
       if (roleRes.data) setRole(roleRes.data.role as AppRole);
       if (profileRes.data) setProfile(profileRes.data);
@@ -120,7 +131,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, role, profile, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        session,
+        role,
+        profile,
+        loading,
+        refreshProfile: async () => {
+          if (user) await fetchUserData(user.id);
+        },
+        signIn,
+        signUp,
+        signOut,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
