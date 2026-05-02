@@ -272,15 +272,8 @@ export default function Auth() {
                   </div>
 
                   {/* Role */}
-                  <div className="space-y-2">
-                    <Label>{t("auth.role")}</Label>
-                    <Select value={role} onValueChange={(v) => setRole(v as "student" | "lecturer")}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="student">{t("auth.student")}</SelectItem>
-                        <SelectItem value="lecturer">{t("auth.lecturer")}</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="rounded-md border border-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                    {t("auth.studentOnlyNotice")}
                   </div>
 
                   {/* Gender */}
@@ -340,7 +333,7 @@ export default function Auth() {
                   </div>
 
                   {/* Study Year - students only */}
-                  {role === "student" && (
+                  {true && (
                     <div className="space-y-2">
                       <Label>{t("auth.studyYear")}</Label>
                       <Select value={studyYear} onValueChange={setStudyYear}>
