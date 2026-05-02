@@ -13,14 +13,15 @@ import { QrCode, GraduationCap } from "lucide-react";
 import { z } from "zod";
 
 const loginSchema = z.object({
-  email: z.string().email("Invalid email"),
+  loginId: z.string().min(3, "Email or University/Staff ID required"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
-const signupSchema = loginSchema.extend({
+const signupSchema = z.object({
+  email: z.string().email("Invalid email"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
   universityId: z.string().min(3, "University ID is required"),
   fullName: z.string().min(2, "Full name is required"),
-  role: z.enum(["student", "lecturer"]),
   gender: z.enum(["M", "F"], { required_error: "Gender is required" }),
   programme: z.string().min(1, "Programme is required"),
   phone: z.string().regex(/^0\d{9}$/, "Phone must be 10 digits starting with 0"),
@@ -34,10 +35,12 @@ export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState("");
+  const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
   const [universityId, setUniversityId] = useState("");
   const [fullName, setFullName] = useState("");
-  const [role, setRole] = useState<"student" | "lecturer">("student");
+  // Self-registration is restricted to students. Lecturers are created by an admin.
+  const role: "student" = "student";
   const [gender, setGender] = useState<"M" | "F">("M");
   const [programme, setProgramme] = useState("");
   const [phone, setPhone] = useState("0");
@@ -123,7 +126,7 @@ export default function Auth() {
 
     try {
       if (isLogin) {
-        const parsed = loginSchema.safeParse({ email, password });
+        const parsed = loginSchema.safeParse({ loginId, password });
         if (!parsed.success) {
           const fieldErrors: Record<string, string> = {};
           parsed.error.errors.forEach((err) => {
@@ -133,7 +136,20 @@ export default function Auth() {
           setSubmitting(false);
           return;
         }
-        const { error } = await signIn(email, password);
+        // Resolve loginId: if it's not an email, look up the email by university_id
+        let emailToUse = loginId.trim();
+        if (!emailToUse.includes("@")) {
+          const { data: resolved } = await supabase.rpc("email_for_login_id", {
+            _login_id: emailToUse,
+          });
+          if (!resolved) {
+            toast({ title: t("common.error"), description: "Account not found", variant: "destructive" });
+            setSubmitting(false);
+            return;
+          }
+          emailToUse = resolved as string;
+        }
+        const { error } = await signIn(emailToUse, password);
         if (error) {
           toast({ title: t("common.error"), description: error.message, variant: "destructive" });
         } else {
@@ -141,9 +157,9 @@ export default function Auth() {
         }
       } else {
         const parsed = signupSchema.safeParse({
-          email, password, universityId, fullName, role, gender,
+          email, password, universityId, fullName, gender,
           programme, phone, academicYear,
-          studyYear: role === "student" ? studyYear : undefined,
+          studyYear,
         });
         if (!parsed.success) {
           const fieldErrors: Record<string, string> = {};
@@ -164,7 +180,7 @@ export default function Auth() {
           programme,
           phone,
           academic_year: academicYear,
-          study_year: role === "student" ? parseInt(studyYear) : undefined,
+          study_year: parseInt(studyYear),
         });
         if (error) {
           toast({ title: t("common.error"), description: error.message, variant: "destructive" });
