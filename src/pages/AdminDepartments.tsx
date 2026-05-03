@@ -49,6 +49,7 @@ export default function AdminDepartments() {
   const [assignCourseId, setAssignCourseId] = useState("");
   const [assignLecturerId, setAssignLecturerId] = useState("");
   const [assignDeptId, setAssignDeptId] = useState("");
+  const [assignLevelId, setAssignLevelId] = useState("");
   
   // Course dialog
   const [openCourseDialog, setOpenCourseDialog] = useState(false);
