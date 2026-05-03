@@ -577,11 +577,11 @@ export default function AdminDepartments() {
             <div className="space-y-2">
               <Label>{t("dept.course")}</Label>
               <Select value={assignDeptId} onValueChange={(v) => { setAssignDeptId(v); setAssignLevelId(""); setAssignCourseId(""); }}>
-                <SelectTrigger><SelectValue placeholder={t("dept.department")} /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t("dept.departments")} /></SelectTrigger>
                 <SelectContent>{departments.map((d: any) => (<SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>))}</SelectContent>
               </Select>
               <Select value={assignLevelId} onValueChange={(v) => { setAssignLevelId(v); setAssignCourseId(""); }} disabled={!assignDeptId}>
-                <SelectTrigger><SelectValue placeholder={t("dept.level") || "Level"} /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t("dept.level")} /></SelectTrigger>
                 <SelectContent>{assignDeptLevels.map((l: any) => (<SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>))}</SelectContent>
               </Select>
               <Select value={assignCourseId} onValueChange={setAssignCourseId}>
