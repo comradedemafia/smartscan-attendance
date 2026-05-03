@@ -472,7 +472,12 @@ export default function AdminDepartments() {
   const semesterCourses = (semesterId: string) => allCourses.filter((c: any) => c.semester_id === semesterId);
   const deptLevels = (deptId: string) => allLevels.filter((l) => l.department_id === deptId);
   const levelSemesters = (levelId: string) => allSemesters.filter((s) => s.level_id === levelId);
-  const assignFilteredCourses = assignDeptId ? deptCourses(assignDeptId) : allCourses;
+  const assignFilteredCourses = (() => {
+    let list = assignDeptId ? deptCourses(assignDeptId) : allCourses;
+    if (assignLevelId) list = list.filter((c: any) => c.level_id === assignLevelId);
+    return list;
+  })();
+  const assignDeptLevels = assignDeptId ? deptLevels(assignDeptId) : [];
   // Lecturers may teach across multiple departments/levels — show all so the admin can freely assign.
   const assignFilteredLecturers = allLecturers;
 
