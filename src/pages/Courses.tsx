@@ -42,7 +42,8 @@ export default function Courses() {
   const isAdmin = role === "admin";
   const isLecturer = role === "lecturer";
   const isStudent = role === "student";
-  const canCreate = isAdmin || isLecturer;
+  // Module creation is admin-only. Lecturers are assigned to existing modules.
+  const canCreate = isAdmin;
 
   const { data: lecturerProfile } = useQuery({
     queryKey: ["lecturer-profile-dept", user?.id],
@@ -59,11 +60,18 @@ export default function Courses() {
     queryKey: ["courses", user?.id, role],
     queryFn: async () => {
       if (role === "lecturer") {
-        // Lecturer sees only modules they created
+        // Lecturer sees only modules admin assigned via course_lecturers
+        const { data: assigns, error: aErr } = await supabase
+          .from("course_lecturers")
+          .select("course_id")
+          .eq("lecturer_id", user!.id);
+        if (aErr) throw aErr;
+        const ids = (assigns || []).map((a: any) => a.course_id);
+        if (!ids.length) return [];
         const { data, error } = await supabase
           .from("courses")
           .select("*, course_enrollments(count), departments(name)")
-          .eq("created_by", user!.id)
+          .in("id", ids)
           .order("created_at", { ascending: false });
         if (error) throw error;
         return data || [];
