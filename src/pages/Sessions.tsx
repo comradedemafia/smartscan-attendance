@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, Plus, QrCode, LayoutGrid, List, ChevronLeft, ChevronRight, Edit, Trash2, Building2, ChevronDown, Users, GraduationCap } from "lucide-react";
+import { Calendar, Plus, QrCode, LayoutGrid, List, ChevronLeft, ChevronRight, Edit, Trash2, Building2, ChevronDown, Users, GraduationCap, BookOpen } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay } from "date-fns";
 
@@ -46,6 +46,16 @@ export default function Sessions() {
   const canManage = role === "lecturer" || role === "admin";
   const isAdmin = role === "admin";
 
+  // Predefined venue list (per institution)
+  const VENUE_OPTIONS = [
+    "VIP",
+    "NGUVANA HALL",
+    "MSIGALA HALL",
+    "LIBRARY",
+    "COMPUTER ROOM",
+    "OLD LIBRARY",
+  ];
+
   // Departments for admin filter
   const { data: departments = [] } = useQuery({
     queryKey: ["departments-for-sessions"],
@@ -71,10 +81,18 @@ export default function Sessions() {
     queryKey: ["courses-for-sessions", user?.id, role],
     queryFn: async () => {
       if (role === "lecturer") {
+        // Modules admin assigned to this lecturer
+        const { data: assigns, error: aErr } = await supabase
+          .from("course_lecturers")
+          .select("course_id")
+          .eq("lecturer_id", user!.id);
+        if (aErr) throw aErr;
+        const ids = (assigns || []).map((a: any) => a.course_id);
+        if (!ids.length) return [];
         const { data, error } = await supabase
           .from("courses")
           .select("id, code, name, department_id, level_id")
-          .eq("created_by", user!.id)
+          .in("id", ids)
           .order("name");
         if (error) throw error;
         return data;
@@ -336,7 +354,17 @@ export default function Sessions() {
                     </div>
                     <div className="space-y-2">
                       <Label>{t("sessions.venue")}</Label>
-                      <Input value={venueName} onChange={(e) => setVenueName(e.target.value)} placeholder="Room 101" />
+                      <select
+                        value={venueName}
+                        onChange={(e) => setVenueName(e.target.value)}
+                        className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                        required
+                      >
+                        <option value="">Select venue</option>
+                        {VENUE_OPTIONS.map((v) => (
+                          <option key={v} value={v}>{v}</option>
+                        ))}
+                      </select>
                     </div>
                     <div className="space-y-2">
                       <Label>{t("sessions.duration")}</Label>
