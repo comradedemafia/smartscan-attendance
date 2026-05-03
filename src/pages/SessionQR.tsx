@@ -215,6 +215,13 @@ export default function SessionQR() {
   const isExpired = timeLeft !== null && timeLeft <= 0;
   const isActive = qrValue && !isExpired;
 
+  // Lecturers cannot launch sessions that are completed/terminated, or whose
+  // scheduled date is in the past (already happened).
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const sessionPast = !!session?.session_date && session.session_date < todayStr;
+  const sessionEnded = session?.status === "completed";
+  const cannotLaunch = sessionPast || sessionEnded;
+
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
       <Button variant="ghost" onClick={() => navigate("/sessions")} className="gap-2">
@@ -273,6 +280,15 @@ export default function SessionQR() {
                 </Button>
               </div>
             </>
+          ) : cannotLaunch ? (
+            <div className="text-center space-y-3 py-8">
+              <p className="text-lg font-medium text-destructive">
+                {sessionEnded ? t("sessions.terminated") : t("qr.expired")}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {t("sessions.cannotLaunchPast") || "This session has ended and cannot be launched again."}
+              </p>
+            </div>
           ) : isExpired ? (
             <div className="text-center space-y-4 py-8">
               <p className="text-lg font-medium text-destructive">{t("qr.expired")}</p>
