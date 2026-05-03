@@ -286,7 +286,7 @@ export default function SessionQR() {
                 {sessionEnded ? t("sessions.terminated") : t("qr.expired")}
               </p>
               <p className="text-sm text-muted-foreground">
-                {t("sessions.cannotLaunchPast") || "This session has ended and cannot be launched again."}
+                This session has ended and cannot be launched again.
               </p>
             </div>
           ) : isExpired ? (
