@@ -267,6 +267,19 @@ export default function Sessions() {
 
   return (
     <div className="space-y-6">
+      {role === "lecturer" && (
+        <Card className="bg-primary/5 border-primary/20">
+          <CardContent className="py-3 flex items-center gap-3">
+            <BookOpen className="h-5 w-5 text-primary" />
+            <div className="text-sm">
+              <span className="text-muted-foreground">Modules you teach: </span>
+              <span className="font-semibold text-foreground">{courses.length}</span>
+              <span className="text-muted-foreground ml-3">Sessions: </span>
+              <span className="font-semibold text-foreground">{sessions.length}</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-bold tracking-tight font-['Space_Grotesk']">{t("sessions.title")}</h1>
         <div className="flex items-center gap-2 flex-wrap">
