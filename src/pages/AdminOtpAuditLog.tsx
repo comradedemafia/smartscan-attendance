@@ -51,11 +51,13 @@ export default function AdminOtpAuditLog() {
   const [successFilter, setSuccessFilter] = useState<SuccessFilter>("all");
   const [sortDir, setSortDir] = useState<SortDir>("newest");
   const [page, setPage] = useState(1);
+  const [fromDate, setFromDate] = useState<string>("");
+  const [toDate, setToDate] = useState<string>("");
 
   const isAdmin = role === "admin";
 
   const { data, isLoading } = useQuery({
-    queryKey: ["otp-audit-log", userId, sessionId, successFilter, sortDir, page],
+    queryKey: ["otp-audit-log", userId, sessionId, successFilter, sortDir, page, fromDate, toDate],
     enabled: isAdmin,
     queryFn: async () => {
       let query = supabase
@@ -71,6 +73,13 @@ export default function AdminOtpAuditLog() {
       if (sessionId.trim()) query = query.eq("session_id", sessionId.trim());
       if (successFilter !== "all") {
         query = query.eq("success", successFilter === "success");
+      }
+      if (fromDate) query = query.gte("created_at", new Date(fromDate).toISOString());
+      if (toDate) {
+        // Inclusive end of day
+        const end = new Date(toDate);
+        end.setHours(23, 59, 59, 999);
+        query = query.lte("created_at", end.toISOString());
       }
 
       const { data, error, count } = await query;
@@ -89,6 +98,8 @@ export default function AdminOtpAuditLog() {
     setSessionId("");
     setSuccessFilter("all");
     setSortDir("newest");
+    setFromDate("");
+    setToDate("");
     setPage(1);
   };
 
