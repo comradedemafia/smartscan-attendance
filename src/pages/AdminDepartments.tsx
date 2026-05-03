@@ -49,6 +49,7 @@ export default function AdminDepartments() {
   const [assignCourseId, setAssignCourseId] = useState("");
   const [assignLecturerId, setAssignLecturerId] = useState("");
   const [assignDeptId, setAssignDeptId] = useState("");
+  const [assignLevelId, setAssignLevelId] = useState("");
   
   // Course dialog
   const [openCourseDialog, setOpenCourseDialog] = useState(false);
@@ -331,7 +332,7 @@ export default function AdminDepartments() {
       queryClient.invalidateQueries({ queryKey: ["dept-lecturers-admin"] });
       toast({ title: t("common.success"), description: t("dept.lecturerAssigned") });
       setOpenAssignDialog(false);
-      setAssignCourseId(""); setAssignLecturerId(""); setAssignDeptId("");
+      setAssignCourseId(""); setAssignLecturerId(""); setAssignDeptId(""); setAssignLevelId("");
     },
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
@@ -455,7 +456,7 @@ export default function AdminDepartments() {
   const openAddCourseForSemester = (deptId: string, levelId: string, semesterId: string) => { resetCourseForm(); setCourseDeptId(deptId); setCourseLevelId(levelId); setCourseSemesterId(semesterId); setOpenCourseDialog(true); };
   const openAddSemesterForLevel = (levelId: string) => { setEditingSemester(null); setSemesterName(""); setSemesterCode(""); setSemesterLevelId(levelId); setOpenSemesterDialog(true); };
   const openEditSemester = (sem: Semester) => { setEditingSemester(sem); setSemesterName(sem.name); setSemesterCode(sem.code); setSemesterLevelId(sem.level_id); setOpenSemesterDialog(true); };
-  const openAssignForDept = (deptId: string) => { setAssignDeptId(deptId); setAssignCourseId(""); setAssignLecturerId(""); setOpenAssignDialog(true); };
+  const openAssignForDept = (deptId: string) => { setAssignDeptId(deptId); setAssignLevelId(""); setAssignCourseId(""); setAssignLecturerId(""); setOpenAssignDialog(true); };
   const openRegisterForDept = (deptId: string) => { setRegDeptId(deptId); setRegName(""); setRegEmail(""); setRegUniId(""); setRegGender("M"); setRegPhone(""); setOpenRegisterDialog(true); };
   const openEditLecturer = (l: any) => {
     const prof = allLecturers.find((p: any) => p.id === l.lecturer_id) || l;
@@ -471,10 +472,14 @@ export default function AdminDepartments() {
   const semesterCourses = (semesterId: string) => allCourses.filter((c: any) => c.semester_id === semesterId);
   const deptLevels = (deptId: string) => allLevels.filter((l) => l.department_id === deptId);
   const levelSemesters = (levelId: string) => allSemesters.filter((s) => s.level_id === levelId);
-  const assignFilteredCourses = assignDeptId ? deptCourses(assignDeptId) : allCourses;
-  const assignFilteredLecturers = assignDeptId
-    ? allLecturers.filter((l: any) => l.department_id === assignDeptId)
-    : allLecturers;
+  const assignFilteredCourses = (() => {
+    let list = assignDeptId ? deptCourses(assignDeptId) : allCourses;
+    if (assignLevelId) list = list.filter((c: any) => c.level_id === assignLevelId);
+    return list;
+  })();
+  const assignDeptLevels = assignDeptId ? deptLevels(assignDeptId) : [];
+  // Lecturers may teach across multiple departments/levels — show all so the admin can freely assign.
+  const assignFilteredLecturers = allLecturers;
 
   // Levels & semesters available for selected dept/level in course dialog
   const courseDeptLevels = courseDeptId ? deptLevels(courseDeptId) : [];
@@ -571,6 +576,14 @@ export default function AdminDepartments() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>{t("dept.course")}</Label>
+              <Select value={assignDeptId} onValueChange={(v) => { setAssignDeptId(v); setAssignLevelId(""); setAssignCourseId(""); }}>
+                <SelectTrigger><SelectValue placeholder={t("dept.departments")} /></SelectTrigger>
+                <SelectContent>{departments.map((d: any) => (<SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>))}</SelectContent>
+              </Select>
+              <Select value={assignLevelId} onValueChange={(v) => { setAssignLevelId(v); setAssignCourseId(""); }} disabled={!assignDeptId}>
+                <SelectTrigger><SelectValue placeholder={t("dept.level")} /></SelectTrigger>
+                <SelectContent>{assignDeptLevels.map((l: any) => (<SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>))}</SelectContent>
+              </Select>
               <Select value={assignCourseId} onValueChange={setAssignCourseId}>
                 <SelectTrigger><SelectValue placeholder={t("reports.selectCourse")} /></SelectTrigger>
                 <SelectContent>{assignFilteredCourses.map((c: any) => (<SelectItem key={c.id} value={c.id}>{c.code} — {c.name}</SelectItem>))}</SelectContent>
