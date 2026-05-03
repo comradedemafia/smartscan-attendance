@@ -205,6 +205,24 @@ export default function AdminOtpAuditLog() {
               {t("otpAudit.clear")}
             </Button>
           </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">From</label>
+            <Input
+              type="date"
+              value={fromDate}
+              onChange={(e) => { setFromDate(e.target.value); setPage(1); }}
+              className="h-9 text-xs"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">To</label>
+            <Input
+              type="date"
+              value={toDate}
+              onChange={(e) => { setToDate(e.target.value); setPage(1); }}
+              className="h-9 text-xs"
+            />
+          </div>
         </CardContent>
       </Card>
 
