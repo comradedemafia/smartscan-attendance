@@ -10,6 +10,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 type Level = { id: string; name: string; code: string; department_id: string; sort_order: number };
 
@@ -19,6 +21,8 @@ export default function Attendance() {
   const isAdmin = role === "admin";
   const [selectedDeptId, setSelectedDeptId] = useState<string>("all");
   const [expandedLevel, setExpandedLevel] = useState<string | null>(null);
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
 
   // Departments for admin
   const { data: departments = [] } = useQuery({
