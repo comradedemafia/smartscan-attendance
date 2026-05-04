@@ -219,6 +219,40 @@ export default function Attendance() {
     ? allCourses.filter((c) => c.department_id === selectedDeptId)
     : allCourses;
 
+  // Apply date range to sessions used in lecturer/admin overall stats
+  const dateFilteredSessions = (() => {
+    if (!dateFrom && !dateTo) return allSessions;
+    return allSessions.filter((s: any) => {
+      if (!s.session_date) return false;
+      if (dateFrom && s.session_date < dateFrom) return false;
+      if (dateTo && s.session_date > dateTo) return false;
+      return true;
+    });
+  })();
+
+  // Lecturer/Admin: overall present/absent across ALL filtered modules
+  const overallSummary = (() => {
+    if (role !== "lecturer" && !isAdmin) return null;
+    const filteredCourseIds = new Set(filteredCourses.map((c) => c.id));
+    const consideredSessions = dateFilteredSessions.filter(
+      (s: any) => filteredCourseIds.has(s.course_id) && (s.status === "completed" || s.status === "active")
+    );
+    const consideredSessionIds = new Set(consideredSessions.map((s: any) => s.id));
+    const enrolledByCourse = new Map<string, string[]>();
+    courseEnrollments.forEach((e: any) => {
+      if (!enrolledByCourse.has(e.course_id)) enrolledByCourse.set(e.course_id, []);
+      enrolledByCourse.get(e.course_id)!.push(e.user_id);
+    });
+    let totalSlots = 0;
+    consideredSessions.forEach((s: any) => {
+      totalSlots += (enrolledByCourse.get(s.course_id) || []).length;
+    });
+    const totalPresent = allRecords.filter((r: any) => consideredSessionIds.has(r.session_id)).length;
+    const totalAbsent = Math.max(0, totalSlots - totalPresent);
+    const rate = totalSlots > 0 ? Math.round((totalPresent / totalSlots) * 100) : 0;
+    return { totalPresent, totalAbsent, totalSlots, rate, sessionCount: consideredSessions.length };
+  })();
+
   // Group filtered courses by level for lecturer/admin
   const coursesGroupedByLevel = (() => {
     const levelMap = new Map<string, { level: Level | null; courses: typeof filteredCourses }>();
