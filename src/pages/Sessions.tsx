@@ -42,6 +42,7 @@ export default function Sessions() {
   );
   const [selectedDeptId, setSelectedDeptId] = useState<string>("all");
   const [selectedFilterLevel, setSelectedFilterLevel] = useState<string>("all");
+  const [selectedStatus, setSelectedStatus] = useState<string>("all");
 
   const canManage = role === "lecturer" || role === "admin";
   const isAdmin = role === "admin";
@@ -174,8 +175,17 @@ export default function Sessions() {
     if (selectedFilterLevel !== "all") {
       result = result.filter((s: any) => s.courses?.level_id === selectedFilterLevel);
     }
+    if (selectedStatus !== "all") {
+      const today = new Date().toISOString().slice(0, 10);
+      result = result.filter((s: any) => {
+        if (selectedStatus === "active") return s.status === "active";
+        if (selectedStatus === "completed") return s.status === "completed" || (s.session_date && s.session_date < today);
+        if (selectedStatus === "scheduled") return s.status === "scheduled" && s.session_date && s.session_date >= today;
+        return true;
+      });
+    }
     return result;
-  }, [sessions, selectedDeptId, selectedFilterLevel, isAdmin]);
+  }, [sessions, selectedDeptId, selectedFilterLevel, selectedStatus, isAdmin]);
 
   // ===== SESSION MUTATIONS =====
   const createMutation = useMutation({
@@ -312,6 +322,18 @@ export default function Sessions() {
               </SelectContent>
             </Select>
           )}
+          {/* Session status filter */}
+          <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder={t("sessions.statusFilter")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("sessions.allStatuses")}</SelectItem>
+              <SelectItem value="scheduled">{t("sessions.upcoming")}</SelectItem>
+              <SelectItem value="active">{t("sessions.ongoing")}</SelectItem>
+              <SelectItem value="completed">{t("sessions.completed")}</SelectItem>
+            </SelectContent>
+          </Select>
           <div className="flex items-center border border-border rounded-lg overflow-hidden">
             <Button variant={viewMode === "week" ? "default" : "ghost"} size="sm" onClick={() => setViewMode("week")} className="rounded-none">
               <LayoutGrid className="h-4 w-4 mr-1" />{t("sessions.weeklyView")}
