@@ -339,12 +339,7 @@ export default function Reports() {
   });
 
   if (role === "student") {
-    return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-bold tracking-tight font-['Space_Grotesk']">{t("reports.title")}</h1>
-        <p className="text-muted-foreground">{t("reports.noData")}</p>
-      </div>
-    );
+    return <StudentReportView t={t} userId={user!.id} />;
   }
 
   const chartConfig = { attendance: { label: t("attendance.attended"), color: "hsl(var(--primary))" } };
