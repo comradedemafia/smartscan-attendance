@@ -339,12 +339,7 @@ export default function Reports() {
   });
 
   if (role === "student") {
-    return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-bold tracking-tight font-['Space_Grotesk']">{t("reports.title")}</h1>
-        <p className="text-muted-foreground">{t("reports.noData")}</p>
-      </div>
-    );
+    return <StudentReportView t={t} userId={user!.id} />;
   }
 
   const chartConfig = { attendance: { label: t("attendance.attended"), color: "hsl(var(--primary))" } };
@@ -1028,6 +1023,355 @@ export default function Reports() {
           </CardContent>
         </Card>
       )}
+    </div>
+  );
+}
+
+// ============================================================================
+// Student Report View — per-module + general summary + daily sessions
+// ============================================================================
+function StudentReportView({ t, userId }: { t: (k: string) => string; userId: string }) {
+  const [tab, setTab] = useState<string>("modules");
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
+
+  // Profile
+  const { data: profile } = useQuery({
+    queryKey: ["student-self-profile", userId],
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles")
+        .select("full_name, university_id, email").eq("id", userId).maybeSingle();
+      return data;
+    },
+  });
+
+  // Enrollments → courses
+  const { data: enrollments = [] } = useQuery({
+    queryKey: ["student-self-enrollments", userId],
+    queryFn: async () => {
+      const { data } = await supabase.from("course_enrollments")
+        .select("course_id, courses(id, name, code)").eq("user_id", userId);
+      return data || [];
+    },
+  });
+
+  const courseIds = enrollments.map((e: any) => e.course_id);
+
+  // Sessions for enrolled courses
+  const { data: sessions = [] } = useQuery({
+    queryKey: ["student-self-sessions", courseIds, dateFrom, dateTo],
+    enabled: courseIds.length > 0,
+    queryFn: async () => {
+      let q = supabase.from("sessions")
+        .select("id, title, course_id, session_date, status, venue_name")
+        .in("course_id", courseIds)
+        .in("status", ["completed", "active"]);
+      if (dateFrom) q = q.gte("session_date", dateFrom);
+      if (dateTo) q = q.lte("session_date", dateTo);
+      const { data } = await q.order("session_date", { ascending: false });
+      return data || [];
+    },
+  });
+
+  // My attendance records
+  const { data: records = [] } = useQuery({
+    queryKey: ["student-self-records", userId, sessions.length],
+    enabled: sessions.length > 0,
+    queryFn: async () => {
+      const sIds = sessions.map((s: any) => s.id);
+      const { data } = await supabase.from("attendance_records")
+        .select("session_id, scanned_at, status").eq("user_id", userId).in("session_id", sIds);
+      return data || [];
+    },
+  });
+
+  // Approved excuses
+  const { data: excuses = [] } = useQuery({
+    queryKey: ["student-self-excuses", userId, sessions.length],
+    enabled: sessions.length > 0,
+    queryFn: async () => {
+      const sIds = sessions.map((s: any) => s.id);
+      const { data } = await supabase.from("excuses")
+        .select("session_id, status, reason").eq("user_id", userId).in("session_id", sIds);
+      return data || [];
+    },
+  });
+
+  const attendedSet = new Set(records.map((r: any) => r.session_id));
+  const excuseMap = new Map(excuses.map((e: any) => [e.session_id, e]));
+  const courseMap = Object.fromEntries(enrollments.map((e: any) => [e.course_id, e.courses]));
+
+  // Per-module stats
+  const perModule = enrollments.map((e: any) => {
+    const cSessions = sessions.filter((s: any) => s.course_id === e.course_id);
+    const attended = cSessions.filter((s: any) => attendedSet.has(s.id)).length;
+    const total = cSessions.length;
+    const missed = total - attended;
+    const excused = cSessions.filter((s: any) => !attendedSet.has(s.id) && (excuseMap.get(s.id) as any)?.status === "approved").length;
+    return {
+      courseId: e.course_id,
+      code: e.courses?.code || "—",
+      name: e.courses?.name || "—",
+      total, attended, missed, excused,
+      pct: total > 0 ? Math.round((attended / total) * 100) : 0,
+    };
+  });
+
+  // General summary totals
+  const totals = perModule.reduce((acc, m) => ({
+    total: acc.total + m.total, attended: acc.attended + m.attended,
+    missed: acc.missed + m.missed, excused: acc.excused + m.excused,
+  }), { total: 0, attended: 0, missed: 0, excused: 0 });
+  const overallPct = totals.total > 0 ? Math.round((totals.attended / totals.total) * 100) : 0;
+
+  // Daily sessions list
+  const daily = sessions.map((s: any) => {
+    const attended = attendedSet.has(s.id);
+    const excuse = excuseMap.get(s.id) as any;
+    const status = attended ? "present" : (excuse?.status === "approved" ? "excused" : "absent");
+    return {
+      id: s.id, title: s.title, date: s.session_date, venue: s.venue_name,
+      module: courseMap[s.course_id]?.code || "—", status,
+      excuseReason: excuse?.reason || null,
+    };
+  });
+
+  const handleExport = (fmt: "pdf" | "excel") => {
+    const fn = fmt === "pdf" ? exportToPDF : exportToExcel;
+    if (tab === "modules") {
+      fn({
+        title: t("reports.byModule"),
+        subtitle: profile ? `${profile.full_name} (${profile.university_id})` : undefined,
+        columns: [
+          { header: t("courses.code"), key: "code" },
+          { header: t("courses.name"), key: "name" },
+          { header: t("reports.totalSessions"), key: "total" },
+          { header: t("reports.attendedSessions"), key: "attended" },
+          { header: t("reports.missedSessions"), key: "missed" },
+          { header: t("reports.missedWithExcuse"), key: "excused" },
+          { header: t("reports.percentage"), key: "pct" },
+        ],
+        rows: perModule.map((m) => ({ ...m, pct: `${m.pct}%` })),
+      });
+    } else if (tab === "general") {
+      fn({
+        title: t("reports.generalSummary"),
+        subtitle: profile ? `${profile.full_name} (${profile.university_id})` : undefined,
+        columns: [
+          { header: t("reports.studentName"), key: "name" },
+          { header: t("reports.universityId"), key: "uid" },
+          { header: "Module", key: "module" },
+          { header: t("reports.totalSessions"), key: "total" },
+          { header: t("reports.attendedSessions"), key: "attended" },
+          { header: t("reports.missedSessions"), key: "missed" },
+          { header: t("reports.missedWithExcuse"), key: "excused" },
+        ],
+        rows: perModule.map((m) => ({
+          name: profile?.full_name || "—",
+          uid: profile?.university_id || "—",
+          module: `${m.code} — ${m.name}`,
+          total: m.total, attended: m.attended, missed: m.missed, excused: m.excused,
+        })),
+      });
+    } else {
+      fn({
+        title: t("reports.dailyReport"),
+        subtitle: profile ? `${profile.full_name} (${profile.university_id})` : undefined,
+        dateRange: (dateFrom || dateTo) ? { from: dateFrom, to: dateTo } : undefined,
+        columns: [
+          { header: "Date", key: "date" },
+          { header: "Module", key: "module" },
+          { header: "Session", key: "title" },
+          { header: t("sessions.venue"), key: "venue" },
+          { header: t("sessions.status"), key: "status" },
+        ],
+        rows: daily,
+      });
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <h1 className="text-2xl font-bold tracking-tight font-['Space_Grotesk']">{t("reports.studentMyReport")}</h1>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => handleExport("pdf")}>
+            <FileDown className="h-4 w-4 mr-2" />{t("reports.exportPdf")}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => handleExport("excel")}>
+            <FileSpreadsheet className="h-4 w-4 mr-2" />{t("reports.exportExcel")}
+          </Button>
+        </div>
+      </div>
+
+      {/* Date range filter */}
+      <Card>
+        <CardContent className="pt-4 flex flex-wrap items-end gap-3">
+          <div className="text-sm font-medium flex items-center gap-2">
+            <CalendarRange className="h-4 w-4 text-primary" />
+            {t("reports.dateRange")}
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">{t("reports.from")}</Label>
+            <Input type="date" value={dateFrom} max={dateTo || undefined}
+              onChange={(e) => setDateFrom(e.target.value)} className="w-[160px]" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">{t("reports.to")}</Label>
+            <Input type="date" value={dateTo} min={dateFrom || undefined}
+              onChange={(e) => setDateTo(e.target.value)} className="w-[160px]" />
+          </div>
+          {(dateFrom || dateTo) && (
+            <Button variant="outline" size="sm" onClick={() => { setDateFrom(""); setDateTo(""); }}>
+              <X className="h-3.5 w-3.5 mr-1" />{t("reports.clearDates")}
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Overall summary cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card><CardContent className="pt-6 text-center">
+          <CalendarCheck className="h-6 w-6 mx-auto mb-2 text-primary" />
+          <p className="text-2xl font-bold">{totals.attended}</p>
+          <p className="text-xs text-muted-foreground">{t("reports.attendedSessions")}</p>
+        </CardContent></Card>
+        <Card><CardContent className="pt-6 text-center">
+          <BarChart3 className="h-6 w-6 mx-auto mb-2 text-destructive" />
+          <p className="text-2xl font-bold">{totals.missed}</p>
+          <p className="text-xs text-muted-foreground">{t("reports.missedSessions")}</p>
+        </CardContent></Card>
+        <Card><CardContent className="pt-6 text-center">
+          <Users className="h-6 w-6 mx-auto mb-2 text-accent-foreground" />
+          <p className="text-2xl font-bold">{totals.excused}</p>
+          <p className="text-xs text-muted-foreground">{t("reports.missedWithExcuse")}</p>
+        </CardContent></Card>
+        <Card><CardContent className="pt-6 text-center">
+          <Percent className="h-6 w-6 mx-auto mb-2 text-primary" />
+          <p className={`text-2xl font-bold ${overallPct >= 75 ? "text-primary" : overallPct >= 50 ? "text-accent-foreground" : "text-destructive"}`}>{overallPct}%</p>
+          <p className="text-xs text-muted-foreground">{t("reports.averageRate")}</p>
+        </CardContent></Card>
+      </div>
+
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList>
+          <TabsTrigger value="modules">{t("reports.byModule")}</TabsTrigger>
+          <TabsTrigger value="general">{t("reports.generalSummary")}</TabsTrigger>
+          <TabsTrigger value="daily">{t("reports.dailyReport")}</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="modules" className="mt-4">
+          <Card>
+            <CardHeader><CardTitle className="text-base">{t("reports.byModule")}</CardTitle></CardHeader>
+            <CardContent>
+              {perModule.length === 0 ? (
+                <p className="text-muted-foreground">{t("reports.noData")}</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader><TableRow>
+                      <TableHead>{t("courses.code")}</TableHead>
+                      <TableHead>{t("courses.name")}</TableHead>
+                      <TableHead className="text-center">{t("reports.totalSessions")}</TableHead>
+                      <TableHead className="text-center">{t("reports.attendedSessions")}</TableHead>
+                      <TableHead className="text-center">{t("reports.missedSessions")}</TableHead>
+                      <TableHead className="text-center">{t("reports.missedWithExcuse")}</TableHead>
+                      <TableHead className="text-center">{t("reports.percentage")}</TableHead>
+                    </TableRow></TableHeader>
+                    <TableBody>
+                      {perModule.map((m) => (
+                        <TableRow key={m.courseId}>
+                          <TableCell className="font-mono text-sm">{m.code}</TableCell>
+                          <TableCell className="font-medium">{m.name}</TableCell>
+                          <TableCell className="text-center">{m.total}</TableCell>
+                          <TableCell className="text-center"><Badge variant="default">{m.attended}</Badge></TableCell>
+                          <TableCell className="text-center"><Badge variant="destructive">{m.missed}</Badge></TableCell>
+                          <TableCell className="text-center"><Badge variant="secondary">{m.excused}</Badge></TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant={m.pct >= 75 ? "default" : m.pct >= 50 ? "secondary" : "destructive"}>{m.pct}%</Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="general" className="mt-4">
+          <Card>
+            <CardHeader><CardTitle className="text-base">{t("reports.generalSummary")}</CardTitle></CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader><TableRow>
+                    <TableHead>{t("reports.studentName")}</TableHead>
+                    <TableHead>{t("reports.universityId")}</TableHead>
+                    <TableHead>Module</TableHead>
+                    <TableHead className="text-center">Total</TableHead>
+                    <TableHead className="text-center">Attended</TableHead>
+                    <TableHead className="text-center">Missed</TableHead>
+                    <TableHead className="text-center">Excused</TableHead>
+                  </TableRow></TableHeader>
+                  <TableBody>
+                    {perModule.map((m) => (
+                      <TableRow key={m.courseId}>
+                        <TableCell>{profile?.full_name || "—"}</TableCell>
+                        <TableCell>{profile?.university_id || "—"}</TableCell>
+                        <TableCell>{m.code} — {m.name}</TableCell>
+                        <TableCell className="text-center">{m.total}</TableCell>
+                        <TableCell className="text-center">{m.attended}</TableCell>
+                        <TableCell className="text-center">{m.missed}</TableCell>
+                        <TableCell className="text-center">{m.excused}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="daily" className="mt-4">
+          <Card>
+            <CardHeader><CardTitle className="text-base">{t("reports.dailyReport")}</CardTitle></CardHeader>
+            <CardContent>
+              {daily.length === 0 ? (
+                <p className="text-muted-foreground">{t("reports.noData")}</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader><TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Module</TableHead>
+                      <TableHead>Session</TableHead>
+                      <TableHead>{t("sessions.venue")}</TableHead>
+                      <TableHead>{t("sessions.status")}</TableHead>
+                    </TableRow></TableHeader>
+                    <TableBody>
+                      {daily.map((d) => (
+                        <TableRow key={d.id}>
+                          <TableCell className="text-sm">{d.date}</TableCell>
+                          <TableCell className="font-mono text-xs">{d.module}</TableCell>
+                          <TableCell>{d.title}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{d.venue || "—"}</TableCell>
+                          <TableCell>
+                            {d.status === "present" && <Badge variant="default">{t("attendance.present")}</Badge>}
+                            {d.status === "absent" && <Badge variant="destructive">{t("attendance.absent")}</Badge>}
+                            {d.status === "excused" && <Badge variant="secondary" title={d.excuseReason || ""}>{t("reports.missedWithExcuse")}</Badge>}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
