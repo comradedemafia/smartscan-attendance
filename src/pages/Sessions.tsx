@@ -360,46 +360,53 @@ export default function Sessions() {
                     </div>
                     <div className="space-y-2">
                       <Label>{t("auth.programme")}</Label>
-                      <select
+                      <Select
                         value={selectedLevelId}
-                        onChange={(e) => { setSelectedLevelId(e.target.value); setCourseId(""); }}
-                        className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                        required
+                        onValueChange={(v) => { setSelectedLevelId(v); setCourseId(""); }}
                       >
-                        <option value="">{t("auth.selectProgramme")}</option>
-                        {availableLevels.map((l) => (
-                          <option key={l.id} value={l.id}>{l.name}</option>
-                        ))}
-                      </select>
+                        <SelectTrigger>
+                          <SelectValue placeholder={availableLevels.length === 0 ? "No assigned modules — contact admin" : t("auth.selectProgramme")} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableLevels.length === 0 ? (
+                            <div className="px-2 py-1.5 text-xs text-muted-foreground">No programmes available</div>
+                          ) : (
+                            availableLevels.map((l) => (
+                              <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-2">
                       <Label>{t("sessions.course")}</Label>
-                      <select
+                      <Select
                         value={courseId}
-                        onChange={(e) => setCourseId(e.target.value)}
-                        className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                        required
+                        onValueChange={setCourseId}
                         disabled={!selectedLevelId}
                       >
-                        <option value="">Select module</option>
-                        {filteredFormCourses.map((c: any) => (
-                          <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
-                        ))}
-                      </select>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select module" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {filteredFormCourses.map((c: any) => (
+                            <SelectItem key={c.id} value={c.id}>{c.code} - {c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-2">
                       <Label>{t("sessions.venue")}</Label>
-                      <select
-                        value={venueName}
-                        onChange={(e) => setVenueName(e.target.value)}
-                        className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                        required
-                      >
-                        <option value="">Select venue</option>
-                        {VENUE_OPTIONS.map((v) => (
-                          <option key={v} value={v}>{v}</option>
-                        ))}
-                      </select>
+                      <Select value={venueName} onValueChange={setVenueName}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select venue" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {VENUE_OPTIONS.map((v) => (
+                            <SelectItem key={v} value={v}>{v}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-2">
                       <Label>{t("sessions.duration")}</Label>
