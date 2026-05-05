@@ -607,9 +607,15 @@ export default function Sessions() {
                 </div>
                 <p className="text-xs text-muted-foreground">{session.duration_minutes} {t("qr.minutes")}</p>
                 {canEditSession(session) && (
-                  <Button variant="outline" size="sm" className="w-full mt-2" onClick={() => navigate(`/sessions/${session.id}/qr`)}>
-                    <QrCode className="h-4 w-4 mr-2" />{t("sessions.generateQr")}
-                  </Button>
+                  isSessionLaunchable(session) ? (
+                    <Button variant="outline" size="sm" className="w-full mt-2" onClick={() => navigate(`/sessions/${session.id}/qr`)}>
+                      <QrCode className="h-4 w-4 mr-2" />{t("sessions.generateQr")}
+                    </Button>
+                  ) : (
+                    <Button variant="outline" size="sm" className="w-full mt-2" disabled title="Session ended or expired">
+                      <QrCode className="h-4 w-4 mr-2" />{session.status === "completed" ? t("sessions.terminated") : t("qr.expired")}
+                    </Button>
+                  )
                 )}
               </CardContent>
             </Card>
