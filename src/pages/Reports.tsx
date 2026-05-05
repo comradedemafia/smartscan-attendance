@@ -1050,16 +1050,19 @@ function StudentReportView({ t, userId }: { t: (k: string) => string; userId: st
     queryKey: ["student-self-enrollments", userId],
     queryFn: async () => {
       const { data } = await supabase.from("course_enrollments")
-        .select("course_id, courses(id, name, code)").eq("user_id", userId);
+        .select("course_id, enrolled_at, courses(id, name, code)").eq("user_id", userId);
       return data || [];
     },
   });
 
   const courseIds = enrollments.map((e: any) => e.course_id);
+  const enrolledAtMap: Record<string, string> = Object.fromEntries(
+    enrollments.map((e: any) => [e.course_id, e.enrolled_at])
+  );
 
   // Sessions for enrolled courses
   const { data: sessions = [] } = useQuery({
-    queryKey: ["student-self-sessions", courseIds, dateFrom, dateTo],
+    queryKey: ["student-self-sessions", courseIds, JSON.stringify(enrolledAtMap), dateFrom, dateTo],
     enabled: courseIds.length > 0,
     queryFn: async () => {
       let q = supabase.from("sessions")
@@ -1069,7 +1072,13 @@ function StudentReportView({ t, userId }: { t: (k: string) => string; userId: st
       if (dateFrom) q = q.gte("session_date", dateFrom);
       if (dateTo) q = q.lte("session_date", dateTo);
       const { data } = await q.order("session_date", { ascending: false });
-      return data || [];
+      // Restrict to sessions on/after the student's enrollment (join) date per course
+      return (data || []).filter((s: any) => {
+        const enrolledAt = enrolledAtMap[s.course_id];
+        if (!enrolledAt) return true;
+        const enrolledDay = enrolledAt.slice(0, 10);
+        return s.session_date >= enrolledDay;
+      });
     },
   });
 
