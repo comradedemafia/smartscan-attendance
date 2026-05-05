@@ -526,8 +526,8 @@ export default function Sessions() {
                           session.status === "active" ? "bg-primary/15 text-primary border border-primary/30"
                           : session.status === "completed" ? "bg-muted text-muted-foreground"
                           : "bg-secondary text-secondary-foreground"
-                        } ${canEditSession(session) ? "cursor-pointer hover:opacity-80" : ""}`}
-                          onClick={() => canEditSession(session) ? navigate(`/sessions/${session.id}/qr`) : null}
+                        } ${canEditSession(session) && isSessionLaunchable(session) ? "cursor-pointer hover:opacity-80" : ""}`}
+                          onClick={() => canEditSession(session) && isSessionLaunchable(session) ? navigate(`/sessions/${session.id}/qr`) : null}
                         >
                         <p className="font-medium truncate">{session.title}</p>
                           <p className="text-[10px] opacity-75 truncate">
