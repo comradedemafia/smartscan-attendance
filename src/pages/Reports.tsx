@@ -1062,7 +1062,7 @@ function StudentReportView({ t, userId }: { t: (k: string) => string; userId: st
 
   // Sessions for enrolled courses
   const { data: sessions = [] } = useQuery({
-    queryKey: ["student-self-sessions", courseIds, dateFrom, dateTo],
+    queryKey: ["student-self-sessions", courseIds, JSON.stringify(enrolledAtMap), dateFrom, dateTo],
     enabled: courseIds.length > 0,
     queryFn: async () => {
       let q = supabase.from("sessions")
