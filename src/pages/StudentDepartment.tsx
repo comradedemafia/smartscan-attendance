@@ -40,7 +40,7 @@ export default function StudentDepartment() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("department_id, academic_year, study_year, departments(id, name, description)")
+        .select("department_id, academic_year, study_year")
         .eq("id", user!.id)
         .maybeSingle();
       if (error) throw error;
@@ -49,7 +49,22 @@ export default function StudentDepartment() {
     enabled: !!user,
   });
 
-  const departmentId = (studentProfile?.departments as any)?.id;
+  const departmentId = studentProfile?.department_id;
+
+  // Fetch department separately so the card always renders when set
+  const { data: dept } = useQuery({
+    queryKey: ["student-dept", departmentId],
+    enabled: !!departmentId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("departments")
+        .select("id, name, description")
+        .eq("id", departmentId!)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
 
   // Get levels for this department
   const { data: levels = [] } = useQuery({
@@ -224,8 +239,6 @@ export default function StudentDepartment() {
       return next;
     });
   };
-
-  const dept = studentProfile?.departments as any;
 
   if (!dept) {
     return (
