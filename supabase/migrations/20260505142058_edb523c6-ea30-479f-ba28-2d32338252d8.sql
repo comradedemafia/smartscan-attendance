@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.validate_session_venue() FROM PUBLIC, anon, authenticated;
