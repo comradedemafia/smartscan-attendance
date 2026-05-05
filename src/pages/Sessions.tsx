@@ -247,8 +247,22 @@ export default function Sessions() {
 
   const resetSessionForm = () => { setOpen(false); setEditingSession(null); setTitle(""); setCourseId(""); setVenueName(""); setDurationMinutes("30"); setSelectedLevelId(""); };
   const openEdit = (session: any) => { setEditingSession(session); setTitle(session.title); setCourseId(session.course_id); setVenueName(session.venue_name || ""); setDurationMinutes(String(session.duration_minutes)); const course = courses.find((c: any) => c.id === session.course_id); setSelectedLevelId(course?.level_id || ""); setOpen(true); };
-  const handleSessionSubmit = (e: React.FormEvent) => { e.preventDefault(); if (!title.trim() || !courseId) return; editingSession ? updateMutation.mutate() : createMutation.mutate(); };
+  const handleSessionSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim() || !courseId) return;
+    if (!venueName) {
+      toast({ title: t("common.error"), description: "Please select a venue", variant: "destructive" });
+      return;
+    }
+    editingSession ? updateMutation.mutate() : createMutation.mutate();
+  };
   const canEditSession = (session: any) => role === "admin" || (role === "lecturer" && session.created_by === user?.id);
+  const isSessionLaunchable = (session: any) => {
+    const today = new Date().toISOString().slice(0, 10);
+    if (session.status === "completed") return false;
+    if (session.session_date && session.session_date < today) return false;
+    return true;
+  };
   const statusColor = (status: string) => { switch (status) { case "active": return "default"; case "completed": return "secondary"; default: return "outline"; } };
 
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i)), [currentWeekStart]);
@@ -396,8 +410,8 @@ export default function Sessions() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>{t("sessions.venue")}</Label>
-                      <Select value={venueName} onValueChange={setVenueName}>
+                      <Label>{t("sessions.venue")} <span className="text-destructive">*</span></Label>
+                      <Select value={venueName} onValueChange={setVenueName} required>
                         <SelectTrigger>
                           <SelectValue placeholder="Select venue" />
                         </SelectTrigger>
@@ -512,8 +526,8 @@ export default function Sessions() {
                           session.status === "active" ? "bg-primary/15 text-primary border border-primary/30"
                           : session.status === "completed" ? "bg-muted text-muted-foreground"
                           : "bg-secondary text-secondary-foreground"
-                        } ${canEditSession(session) ? "cursor-pointer hover:opacity-80" : ""}`}
-                          onClick={() => canEditSession(session) ? navigate(`/sessions/${session.id}/qr`) : null}
+                        } ${canEditSession(session) && isSessionLaunchable(session) ? "cursor-pointer hover:opacity-80" : ""}`}
+                          onClick={() => canEditSession(session) && isSessionLaunchable(session) ? navigate(`/sessions/${session.id}/qr`) : null}
                         >
                         <p className="font-medium truncate">{session.title}</p>
                           <p className="text-[10px] opacity-75 truncate">
@@ -593,9 +607,15 @@ export default function Sessions() {
                 </div>
                 <p className="text-xs text-muted-foreground">{session.duration_minutes} {t("qr.minutes")}</p>
                 {canEditSession(session) && (
-                  <Button variant="outline" size="sm" className="w-full mt-2" onClick={() => navigate(`/sessions/${session.id}/qr`)}>
-                    <QrCode className="h-4 w-4 mr-2" />{t("sessions.generateQr")}
-                  </Button>
+                  isSessionLaunchable(session) ? (
+                    <Button variant="outline" size="sm" className="w-full mt-2" onClick={() => navigate(`/sessions/${session.id}/qr`)}>
+                      <QrCode className="h-4 w-4 mr-2" />{t("sessions.generateQr")}
+                    </Button>
+                  ) : (
+                    <Button variant="outline" size="sm" className="w-full mt-2" disabled title="Session ended or expired">
+                      <QrCode className="h-4 w-4 mr-2" />{session.status === "completed" ? t("sessions.terminated") : t("qr.expired")}
+                    </Button>
+                  )
                 )}
               </CardContent>
             </Card>

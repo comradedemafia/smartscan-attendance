@@ -1174,13 +1174,21 @@ function StudentReportView({ t, userId }: { t: (k: string) => string; userId: st
           { header: t("reports.attendedSessions"), key: "attended" },
           { header: t("reports.missedSessions"), key: "missed" },
           { header: t("reports.missedWithExcuse"), key: "excused" },
+          { header: "Excuse / Permission", key: "excuseReasons" },
         ],
-        rows: perModule.map((m) => ({
-          name: profile?.full_name || "—",
-          uid: profile?.university_id || "—",
-          module: `${m.code} — ${m.name}`,
-          total: m.total, attended: m.attended, missed: m.missed, excused: m.excused,
-        })),
+        rows: perModule.map((m) => {
+          const reasons = sessions
+            .filter((s: any) => s.course_id === m.courseId && !attendedSet.has(s.id))
+            .map((s: any) => (excuseMap.get(s.id) as any)?.reason)
+            .filter(Boolean);
+          return {
+            name: profile?.full_name || "—",
+            uid: profile?.university_id || "—",
+            module: `${m.code} — ${m.name}`,
+            total: m.total, attended: m.attended, missed: m.missed, excused: m.excused,
+            excuseReasons: reasons.length ? reasons.join("; ") : "—",
+          };
+        }),
       });
     } else {
       fn({
@@ -1193,8 +1201,9 @@ function StudentReportView({ t, userId }: { t: (k: string) => string; userId: st
           { header: "Session", key: "title" },
           { header: t("sessions.venue"), key: "venue" },
           { header: t("sessions.status"), key: "status" },
+          { header: "Excuse / Permission", key: "excuseReason" },
         ],
-        rows: daily,
+        rows: daily.map((d) => ({ ...d, excuseReason: d.excuseReason || "—" })),
       });
     }
   };
