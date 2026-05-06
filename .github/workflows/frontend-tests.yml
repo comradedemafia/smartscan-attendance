@@ -1,0 +1,60 @@
+name: Frontend Unit Tests (TZ matrix)
+
+on:
+  push:
+    paths:
+      - "src/**"
+      - "package.json"
+      - "vitest.config.ts"
+      - ".github/workflows/frontend-tests.yml"
+  pull_request:
+    paths:
+      - "src/**"
+      - "package.json"
+      - "vitest.config.ts"
+      - ".github/workflows/frontend-tests.yml"
+
+jobs:
+  vitest-tz-matrix:
+    name: Vitest (TZ=${{ matrix.tz }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Cover east-of-UTC, UTC, and west-of-UTC plus a DST-active zone so any
+        # off-by-one bug in date-string slicing surfaces in CI.
+        tz:
+          - "UTC"
+          - "Pacific/Kiritimati"   # UTC+14
+          - "Pacific/Pago_Pago"    # UTC-11
+          - "Asia/Kolkata"         # UTC+5:30 (half-hour offset)
+          - "America/Los_Angeles"  # DST
+          - "Africa/Dar_es_Salaam" # project's local TZ
+    env:
+      TZ: ${{ matrix.tz }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install deps
+        run: bun install --frozen-lockfile
+
+      - name: Run date-sensitive unit tests under TZ=${{ matrix.tz }}
+        run: |
+          echo "Running with TZ=$TZ"
+          node -e "console.log('Node sees TZ offset minutes:', new Date().getTimezoneOffset())"
+          bunx vitest run \
+            src/lib/studentReport.test.ts \
+            src/lib/studentReport.boundaries.test.ts \
+            src/lib/studentReport.window.test.ts \
+            src/lib/exportReports.test.ts \
+            src/lib/exportReports.columns.test.ts \
+            src/lib/sessionGuards.test.ts \
+            src/lib/sessionGuards.qrApi.test.ts
