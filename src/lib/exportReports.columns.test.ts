@@ -163,7 +163,7 @@ describe("exportReports — em dash placeholder when no excuse exists", () => {
       title: "General Summary",
       columns: GENERAL_COLUMNS,
       rows: [
-        { name: "A", uid: "S/1", module: "C1", total: 2, attended: 2, missed: 0, excused: 0, excuseReasons: "" },
+        { name: "A", uid: "S/1", module: "C1", total: 2, attended: 2, missed: 0, excused: 0 },
       ],
     });
     const headers: string[] = autoTableCalls[0].head[0];
