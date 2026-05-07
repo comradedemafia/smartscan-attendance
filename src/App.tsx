@@ -99,9 +99,8 @@ const App = () => (
                   <Route path="/departments" element={<AdminDepartments />} />
                   <Route path="/notifications" element={<Notifications />} />
                   <Route path="/excuses" element={<Excuses />} />
-                  <Route path="/otp-audit" element={<AdminOtpAuditLog />} />
-                  <Route path="/audit-log" element={<RequireAdmin><AdminAuditLog /></RequireAdmin>} />
                   <Route path="/otp-audit" element={<RequireAdmin><AdminOtpAuditLog /></RequireAdmin>} />
+                  <Route path="/audit-log" element={<RequireAdmin><AdminAuditLog /></RequireAdmin>} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>
