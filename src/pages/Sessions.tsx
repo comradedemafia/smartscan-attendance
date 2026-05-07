@@ -300,6 +300,9 @@ export default function Sessions() {
               <span className="font-semibold text-foreground">{courses.length}</span>
               <span className="text-muted-foreground ml-3">Sessions: </span>
               <span className="font-semibold text-foreground">{sessions.length}</span>
+              {courses.length === 0 && (
+                <span className="ml-3 text-amber-600">No modules assigned. Contact admin to assign you modules.</span>
+              )}
             </div>
           </CardContent>
         </Card>

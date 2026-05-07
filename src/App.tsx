@@ -27,6 +27,7 @@ import AdminDepartments from "@/pages/AdminDepartments";
 import Notifications from "@/pages/Notifications";
 import Excuses from "@/pages/Excuses";
 import AdminOtpAuditLog from "@/pages/AdminOtpAuditLog";
+import AdminAuditLog from "@/pages/AdminAuditLog";
 import MustChangePassword from "@/pages/MustChangePassword";
 
 const queryClient = new QueryClient();
@@ -92,6 +93,7 @@ const App = () => (
                   <Route path="/notifications" element={<Notifications />} />
                   <Route path="/excuses" element={<Excuses />} />
                   <Route path="/otp-audit" element={<AdminOtpAuditLog />} />
+                  <Route path="/audit-log" element={<AdminAuditLog />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>
