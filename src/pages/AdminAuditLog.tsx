@@ -1,23 +1,16 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, Fragment } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Download, ShieldAlert } from "lucide-react";
+import { Download, ShieldAlert, ChevronDown, ChevronRight } from "lucide-react";
+import { computeDiff, filterAuditRows, type AuditRow as AuditRowT } from "@/lib/auditLog";
 
-type AuditRow = {
-  id: string;
-  actor_id: string | null;
-  actor_role: string | null;
-  action: string;
-  entity_type: string;
-  entity_id: string | null;
-  old_data: any;
-  new_data: any;
-  created_at: string;
-};
+type AuditRow = AuditRowT;
+
+const PAGE_SIZE = 25;
 
 export default function AdminAuditLog() {
   const [search, setSearch] = useState("");
@@ -25,6 +18,8 @@ export default function AdminAuditLog() {
   const [action, setAction] = useState<string>("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [page, setPage] = useState(1);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["audit-log"],
@@ -57,19 +52,12 @@ export default function AdminAuditLog() {
   });
 
   const filtered = useMemo(() => {
-    return rows.filter((r) => {
-      if (entity !== "all" && r.entity_type !== entity) return false;
-      if (action !== "all" && r.action !== action) return false;
-      if (from && r.created_at < from) return false;
-      if (to && r.created_at > to + "T23:59:59") return false;
-      if (search) {
-        const a: any = (actors as any)[r.actor_id || ""] || {};
-        const hay = `${r.entity_type} ${r.entity_id} ${a.full_name || ""} ${a.university_id || ""} ${a.email || ""}`.toLowerCase();
-        if (!hay.includes(search.toLowerCase())) return false;
-      }
-      return true;
-    });
+    return filterAuditRows(rows, { entity, action, from, to, search }, actors as any);
   }, [rows, entity, action, from, to, search, actors]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageRows = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const entities = useMemo(() => Array.from(new Set(rows.map((r) => r.entity_type))).sort(), [rows]);
 
@@ -100,6 +88,8 @@ export default function AdminAuditLog() {
     URL.revokeObjectURL(url);
   };
 
+  const resetPage = <T,>(setter: (v: T) => void) => (v: T) => { setter(v); setPage(1); };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -116,19 +106,19 @@ export default function AdminAuditLog() {
 
       <Card>
         <CardContent className="p-4 grid gap-3 md:grid-cols-5">
-          <Input placeholder="Search actor / entity…" value={search} onChange={(e) => setSearch(e.target.value)} />
-          <select className="h-10 rounded-md border bg-background px-3 text-sm" value={entity} onChange={(e) => setEntity(e.target.value)}>
+          <Input placeholder="Search actor / entity…" value={search} onChange={(e) => resetPage(setSearch)(e.target.value)} />
+          <select className="h-10 rounded-md border bg-background px-3 text-sm" value={entity} onChange={(e) => resetPage(setEntity)(e.target.value)}>
             <option value="all">All entities</option>
             {entities.map((e) => <option key={e} value={e}>{e}</option>)}
           </select>
-          <select className="h-10 rounded-md border bg-background px-3 text-sm" value={action} onChange={(e) => setAction(e.target.value)}>
+          <select className="h-10 rounded-md border bg-background px-3 text-sm" value={action} onChange={(e) => resetPage(setAction)(e.target.value)}>
             <option value="all">All actions</option>
             <option value="INSERT">INSERT</option>
             <option value="UPDATE">UPDATE</option>
             <option value="DELETE">DELETE</option>
           </select>
-          <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-          <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          <Input type="date" value={from} onChange={(e) => resetPage(setFrom)(e.target.value)} />
+          <Input type="date" value={to} onChange={(e) => resetPage(setTo)(e.target.value)} />
         </CardContent>
       </Card>
 
@@ -143,6 +133,7 @@ export default function AdminAuditLog() {
             <table className="w-full text-sm">
               <thead className="bg-muted/50 text-xs uppercase">
                 <tr>
+                  <th className="w-8 p-3"></th>
                   <th className="text-left p-3">When</th>
                   <th className="text-left p-3">Actor</th>
                   <th className="text-left p-3">Role</th>
@@ -152,25 +143,70 @@ export default function AdminAuditLog() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((r) => {
+                {pageRows.map((r) => {
                   const a: any = (actors as any)[r.actor_id || ""] || {};
+                  const isOpen = !!expanded[r.id];
+                  const diff = computeDiff(r.old_data, r.new_data);
                   return (
-                    <tr key={r.id} className="border-t hover:bg-muted/30">
-                      <td className="p-3 whitespace-nowrap">{new Date(r.created_at).toLocaleString()}</td>
-                      <td className="p-3">{a.full_name || r.actor_id || <span className="text-muted-foreground">system</span>}</td>
-                      <td className="p-3"><Badge variant="outline" className="text-[10px]">{r.actor_role || "—"}</Badge></td>
-                      <td className="p-3">
-                        <Badge variant={r.action === "DELETE" ? "destructive" : r.action === "INSERT" ? "default" : "secondary"} className="text-[10px]">
-                          {r.action}
-                        </Badge>
-                      </td>
-                      <td className="p-3 font-mono text-xs">{r.entity_type}</td>
-                      <td className="p-3 font-mono text-[10px] text-muted-foreground truncate max-w-[180px]">{r.entity_id}</td>
-                    </tr>
+                    <Fragment key={r.id}>
+                      <tr className="border-t hover:bg-muted/30 cursor-pointer" onClick={() => setExpanded((s) => ({ ...s, [r.id]: !s[r.id] }))}>
+                        <td className="p-3">{isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</td>
+                        <td className="p-3 whitespace-nowrap">{new Date(r.created_at).toLocaleString()}</td>
+                        <td className="p-3">{a.full_name || r.actor_id || <span className="text-muted-foreground">system</span>}</td>
+                        <td className="p-3"><Badge variant="outline" className="text-[10px]">{r.actor_role || "—"}</Badge></td>
+                        <td className="p-3">
+                          <Badge variant={r.action === "DELETE" ? "destructive" : r.action === "INSERT" ? "default" : "secondary"} className="text-[10px]">
+                            {r.action}
+                          </Badge>
+                        </td>
+                        <td className="p-3 font-mono text-xs">{r.entity_type}</td>
+                        <td className="p-3 font-mono text-[10px] text-muted-foreground truncate max-w-[180px]">{r.entity_id}</td>
+                      </tr>
+                      {isOpen && (
+                        <tr className="bg-muted/20 border-t">
+                          <td></td>
+                          <td colSpan={6} className="p-3">
+                            {diff.length === 0 ? (
+                              <p className="text-xs text-muted-foreground">No field-level changes recorded.</p>
+                            ) : (
+                              <table className="w-full text-xs border rounded-md overflow-hidden">
+                                <thead className="bg-muted/40">
+                                  <tr>
+                                    <th className="text-left p-2">Field</th>
+                                    <th className="text-left p-2">Old</th>
+                                    <th className="text-left p-2">New</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {diff.map((d) => (
+                                    <tr key={d.key} className="border-t">
+                                      <td className="p-2 font-mono">{d.key}</td>
+                                      <td className="p-2 font-mono text-destructive break-all">{d.oldVal}</td>
+                                      <td className="p-2 font-mono text-primary break-all">{d.newVal}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   );
                 })}
               </tbody>
             </table>
+          )}
+          {filtered.length > 0 && (
+            <div className="flex items-center justify-between p-3 border-t text-sm">
+              <span className="text-muted-foreground">
+                Page {currentPage} of {totalPages} • {filtered.length} events
+              </span>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Prev</Button>
+                <Button variant="outline" size="sm" disabled={currentPage >= totalPages} onClick={() => setPage(currentPage + 1)}>Next</Button>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>
