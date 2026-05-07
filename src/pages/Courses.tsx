@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { BookOpen, Plus, Trash2, Edit, Users, LogIn, LogOut, UserCog, Building2, ChevronDown, ChevronRight, GraduationCap, Lock, Star, Clock, Bell, Unlock, AlertTriangle } from "lucide-react";
 
 type Level = { id: string; name: string; code: string; department_id: string; sort_order: number };
+type Semester = { id: string; name: string; code: string; level_id: string; sort_order: number };
 
 export default function Courses() {
   const { user, role } = useAuth();
@@ -32,6 +33,7 @@ export default function Courses() {
   const [courseDesc, setCourseDesc] = useState("");
   const [courseDeptId, setCourseDeptId] = useState("");
   const [courseLevelId, setCourseLevelId] = useState("");
+  const [courseSemesterId, setCourseSemesterId] = useState("");
   const [courseIsCore, setCourseIsCore] = useState(true);
   const [courseSelectionDeadline, setCourseSelectionDeadline] = useState("");
   const [expandedDept, setExpandedDept] = useState<string | null>(null);
@@ -115,6 +117,18 @@ export default function Courses() {
     },
   });
 
+  const { data: allSemesters = [] } = useQuery<Semester[]>({
+    queryKey: ["all-semesters-courses"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("semesters")
+        .select("id, name, code, level_id, sort_order")
+        .order("sort_order");
+      if (error) throw error;
+      return (data || []) as Semester[];
+    },
+  });
+
   const { data: myEnrollments = [] } = useQuery({
     queryKey: ["my-enrollments", user?.id],
     queryFn: async () => {
@@ -157,6 +171,7 @@ export default function Courses() {
       const { data: newCourse, error } = await supabase.from("courses").insert({
         code: courseCode.toUpperCase(), name: courseName, description: courseDesc || null,
         department_id: deptId, level_id: courseLevelId || null, created_by: user!.id,
+        semester_id: courseSemesterId || null,
         is_core: courseIsCore,
         selection_deadline: !courseIsCore && courseSelectionDeadline ? new Date(courseSelectionDeadline).toISOString() : null,
       }).select("id").single();
@@ -178,6 +193,7 @@ export default function Courses() {
       const { error } = await supabase.from("courses").update({
         code: courseCode.toUpperCase(), name: courseName, description: courseDesc || null,
         department_id: courseDeptId || null, level_id: courseLevelId || null,
+        semester_id: courseSemesterId || null,
         is_core: courseIsCore,
         selection_deadline: !courseIsCore && courseSelectionDeadline ? new Date(courseSelectionDeadline).toISOString() : null,
       }).eq("id", editingCourse.id);
@@ -244,7 +260,7 @@ export default function Courses() {
     );
   }, [courses, canCreate]);
 
-  const resetForm = () => { setOpen(false); setEditingCourse(null); setCourseCode(""); setCourseName(""); setCourseDesc(""); setCourseDeptId(""); setCourseLevelId(""); setCourseIsCore(true); setCourseSelectionDeadline(""); };
+  const resetForm = () => { setOpen(false); setEditingCourse(null); setCourseCode(""); setCourseName(""); setCourseDesc(""); setCourseDeptId(""); setCourseLevelId(""); setCourseSemesterId(""); setCourseIsCore(true); setCourseSelectionDeadline(""); };
   const openEditCourse = (course: any) => {
     setEditingCourse(course);
     setCourseCode(course.code);
@@ -252,6 +268,7 @@ export default function Courses() {
     setCourseDesc(course.description || "");
     setCourseDeptId(course.department_id || "");
     setCourseLevelId(course.level_id || "");
+    setCourseSemesterId(course.semester_id || "");
     setCourseIsCore(course.is_core ?? true);
     setCourseSelectionDeadline(course.selection_deadline ? new Date(course.selection_deadline).toISOString().slice(0, 16) : "");
     setOpen(true);
@@ -260,6 +277,9 @@ export default function Courses() {
 
   const deptLevels = (deptId: string) => allLevels.filter((l) => l.department_id === deptId);
   const courseDeptLevels = courseDeptId ? deptLevels(courseDeptId) : [];
+  const courseLevelSemesters = courseLevelId
+    ? allSemesters.filter((s) => s.level_id === courseLevelId)
+    : [];
 
   const renderCourseCard = (course: any) => (
     <Card key={course.id} className="relative group">
@@ -537,9 +557,9 @@ export default function Courses() {
                   <Input value={courseName} onChange={(e) => setCourseName(e.target.value)} placeholder="Introduction to CS" required />
                 </div>
                 <div className="space-y-2">
-                  <Label>Semester</Label>
-                  <Select value={courseDeptId} onValueChange={(v) => { setCourseDeptId(v); setCourseLevelId(""); }}>
-                    <SelectTrigger><SelectValue placeholder="Select Semester" /></SelectTrigger>
+                  <Label>{t("auth.department")}</Label>
+                  <Select value={courseDeptId} onValueChange={(v) => { setCourseDeptId(v); setCourseLevelId(""); setCourseSemesterId(""); }}>
+                    <SelectTrigger><SelectValue placeholder={t("auth.selectDepartment")} /></SelectTrigger>
                     <SelectContent>
                       {departments.map((d) => (<SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>))}
                     </SelectContent>
@@ -548,10 +568,27 @@ export default function Courses() {
                 {courseDeptLevels.length > 0 && (
                   <div className="space-y-2">
                     <Label>{t("dept.level")}</Label>
-                    <Select value={courseLevelId} onValueChange={setCourseLevelId}>
+                    <Select value={courseLevelId} onValueChange={(v) => { setCourseLevelId(v); setCourseSemesterId(""); }}>
                       <SelectTrigger><SelectValue placeholder={t("dept.selectLevel")} /></SelectTrigger>
                       <SelectContent>
                         {courseDeptLevels.map((l) => (<SelectItem key={l.id} value={l.id}>{l.code} — {l.name}</SelectItem>))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {courseLevelId && (
+                  <div className="space-y-2">
+                    <Label>{t("dept.semester")}</Label>
+                    <Select value={courseSemesterId} onValueChange={setCourseSemesterId}>
+                      <SelectTrigger><SelectValue placeholder={t("dept.selectSemester")} /></SelectTrigger>
+                      <SelectContent>
+                        {courseLevelSemesters.length === 0 ? (
+                          <div className="px-2 py-1.5 text-xs text-muted-foreground">{t("dept.noSemesters")}</div>
+                        ) : (
+                          courseLevelSemesters.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
