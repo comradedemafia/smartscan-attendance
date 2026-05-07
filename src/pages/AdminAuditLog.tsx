@@ -29,13 +29,13 @@ export default function AdminAuditLog() {
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["audit-log"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("audit_log" as any)
+      const { data, error } = await (supabase as any)
+        .from("audit_log")
         .select("*")
         .order("created_at", { ascending: false })
         .limit(1000);
       if (error) throw error;
-      return (data || []) as AuditRow[];
+      return ((data || []) as unknown) as AuditRow[];
     },
   });
 
