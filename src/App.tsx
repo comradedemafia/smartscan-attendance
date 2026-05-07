@@ -42,6 +42,13 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function RequireAdmin({ children }: { children: React.ReactNode }) {
+  const { role, loading } = useAuth();
+  if (loading) return <div className="flex h-screen items-center justify-center text-muted-foreground">Loading...</div>;
+  if (role !== "admin") return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
 function AuthRoute() {
   const { user, loading } = useAuth();
   if (loading) return <div className="flex h-screen items-center justify-center text-muted-foreground">Loading...</div>;
@@ -92,8 +99,8 @@ const App = () => (
                   <Route path="/departments" element={<AdminDepartments />} />
                   <Route path="/notifications" element={<Notifications />} />
                   <Route path="/excuses" element={<Excuses />} />
-                  <Route path="/otp-audit" element={<AdminOtpAuditLog />} />
-                  <Route path="/audit-log" element={<AdminAuditLog />} />
+                  <Route path="/otp-audit" element={<RequireAdmin><AdminOtpAuditLog /></RequireAdmin>} />
+                  <Route path="/audit-log" element={<RequireAdmin><AdminAuditLog /></RequireAdmin>} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>
