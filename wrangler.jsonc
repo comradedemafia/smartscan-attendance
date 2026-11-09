@@ -1,0 +1,5 @@
+{
+  "name": "smartscan-attendance",
+  "compatibility_date": "2026-11-09",
+  "assets": { "directory": "./dist" }
+}
