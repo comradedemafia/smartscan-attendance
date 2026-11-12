@@ -35,5 +35,8 @@ supabase/.temp/
 .wrangler/
 .dev.vars
 
+# Legacy binary Bun lockfile (bun.lock is the source of truth)
+bun.lockb
+
 # Generated face verification models
 public/models/

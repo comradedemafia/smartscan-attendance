@@ -64,8 +64,9 @@ npx supabase secrets set \
   TOTP_ISSUER="SmartScan Attendance"
 ```
 
-- `ALLOWED_ORIGINS` — trusted browser origins for CORS. Falls back to `*` when
-  unset, so set it in production.
+- `ALLOWED_ORIGINS` — trusted browser origins for CORS. When unset, only the
+  production worker and localhost dev origins are allowed; there is no `*`
+  fallback.
 - `CRON_SECRET` — required by `optional-deadline-reminders`. Schedule it with
   `pg_cron`/an external scheduler and send it as the `x-cron-secret` header.
 - `TOTP_ISSUER` — label shown in the user's authenticator app.
