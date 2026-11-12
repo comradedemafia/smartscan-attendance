@@ -1,5 +1,4 @@
 import { useState } from "react";
-import type { Locale } from "date-fns";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,7 +17,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 
 export default function Reports() {
-  const { t, dateLocale } = useI18n();
+  const { t, localeCode } = useI18n();
   const { user, role } = useAuth();
   const [selectedCourse, setSelectedCourse] = useState<string>("");
   const [selectedStudent, setSelectedStudent] = useState<string>("");
@@ -340,7 +339,7 @@ export default function Reports() {
   });
 
   if (role === "student") {
-    return <StudentReportView t={t} dateLocale={dateLocale} userId={user!.id} />;
+    return <StudentReportView t={t} localeCode={localeCode} userId={user!.id} />;
   }
 
   const chartConfig = { attendance: { label: t("attendance.attended"), color: "hsl(var(--primary))" } };
@@ -349,7 +348,7 @@ export default function Reports() {
     const run = format === "pdf" ? exportToPDF : exportToExcel;
     const fn = (data: Parameters<typeof run>[0]) => run({
       ...data,
-      locale: dateLocale.code,
+      locale: localeCode,
       labels: {
         filters: t("reports.filters"),
         generated: t("reports.generated"),
@@ -1041,7 +1040,7 @@ export default function Reports() {
 // ============================================================================
 // Student Report View — per-module + general summary + daily sessions
 // ============================================================================
-function StudentReportView({ t, dateLocale, userId }: { t: (k: string) => string; dateLocale: Locale; userId: string }) {
+function StudentReportView({ t, localeCode, userId }: { t: (k: string) => string; localeCode: string; userId: string }) {
   const [tab, setTab] = useState<string>("modules");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
@@ -1160,7 +1159,7 @@ function StudentReportView({ t, dateLocale, userId }: { t: (k: string) => string
     const run = fmt === "pdf" ? exportToPDF : exportToExcel;
     const fn = (data: Parameters<typeof run>[0]) => run({
       ...data,
-      locale: dateLocale.code,
+      locale: localeCode,
       labels: {
         filters: t("reports.filters"),
         generated: t("reports.generated"),

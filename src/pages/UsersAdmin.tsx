@@ -31,7 +31,7 @@ import ResetTotpDialog from "@/components/ResetTotpDialog";
 import BulkCreateStudentsDialog from "@/components/BulkCreateStudentsDialog";
 
 export default function UsersAdmin() {
-  const { t, dateLocale } = useI18n();
+  const { t, localeCode } = useI18n();
   const { user, role } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -1408,7 +1408,7 @@ export default function UsersAdmin() {
             const lecLevelIds = [...new Set(lecCourses.map((c) => c.level_id).filter(Boolean))];
             const lecLevels = levels.filter((l) => lecLevelIds.includes(l.id));
             const dept = departments.find((d) => d.id === lec.department_id);
-            const joined = lec.created_at ? new Date(lec.created_at).toLocaleDateString(dateLocale.code) : "—";
+            const joined = lec.created_at ? new Date(lec.created_at).toLocaleDateString(localeCode) : "—";
             return (
               <>
                 <DialogHeader>

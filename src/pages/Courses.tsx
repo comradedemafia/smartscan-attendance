@@ -22,7 +22,7 @@ type Semester = { id: string; name: string; code: string; level_id: string; sort
 export default function Courses() {
   const { user, role } = useAuth();
   const navigate = useNavigate();
-  const { t, dateLocale } = useI18n();
+  const { t, localeCode } = useI18n();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -300,7 +300,7 @@ export default function Courses() {
                   return (
                     <Badge variant="outline" className="text-[10px] gap-1">
                       {closed ? <Lock className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
-                      {closed ? t("courses.selectionClosed") : new Date(course.selection_deadline).toLocaleString(dateLocale.code)}
+                      {closed ? t("courses.selectionClosed") : new Date(course.selection_deadline).toLocaleString(localeCode)}
                     </Badge>
                   );
                 })()

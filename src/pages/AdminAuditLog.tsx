@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Download, ShieldAlert, ChevronDown, ChevronRight } from "lucide-react";
-import { format } from "date-fns";
 import { computeDiff, filterAuditRows, type AuditRow as AuditRowT } from "@/lib/auditLog";
+import { formatIntlDate } from "@/lib/dates";
 import { useI18n } from "@/lib/i18n";
 
 type AuditRow = AuditRowT;
@@ -15,7 +15,7 @@ type AuditRow = AuditRowT;
 const PAGE_SIZE = 25;
 
 export default function AdminAuditLog() {
-  const { t, dateLocale } = useI18n();
+  const { t, localeCode } = useI18n();
   const actionLabel = (value: string) => value === "INSERT" ? t("audit.actionInsert") : value === "UPDATE" ? t("audit.actionUpdate") : value === "DELETE" ? t("audit.actionDelete") : value;
   const roleLabel = (value?: string | null) => value === "admin" ? t("common.admin") : value === "lecturer" ? t("auth.lecturer") : value === "student" ? t("auth.student") : value || "—";
   const [search, setSearch] = useState("");
@@ -156,7 +156,7 @@ export default function AdminAuditLog() {
                     <Fragment key={r.id}>
                       <tr className="border-t hover:bg-muted/30 cursor-pointer" onClick={() => setExpanded((s) => ({ ...s, [r.id]: !s[r.id] }))}>
                         <td className="p-3">{isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</td>
-                        <td className="p-3 whitespace-nowrap">{format(new Date(r.created_at), "PPpp", { locale: dateLocale })}</td>
+                        <td className="p-3 whitespace-nowrap">{formatIntlDate(r.created_at, localeCode, { dateStyle: "medium", timeStyle: "medium" })}</td>
                         <td className="p-3">{a.full_name || r.actor_id || <span className="text-muted-foreground">{t("common.system")}</span>}</td>
                         <td className="p-3"><Badge variant="outline" className="text-[10px]">{roleLabel(r.actor_role)}</Badge></td>
                         <td className="p-3">

@@ -1,6 +1,4 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
-import { enUS } from "date-fns/locale";
-import type { Locale } from "date-fns";
 
 type Language = "en" | "sw";
 
@@ -2112,7 +2110,7 @@ interface I18nContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
   t: (key: TranslationKey, params?: Record<string, string | number>) => string;
-  dateLocale: Locale;
+  localeCode: string;
 }
 
 const I18nContext = createContext<I18nContextType | null>(null);
@@ -2132,7 +2130,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.lang = language;
   }, [language]);
 
-  const dateLocale = enUS;
+  const localeCode = language === "sw" ? "sw-TZ" : "en-US";
 
   const t = useCallback(
     (key: TranslationKey, params?: Record<string, string | number>) => {
@@ -2148,7 +2146,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <I18nContext.Provider value={{ language, setLanguage: handleSetLanguage, t, dateLocale }}>
+    <I18nContext.Provider value={{ language, setLanguage: handleSetLanguage, t, localeCode }}>
       {children}
     </I18nContext.Provider>
   );

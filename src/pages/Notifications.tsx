@@ -8,11 +8,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Bell, Calendar, QrCode, Check, Trash2, AlertTriangle, Info } from "lucide-react";
-import { formatDistanceToNow, format } from "date-fns";
+import { formatIntlDate, formatRelativeTime } from "@/lib/dates";
 
 export default function Notifications() {
   const { user } = useAuth();
-  const { t, dateLocale } = useI18n();
+  const { t, localeCode } = useI18n();
   const queryClient = useQueryClient();
   const [confirmClearAll, setConfirmClearAll] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -152,8 +152,8 @@ export default function Notifications() {
                   </div>
                   <p className="text-sm text-muted-foreground">{n.message}</p>
                   <p className="text-xs text-muted-foreground/60">
-                    {format(new Date(n.created_at), "PPp", { locale: dateLocale })} •{" "}
-                    {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: dateLocale })}
+                    {formatIntlDate(n.created_at, localeCode, { dateStyle: "medium", timeStyle: "short" })} •{" "}
+                    {formatRelativeTime(n.created_at, localeCode)}
                   </p>
                 </div>
                 <Button

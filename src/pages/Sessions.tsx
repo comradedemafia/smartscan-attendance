@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useI18n } from "@/lib/i18n";
+import { formatIntlDate } from "@/lib/dates";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +20,7 @@ import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay } from "dat
 
 export default function Sessions() {
   const { user, role } = useAuth();
-  const { t } = useI18n();
+  const { t, localeCode } = useI18n();
   const { toast } = useToast();
   const sessionStatusLabel = (status: string) => {
     switch (status) {
@@ -567,7 +568,7 @@ export default function Sessions() {
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <span className="font-medium text-sm">
-              {format(weekDays[0], "dd MMM")} — {format(weekDays[6], "dd MMM yyyy")}
+              {formatIntlDate(weekDays[0], localeCode, { day: "2-digit", month: "short" })} — {formatIntlDate(weekDays[6], localeCode, { day: "2-digit", month: "short", year: "numeric" })}
             </span>
             <Button variant="outline" size="sm" onClick={() => setCurrentWeekStart(addWeeks(currentWeekStart, 1))}>
               <ChevronRight className="h-4 w-4" />

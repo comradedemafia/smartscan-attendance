@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ClipboardList, CheckCircle2, XCircle, Clock, Building2, Users, BookOpen, ChevronDown, ChevronRight, CalendarDays, GraduationCap } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
+import { formatIntlDate } from "@/lib/dates";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label";
 type Level = { id: string; name: string; code: string; department_id: string; sort_order: number };
 
 export default function Attendance() {
-  const { t, dateLocale } = useI18n();
+  const { t, localeCode } = useI18n();
   const { user, role } = useAuth();
   const isAdmin = role === "admin";
   const [selectedDeptId, setSelectedDeptId] = useState<string>("all");
@@ -445,7 +445,7 @@ export default function Attendance() {
                                 <div>
                                   <p className="font-medium text-sm">{s.title}</p>
                                   <p className="text-xs text-muted-foreground">
-                                    {format(new Date(s.session_date), "dd MMM yyyy", { locale: dateLocale })}
+                                    {formatIntlDate(s.session_date, localeCode, { day: "2-digit", month: "short", year: "numeric" })}
                                     {s.venue_name && ` · 📍 ${s.venue_name}`}
                                   </p>
                                 </div>
@@ -453,7 +453,7 @@ export default function Attendance() {
                               <div className="flex items-center gap-2">
                                 {s.attended && s.record ? (
                                   <>
-                                    <span className="text-xs text-muted-foreground">{format(new Date(s.record.scanned_at), "HH:mm")}</span>
+                                    <span className="text-xs text-muted-foreground">{formatIntlDate(s.record.scanned_at, localeCode, { hour: "2-digit", minute: "2-digit" })}</span>
                                     {statusBadge(s.record.status)}
                                   </>
                                 ) : (
@@ -578,7 +578,7 @@ function SessionHistoryItem({ sessionData, studentProfiles, t }: {
   t: (key: string) => string;
 }) {
   const [open, setOpen] = useState(false);
-  const { dateLocale } = useI18n();
+  const { localeCode } = useI18n();
   const { session, presentStudents, absentStudents, totalEnrolled } = sessionData;
   const pct = totalEnrolled > 0 ? Math.round((presentStudents.length / totalEnrolled) * 100) : 0;
 
@@ -591,7 +591,7 @@ function SessionHistoryItem({ sessionData, studentProfiles, t }: {
             <div>
               <p className="text-sm font-medium">{session.title}</p>
               <p className="text-xs text-muted-foreground">
-                {format(new Date(session.session_date), "dd MMM yyyy", { locale: dateLocale })}
+                {formatIntlDate(session.session_date, localeCode, { day: "2-digit", month: "short", year: "numeric" })}
                 {session.venue_name && ` · 📍 ${session.venue_name}`}
               </p>
             </div>
@@ -615,7 +615,7 @@ function SessionHistoryItem({ sessionData, studentProfiles, t }: {
                   <span className="text-xs text-muted-foreground">{profile?.university_id}</span>
                 </div>
                 <span className="text-xs text-muted-foreground">
-                  {record?.scanned_at && format(new Date(record.scanned_at), "HH:mm")}
+                  {record?.scanned_at && formatIntlDate(record.scanned_at, localeCode, { hour: "2-digit", minute: "2-digit" })}
                 </span>
               </div>
             );

@@ -8,11 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Bell, Check, Calendar, QrCode, Trash2, AlertTriangle, Info } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { formatRelativeTime } from "@/lib/dates";
 
 export default function NotificationBell() {
   const { user } = useAuth();
-  const { t, dateLocale } = useI18n();
+  const { t, localeCode } = useI18n();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
@@ -168,7 +168,7 @@ export default function NotificationBell() {
                   </div>
                   <p className="text-xs text-muted-foreground line-clamp-2">{n.message}</p>
                   <p className="text-[10px] text-muted-foreground/60">
-                    {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: dateLocale })}
+                    {formatRelativeTime(n.created_at, localeCode)}
                   </p>
                 </div>
                 <Button

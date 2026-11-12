@@ -16,12 +16,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { format } from "date-fns";
+import { formatIntlDate } from "@/lib/dates";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Dashboard() {
   const { role, profile, user } = useAuth();
-  const { t, dateLocale } = useI18n();
+  const { t, localeCode } = useI18n();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -445,7 +445,7 @@ export default function Dashboard() {
                       )}
                       {c.selection_deadline && status !== "core" && (
                         <span className="text-[10px] text-muted-foreground hidden sm:inline">
-                          · {format(new Date(c.selection_deadline), "PP", { locale: dateLocale })}
+                          · {formatIntlDate(c.selection_deadline, localeCode, { dateStyle: "medium" })}
                         </span>
                       )}
                     </div>
@@ -670,7 +670,7 @@ export default function Dashboard() {
                     <Clock className="h-4 w-4 text-primary shrink-0" />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium truncate">{session.title}</p>
-                      <p className="text-xs text-muted-foreground">{(session as any).courses?.code} • {format(new Date(session.session_date), "dd MMM yyyy", { locale: dateLocale })}</p>
+                      <p className="text-xs text-muted-foreground">{(session as any).courses?.code} • {formatIntlDate(session.session_date, localeCode, { day: "2-digit", month: "short", year: "numeric" })}</p>
                     </div>
                     <Badge variant={session.status === "active" ? "default" : "secondary"} className="text-xs shrink-0">{sessionStatusLabel(session.status)}</Badge>
                   </div>

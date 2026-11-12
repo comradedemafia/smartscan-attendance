@@ -16,7 +16,7 @@ import { QRCodeSVG } from "qrcode.react";
 export default function SessionQR() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const { user } = useAuth();
-  const { t, dateLocale } = useI18n();
+  const { t, localeCode } = useI18n();
   const { toast } = useToast();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -354,7 +354,7 @@ export default function SessionQR() {
                     </div>
                   </div>
                   <span className="text-xs text-muted-foreground">
-                    {new Date(a.scanned_at).toLocaleTimeString(dateLocale.code)}
+                    {new Date(a.scanned_at).toLocaleTimeString(localeCode)}
                   </span>
                 </div>
               ))}
