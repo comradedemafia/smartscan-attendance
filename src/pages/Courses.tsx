@@ -22,7 +22,7 @@ type Semester = { id: string; name: string; code: string; level_id: string; sort
 export default function Courses() {
   const { user, role } = useAuth();
   const navigate = useNavigate();
-  const { t } = useI18n();
+  const { t, dateLocale } = useI18n();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -273,7 +273,7 @@ export default function Courses() {
     setCourseSelectionDeadline(course.selection_deadline ? new Date(course.selection_deadline).toISOString().slice(0, 16) : "");
     setOpen(true);
   };
-  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); if (!courseCode.trim() || !courseName.trim()) return; editingCourse ? updateCourseMutation.mutate() : createCourseMutation.mutate(); };
+  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); if (!courseCode.trim() || !courseName.trim()) return; if (editingCourse) updateCourseMutation.mutate(); else createCourseMutation.mutate(); };
 
   const deptLevels = (deptId: string) => allLevels.filter((l) => l.department_id === deptId);
   const courseDeptLevels = courseDeptId ? deptLevels(courseDeptId) : [];
@@ -300,7 +300,7 @@ export default function Courses() {
                   return (
                     <Badge variant="outline" className="text-[10px] gap-1">
                       {closed ? <Lock className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
-                      {closed ? t("courses.selectionClosed") : new Date(course.selection_deadline).toLocaleString()}
+                      {closed ? t("courses.selectionClosed") : new Date(course.selection_deadline).toLocaleString(dateLocale.code)}
                     </Badge>
                   );
                 })()
@@ -550,11 +550,11 @@ export default function Courses() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
                   <Label>{t("courses.code")}</Label>
-                  <Input value={courseCode} onChange={(e) => setCourseCode(e.target.value)} placeholder="CS101" required />
+                  <Input value={courseCode} onChange={(e) => setCourseCode(e.target.value)} placeholder={t("courses.codePlaceholder")} required />
                 </div>
                 <div className="space-y-2">
                   <Label>{t("courses.name")}</Label>
-                  <Input value={courseName} onChange={(e) => setCourseName(e.target.value)} placeholder="Introduction to CS" required />
+                  <Input value={courseName} onChange={(e) => setCourseName(e.target.value)} placeholder={t("courses.namePlaceholder")} required />
                 </div>
                 <div className="space-y-2">
                   <Label>{t("auth.department")}</Label>
@@ -595,7 +595,7 @@ export default function Courses() {
                 )}
                 <div className="space-y-2">
                   <Label>{t("courses.description")}</Label>
-                  <Textarea value={courseDesc} onChange={(e) => setCourseDesc(e.target.value)} placeholder="Optional description" />
+                  <Textarea value={courseDesc} onChange={(e) => setCourseDesc(e.target.value)} placeholder={t("courses.descriptionPlaceholder")} />
                 </div>
                 <div className="space-y-2">
                   <Label>{t("courses.moduleType")}</Label>

@@ -21,6 +21,15 @@ export default function Sessions() {
   const { user, role } = useAuth();
   const { t } = useI18n();
   const { toast } = useToast();
+  const sessionStatusLabel = (status: string) => {
+    switch (status) {
+      case "active": return t("sessions.active");
+      case "scheduled": return t("sessions.scheduled");
+      case "completed": return t("sessions.completed");
+      case "terminated": return t("sessions.statusTerminated");
+      default: return status;
+    }
+  };
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
@@ -31,6 +40,12 @@ export default function Sessions() {
   const [courseId, setCourseId] = useState("");
   
   const [venueName, setVenueName] = useState("");
+  const [customVenue, setCustomVenue] = useState("");
+  const [sessionDate, setSessionDate] = useState(() => format(new Date(), "yyyy-MM-dd"));
+  const [startTime, setStartTime] = useState(() => format(new Date(), "HH:mm"));
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
+  const [radiusMeters, setRadiusMeters] = useState("100");
   const [durationMinutes, setDurationMinutes] = useState("30");
   const [selectedLevelId, setSelectedLevelId] = useState("");
   const [deleteSessionId, setDeleteSessionId] = useState<string | null>(null);
@@ -187,12 +202,27 @@ export default function Sessions() {
     return result;
   }, [sessions, selectedDeptId, selectedFilterLevel, selectedStatus, isAdmin]);
 
+  const buildSessionFields = () => {
+    const finalVenue = venueName === "__custom__" ? customVenue.trim() : venueName;
+    const start = new Date(`${sessionDate}T${startTime}:00`);
+    return {
+      title,
+      course_id: courseId,
+      venue_name: finalVenue || null,
+      duration_minutes: parseInt(durationMinutes, 10),
+      session_date: sessionDate,
+      start_time: start.toISOString(),
+      latitude: latitude.trim() ? Number(latitude) : null,
+      longitude: longitude.trim() ? Number(longitude) : null,
+      location_radius_meters: radiusMeters.trim() ? Number(radiusMeters) : null,
+    };
+  };
+
   // ===== SESSION MUTATIONS =====
   const createMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from("sessions").insert({
-        title, course_id: courseId, venue_name: venueName || null,
-        duration_minutes: parseInt(durationMinutes), created_by: user!.id, status: "scheduled",
+        ...buildSessionFields(), created_by: user!.id, status: "scheduled",
       });
       if (error) throw error;
     },
@@ -205,13 +235,13 @@ export default function Sessions() {
         if (newSessions?.[0]) {
           await supabase.rpc("notify_enrolled_students", {
             _session_id: newSessions[0].id,
-            _title: "📅 New Session",
-            _message: `New session "${title}" has been scheduled`,
+            _title: t("notify.newSessionTitle"),
+            _message: t("notify.newSessionMessage", { title }),
             _type: "session",
           });
         }
-      } catch {}
-      toast({ title: t("common.success"), description: "Session created" });
+      } catch { /* ignore notification failure */ }
+      toast({ title: t("common.success"), description: t("common.sessionCreated") });
       resetSessionForm();
     },
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
@@ -219,14 +249,12 @@ export default function Sessions() {
 
   const updateMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("sessions").update({
-        title, course_id: courseId, venue_name: venueName || null, duration_minutes: parseInt(durationMinutes),
-      }).eq("id", editingSession.id);
+      const { error } = await supabase.from("sessions").update(buildSessionFields()).eq("id", editingSession.id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sessions"] });
-      toast({ title: t("common.success"), description: "Session updated" });
+      toast({ title: t("common.success"), description: t("common.sessionUpdated") });
       resetSessionForm();
     },
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
@@ -239,22 +267,76 @@ export default function Sessions() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sessions"] });
-      toast({ title: t("common.success"), description: "Session deleted" });
+      toast({ title: t("common.success"), description: t("common.sessionDeleted") });
     },
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
 
-  const resetSessionForm = () => { setOpen(false); setEditingSession(null); setTitle(""); setCourseId(""); setVenueName(""); setDurationMinutes("30"); setSelectedLevelId(""); };
-  const openEdit = (session: any) => { setEditingSession(session); setTitle(session.title); setCourseId(session.course_id); setVenueName(session.venue_name || ""); setDurationMinutes(String(session.duration_minutes)); const course = courses.find((c: any) => c.id === session.course_id); setSelectedLevelId(course?.level_id || ""); setOpen(true); };
+  const resetSessionForm = () => {
+    setOpen(false);
+    setEditingSession(null);
+    setTitle("");
+    setCourseId("");
+    setVenueName("");
+    setCustomVenue("");
+    setSessionDate(format(new Date(), "yyyy-MM-dd"));
+    setStartTime(format(new Date(), "HH:mm"));
+    setLatitude("");
+    setLongitude("");
+    setRadiusMeters("100");
+    setDurationMinutes("30");
+    setSelectedLevelId("");
+  };
+  const openEdit = (session: any) => {
+    setEditingSession(session);
+    setTitle(session.title);
+    setCourseId(session.course_id);
+    const preset = VENUE_OPTIONS.includes(session.venue_name);
+    setVenueName(session.venue_name ? (preset ? session.venue_name : "__custom__") : "");
+    setCustomVenue(preset ? "" : session.venue_name || "");
+    setSessionDate(session.session_date || format(new Date(session.start_time || Date.now()), "yyyy-MM-dd"));
+    setStartTime(format(new Date(session.start_time || Date.now()), "HH:mm"));
+    setLatitude(session.latitude == null ? "" : String(session.latitude));
+    setLongitude(session.longitude == null ? "" : String(session.longitude));
+    setRadiusMeters(session.location_radius_meters == null ? "100" : String(session.location_radius_meters));
+    setDurationMinutes(String(session.duration_minutes));
+    const course = courses.find((c: any) => c.id === session.course_id);
+    setSelectedLevelId(course?.level_id || "");
+    setOpen(true);
+  };
   const handleSessionSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !courseId) return;
-    if (!venueName) {
-      toast({ title: t("common.error"), description: "Please select a venue", variant: "destructive" });
+    const finalVenue = venueName === "__custom__" ? customVenue.trim() : venueName;
+    if (!finalVenue) {
+      toast({ title: t("common.error"), description: t("common.selectVenueRequired"), variant: "destructive" });
       return;
     }
-    editingSession ? updateMutation.mutate() : createMutation.mutate();
+    if (!sessionDate || !startTime || Number.isNaN(new Date(`${sessionDate}T${startTime}:00`).getTime())) {
+      toast({ title: t("common.error"), description: t("sessions.invalidDateTime"), variant: "destructive" });
+      return;
+    }
+    const hasLat = latitude.trim() !== "";
+    const hasLng = longitude.trim() !== "";
+    if (hasLat !== hasLng) {
+      toast({ title: t("common.error"), description: t("sessions.invalidCoordinates"), variant: "destructive" });
+      return;
+    }
+    if (hasLat) {
+      const lat = Number(latitude);
+      const lng = Number(longitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        toast({ title: t("common.error"), description: t("sessions.invalidCoordinates"), variant: "destructive" });
+        return;
+      }
+    }
+    const radius = Number(radiusMeters || "100");
+    if (!Number.isFinite(radius) || radius < 10 || radius > 5000) {
+      toast({ title: t("common.error"), description: t("sessions.invalidRadius"), variant: "destructive" });
+      return;
+    }
+    if (editingSession) updateMutation.mutate(); else createMutation.mutate();
   };
   const canEditSession = (session: any) => role === "admin" || (role === "lecturer" && session.created_by === user?.id);
   const isSessionLaunchable = (session: any) => {
@@ -296,12 +378,12 @@ export default function Sessions() {
           <CardContent className="py-3 flex items-center gap-3">
             <BookOpen className="h-5 w-5 text-primary" />
             <div className="text-sm">
-              <span className="text-muted-foreground">Modules you teach: </span>
+              <span className="text-muted-foreground">{t("common.modulesYouTeach")} </span>
               <span className="font-semibold text-foreground">{courses.length}</span>
-              <span className="text-muted-foreground ml-3">Sessions: </span>
+              <span className="text-muted-foreground ml-3">{t("sessions.title")}: </span>
               <span className="font-semibold text-foreground">{sessions.length}</span>
               {courses.length === 0 && (
-                <span className="ml-3 text-amber-600">No modules assigned. Contact admin to assign you modules.</span>
+                <span className="ml-3 text-amber-600">{t("common.noModulesAssigned")}</span>
               )}
             </div>
           </CardContent>
@@ -313,7 +395,7 @@ export default function Sessions() {
           {isAdmin && (
             <Select value={selectedDeptId} onValueChange={setSelectedDeptId}>
               <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Semester" />
+                <SelectValue placeholder={t("common.semester")} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t("admin.allSemesters")}</SelectItem>
@@ -372,8 +454,8 @@ export default function Sessions() {
                   </DialogHeader>
                   <form onSubmit={handleSessionSubmit} className="space-y-4">
                     <div className="space-y-2">
-                      <Label>Title</Label>
-                      <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Week 1 Lecture" required />
+                      <Label>{t("common.title")}</Label>
+                      <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("sessions.titlePlaceholder")} required />
                     </div>
                     <div className="space-y-2">
                       <Label>{t("auth.programme")}</Label>
@@ -382,11 +464,11 @@ export default function Sessions() {
                         onValueChange={(v) => { setSelectedLevelId(v); setCourseId(""); }}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder={availableLevels.length === 0 ? "No assigned modules — contact admin" : t("auth.selectProgramme")} />
+                          <SelectValue placeholder={availableLevels.length === 0 ? t("sessions.noAssignedModules") : t("auth.selectProgramme")} />
                         </SelectTrigger>
                         <SelectContent>
                           {availableLevels.length === 0 ? (
-                            <div className="px-2 py-1.5 text-xs text-muted-foreground">No programmes available</div>
+                            <div className="px-2 py-1.5 text-xs text-muted-foreground">{t("common.noProgrammes")}</div>
                           ) : (
                             availableLevels.map((l) => (
                               <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
@@ -403,7 +485,7 @@ export default function Sessions() {
                         disabled={!selectedLevelId}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select module" />
+                          <SelectValue placeholder={t("sessions.selectModule")} />
                         </SelectTrigger>
                         <SelectContent>
                           {filteredFormCourses.map((c: any) => (
@@ -412,18 +494,37 @@ export default function Sessions() {
                         </SelectContent>
                       </Select>
                     </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label>{t("sessions.date")}</Label>
+                        <Input type="date" value={sessionDate} onChange={(e) => setSessionDate(e.target.value)} required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{t("sessions.time")}</Label>
+                        <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} required />
+                      </div>
+                    </div>
                     <div className="space-y-2">
                       <Label>{t("sessions.venue")} <span className="text-destructive">*</span></Label>
                       <Select value={venueName} onValueChange={setVenueName} required>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select venue" />
+                          <SelectValue placeholder={t("sessions.selectVenue")} />
                         </SelectTrigger>
                         <SelectContent>
                           {VENUE_OPTIONS.map((v) => (
                             <SelectItem key={v} value={v}>{v}</SelectItem>
                           ))}
+                          <SelectItem value="__custom__">{t("sessions.customVenue")}</SelectItem>
                         </SelectContent>
                       </Select>
+                      {venueName === "__custom__" && (
+                        <Input
+                          value={customVenue}
+                          onChange={(e) => setCustomVenue(e.target.value)}
+                          placeholder={t("sessions.customVenuePlaceholder")}
+                          required
+                        />
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label>{t("sessions.duration")}</Label>
@@ -436,6 +537,15 @@ export default function Sessions() {
                           <SelectItem value="60">60 {t("qr.minutes")}</SelectItem>
                         </SelectContent>
                       </Select>
+                    </div>
+                    <div className="space-y-2 rounded-lg border border-border/60 p-3">
+                      <Label className="text-xs">{t("sessions.geofence")}</Label>
+                      <p className="text-[11px] text-muted-foreground">{t("sessions.geofenceHint")}</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input inputMode="decimal" value={latitude} onChange={(e) => setLatitude(e.target.value)} placeholder={t("sessions.latitude")} />
+                        <Input inputMode="decimal" value={longitude} onChange={(e) => setLongitude(e.target.value)} placeholder={t("sessions.longitude")} />
+                      </div>
+                      <Input inputMode="numeric" value={radiusMeters} onChange={(e) => setRadiusMeters(e.target.value)} placeholder={t("sessions.radius")} />
                     </div>
                     <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending}>
                       {editingSession ? t("common.save") : t("sessions.create")}
@@ -599,7 +709,7 @@ export default function Sessions() {
                         </Button>
                       </div>
                     )}
-                    <Badge variant={statusColor(session.status) as any}>{session.status}</Badge>
+                    <Badge variant={statusColor(session.status) as any}>{sessionStatusLabel(session.status)}</Badge>
                   </div>
                 </div>
               </CardHeader>
@@ -615,7 +725,7 @@ export default function Sessions() {
                       <QrCode className="h-4 w-4 mr-2" />{t("sessions.generateQr")}
                     </Button>
                   ) : (
-                    <Button variant="outline" size="sm" className="w-full mt-2" disabled title="Session ended or expired">
+                    <Button variant="outline" size="sm" className="w-full mt-2" disabled title={t("sessions.endedExpired")}>
                       <QrCode className="h-4 w-4 mr-2" />{session.status === "completed" ? t("sessions.terminated") : t("qr.expired")}
                     </Button>
                   )

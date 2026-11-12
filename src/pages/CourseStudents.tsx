@@ -56,7 +56,7 @@ export default function CourseStudents() {
       const profileMap = Object.fromEntries((profiles || []).map((p) => [p.id, p]));
       return data.map((e) => ({
         ...e,
-        profile: profileMap[e.user_id] || { full_name: "Unknown", university_id: "—", email: "", gender: null },
+        profile: profileMap[e.user_id] || { full_name: t("common.unknown"), university_id: "—", email: "", gender: null },
       }));
     },
     enabled: !!courseId,

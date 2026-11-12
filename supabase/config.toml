@@ -1,7 +1,4 @@
-project_id = "vobhssezfdyapckoezcx"
-
-[functions.verify-attendance]
-verify_jwt = false
+project_id = "mdgglcfopiibinbrbgkl"
 
 [functions.attendance-otp]
 verify_jwt = false

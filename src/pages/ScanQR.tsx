@@ -6,25 +6,33 @@ import { Link } from "react-router-dom";
 import { useI18n } from "@/lib/i18n";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { useToast } from "@/hooks/use-toast";
-import { QrCode, CheckCircle2, XCircle, Camera, ShieldAlert, Settings, KeyRound, WifiOff, Wifi, Upload, ShieldOff } from "lucide-react";
+import { QrCode, CheckCircle2, XCircle, Camera, ShieldAlert, Settings, KeyRound, WifiOff, Wifi, Upload, ShieldOff, UserCheck } from "lucide-react";
 import { Html5Qrcode } from "html5-qrcode";
 import { Badge } from "@/components/ui/badge";
 import { z } from "zod";
 import { useOtpBruteForceGuard } from "@/hooks/useOtpBruteForceGuard";
+import SelfieCapture from "@/components/SelfieCapture";
+import { FACE_MATCH_THRESHOLD, verifySelfieDataUrl, type SelfieVerificationPayload } from "@/lib/faceVerification";
 
 const qrPayloadSchema = z.object({
   session_id: z.string().uuid(),
   secret: z.string().min(1).max(200),
 });
 
-type ScanStep = "scan" | "enter-otp" | "verified" | "no-totp" | "offline-saved";
+type ScanStep = "scan" | "enter-reg-no" | "selfie" | "enter-otp" | "verified" | "no-totp" | "offline-saved";
 
 interface OfflineScan {
   session_id: string;
   secret: string;
   timestamp: string;
+  latitude?: number;
+  longitude?: number;
+  registration_number?: string;
+  selfie?: string;
 }
 
 const OFFLINE_QUEUE_KEY = "offline_scan_queue";
@@ -35,18 +43,58 @@ function getOfflineQueue(): OfflineScan[] {
   } catch { return []; }
 }
 
+function saveOfflineQueue(queue: OfflineScan[]) {
+  localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+}
+
 function addToOfflineQueue(scan: OfflineScan) {
   const queue = getOfflineQueue();
   queue.push(scan);
-  localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+  saveOfflineQueue(queue);
 }
 
 function clearOfflineQueue() {
   localStorage.removeItem(OFFLINE_QUEUE_KEY);
 }
 
+/** Best-effort geolocation capture (resolves null on failure/timeout). */
+function getPosition(): Promise<{ latitude: number; longitude: number } | null> {
+  if (!navigator.geolocation) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({
+        latitude: pos.coords.latitude,
+        longitude: pos.coords.longitude,
+      }),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 },
+    );
+  });
+}
+
+/**
+ * Invoke the attendance-otp function and normalize errors so callers can
+ * branch on the server's `error` code (INVALID_OTP, REPLAY_DETECTED, ...).
+ */
+async function callOtp(body: Record<string, unknown>) {
+  const { data, error } = await supabase.functions.invoke("attendance-otp", { body });
+  if (error) {
+    let message = error.message;
+    try {
+      const ctx = (error as { context?: { json?: () => Promise<{ error?: string }> } }).context;
+      if (ctx?.json) {
+        const parsed = await ctx.json();
+        if (parsed?.error) message = parsed.error;
+      }
+    } catch { /* ignore */ }
+    throw new Error(message);
+  }
+  if (data?.error) throw new Error(data.error);
+  return data;
+}
+
 export default function ScanQR() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { t } = useI18n();
   const { toast } = useToast();
   const [scanning, setScanning] = useState(false);
@@ -56,41 +104,61 @@ export default function ScanQR() {
   const processedRef = useRef(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [offlineCount, setOfflineCount] = useState(getOfflineQueue().length);
+  const [totpReady, setTotpReady] = useState<boolean | null>(null);
 
   const [scanStep, setScanStep] = useState<ScanStep>("scan");
   const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
   const [pendingSecret, setPendingSecret] = useState<string | null>(null);
   const [otpCode, setOtpCode] = useState("");
+  const [syncMode, setSyncMode] = useState(false);
+  const [registrationNumber, setRegistrationNumber] = useState("");
+  const [regNoError, setRegNoError] = useState<string | null>(null);
+  const [selfiePayload, setSelfiePayload] = useState<SelfieVerificationPayload | null>(null);
+  const [pendingLocation, setPendingLocation] = useState<{ latitude?: number; longitude?: number }>({});
+  const [offlineFlow, setOfflineFlow] = useState(false);
+  const positionPromiseRef = useRef<Promise<{ latitude: number; longitude: number } | null> | null>(null);
 
   // Brute-force soft-guard based on user's own audit log
   const otpGuard = useOtpBruteForceGuard(pendingSessionId);
 
   // After QR scan — validate
   const initiateMutation = useMutation({
-    mutationFn: async (parsed: { session_id: string; secret: string }) => {
+    mutationFn: async (parsed: { session_id: string; secret: string; registration_number: string; latitude?: number; longitude?: number }) => {
       const { data, error } = await supabase.functions.invoke("attendance-otp", {
         body: { action: "initiate", ...parsed },
       });
-      if (error) throw new Error(error.message || "Network error");
+      if (error) throw new Error(error.message || t("common.networkError"));
       if (data?.error) throw new Error(data.error);
       return data;
     },
     onSuccess: (data) => {
       if (data.needs_totp) {
         setPendingSessionId(data.session_id);
-        setScanStep("enter-otp");
+        setScanStep("selfie");
       } else if (data.no_totp) {
         setScanStep("no-totp");
       }
     },
-    onError: (e: any) => {
+    onError: (e: Error) => {
+      if (e.message === "REG_NO_MISMATCH") {
+        setRegNoError(t("qr.regNoMismatch"));
+        setScanStep("enter-reg-no");
+        return;
+      }
+
       setScanStep("scan");
-      if (e.message === "DUPLICATE") {
+      if (e.message === "STUDENT_INACTIVE") {
+        setResult("error");
+        toast({ title: t("qr.inactiveStudent"), variant: "destructive" });
+      } else if (e.message === "DUPLICATE") {
         setResult("duplicate");
         toast({ title: t("qr.alreadyScanned"), variant: "destructive" });
       } else if (e.message === "QR_EXPIRED") {
         setResult("expired");
         toast({ title: t("qr.expired"), variant: "destructive" });
+      } else if (e.message === "OUTSIDE_RADIUS") {
+        setResult("error");
+        toast({ title: t("qr.locationError"), variant: "destructive" });
       } else {
         setResult("error");
         toast({ title: t("common.error"), description: e.message, variant: "destructive" });
@@ -104,14 +172,24 @@ export default function ScanQR() {
       if (otpGuard.blocked) {
         throw new Error("RATE_LIMITED");
       }
+      if (!selfiePayload) {
+        throw new Error("SELFIE_REQUIRED");
+      }
       const { data, error } = await supabase.functions.invoke("attendance-otp", {
         body: {
           action: "verify-scan-totp",
           session_id: pendingSessionId,
           code: otpCode,
+          registration_number: registrationNumber.trim(),
+          latitude: pendingLocation.latitude,
+          longitude: pendingLocation.longitude,
+          selfie: selfiePayload.dataUrl,
+          face_match_distance: selfiePayload.faceMatchDistance,
+          gender: selfiePayload.gender,
+          gender_match: selfiePayload.genderMatch,
         },
       });
-      if (error) throw new Error(error.message || "Network error");
+      if (error) throw new Error(error.message || t("common.networkError"));
       if (data?.error) throw new Error(data.error);
       return data;
     },
@@ -121,11 +199,21 @@ export default function ScanQR() {
       toast({ title: t("qr.success"), description: t("otp.verified") });
       otpGuard.refresh();
     },
-    onError: (e: any) => {
+    onError: (e: Error) => {
+      if (e.message === "REG_NO_MISMATCH") {
+        setRegNoError(t("qr.regNoMismatch"));
+        setScanStep("enter-reg-no");
+        return;
+      }
+      if (e.message === "SELFIE_REQUIRED" || e.message === "INVALID_SELFIE" || e.message === "SELFIE_TOO_LARGE") {
+        setScanStep("selfie");
+        toast({ title: t("selfie.verifyError"), description: e.message, variant: "destructive" });
+        return;
+      }
       if (e.message === "RATE_LIMITED") {
         toast({
-          title: t("otp.tooManyAttempts") || "Too many attempts",
-          description: t("otp.cooldownDesc") || "Please wait before trying again.",
+          title: t("otp.tooManyAttempts"),
+          description: t("otp.cooldownDesc"),
           variant: "destructive",
         });
       } else if (e.message === "INVALID_OTP") {
@@ -135,15 +223,23 @@ export default function ScanQR() {
         setResult("duplicate");
         setScanStep("scan");
         toast({
-          title: t("otp.replayTitle") || "Code already used",
-          description: t("otp.replayDesc") || "This OTP code has already been used for this session.",
+          title: t("otp.replayTitle"),
+          description: t("otp.replayDesc"),
           variant: "destructive",
         });
         otpGuard.refresh();
+      } else if (e.message === "STUDENT_INACTIVE") {
+        setResult("error");
+        setScanStep("scan");
+        toast({ title: t("qr.inactiveStudent"), variant: "destructive" });
       } else if (e.message === "DUPLICATE") {
         setResult("duplicate");
         setScanStep("scan");
         toast({ title: t("qr.alreadyScanned"), variant: "destructive" });
+      } else if (e.message === "OUTSIDE_RADIUS") {
+        setResult("error");
+        setScanStep("scan");
+        toast({ title: t("qr.locationError"), variant: "destructive" });
       } else {
         toast({ title: t("common.error"), description: e.message, variant: "destructive" });
         otpGuard.refresh();
@@ -153,22 +249,100 @@ export default function ScanQR() {
 
   const stopScanner = useCallback(async () => {
     if (scannerRef.current) {
-      try { await scannerRef.current.stop(); } catch {}
+      try { await scannerRef.current.stop(); } catch { /* ignore */ }
       scannerRef.current = null;
     }
     setScanning(false);
   }, []);
 
-  const handleQrScanned = useCallback(async (parsed: { session_id: string; secret: string }) => {
+  const handleQrScanned = useCallback((parsed: { session_id: string; secret: string }) => {
     setPendingSecret(parsed.secret);
     setPendingSessionId(parsed.session_id);
+    setRegistrationNumber("");
+    setRegNoError(null);
+    setSelfiePayload(null);
+    setPendingLocation({});
+    setOfflineFlow(!navigator.onLine);
+    positionPromiseRef.current = getPosition();
+    setScanStep("enter-reg-no");
+  }, []);
 
-    // If offline, save to queue
+  const resetToScan = useCallback(() => {
+    setScanStep("scan");
+    setResult(null);
+    setPendingSessionId(null);
+    setPendingSecret(null);
+    setOtpCode("");
+    setSyncMode(false);
+    setRegistrationNumber("");
+    setRegNoError(null);
+    setSelfiePayload(null);
+    setPendingLocation({});
+    setOfflineFlow(false);
+    positionPromiseRef.current = null;
+  }, []);
+
+  const handleRegNoSubmit = useCallback(async (event: React.FormEvent) => {
+    event.preventDefault();
+    const value = registrationNumber.trim();
+
+    if (!value) {
+      setRegNoError(t("qr.regNoRequired"));
+      return;
+    }
+
+    const expected = profile?.university_id?.trim().toLowerCase();
+    if (expected && value.toLowerCase() !== expected) {
+      setRegNoError(t("qr.regNoMismatch"));
+      return;
+    }
+
+    if (!pendingSessionId || !pendingSecret) {
+      resetToScan();
+      return;
+    }
+
+    setRegNoError(null);
+    const position = positionPromiseRef.current
+      ? await positionPromiseRef.current
+      : await getPosition();
+    const location = {
+      latitude: position?.latitude,
+      longitude: position?.longitude,
+    };
+    setPendingLocation(location);
+
     if (!navigator.onLine) {
+      setOfflineFlow(true);
+      setScanStep("selfie");
+      return;
+    }
+
+    setOfflineFlow(false);
+    initiateMutation.mutate({
+      session_id: pendingSessionId,
+      secret: pendingSecret,
+      registration_number: value,
+      latitude: location.latitude,
+      longitude: location.longitude,
+    });
+  }, [initiateMutation, pendingSecret, pendingSessionId, profile?.university_id, registrationNumber, resetToScan, t]);
+
+  const handleSelfieVerified = useCallback((payload: SelfieVerificationPayload) => {
+    if (!pendingSessionId || !pendingSecret) {
+      resetToScan();
+      return;
+    }
+
+    if (offlineFlow) {
       addToOfflineQueue({
-        session_id: parsed.session_id,
-        secret: parsed.secret,
+        session_id: pendingSessionId,
+        secret: pendingSecret,
         timestamp: new Date().toISOString(),
+        latitude: pendingLocation.latitude,
+        longitude: pendingLocation.longitude,
+        registration_number: registrationNumber.trim(),
+        selfie: payload.dataUrl,
       });
       setOfflineCount(getOfflineQueue().length);
       setScanStep("offline-saved");
@@ -176,11 +350,10 @@ export default function ScanQR() {
       return;
     }
 
-    initiateMutation.mutate({
-      session_id: parsed.session_id,
-      secret: parsed.secret,
-    });
-  }, [initiateMutation, toast, t]);
+    setSelfiePayload(payload);
+    setScanStep("enter-otp");
+    toast({ title: t("selfie.success") });
+  }, [offlineFlow, pendingLocation.latitude, pendingLocation.longitude, pendingSecret, pendingSessionId, registrationNumber, resetToScan, t, toast]);
 
   const startScanner = useCallback(async () => {
     setResult(null);
@@ -188,6 +361,12 @@ export default function ScanQR() {
     setPendingSessionId(null);
     setPendingSecret(null);
     setOtpCode("");
+    setRegistrationNumber("");
+    setRegNoError(null);
+    setSelfiePayload(null);
+    setPendingLocation({});
+    setOfflineFlow(false);
+    positionPromiseRef.current = null;
     processedRef.current = false;
 
     setScanning(true);
@@ -215,10 +394,25 @@ export default function ScanQR() {
         () => {}
       );
     } catch {
-      toast({ title: t("common.error"), description: "Camera access denied", variant: "destructive" });
+      toast({ title: t("common.error"), description: t("common.cameraAccessDenied"), variant: "destructive" });
       setScanning(false);
     }
   }, [stopScanner, handleQrScanned, toast, t]);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    callOtp({ action: "totp-status" })
+      .then((status) => {
+        if (!cancelled) setTotpReady(Boolean(status?.enabled));
+      })
+      .catch(() => {
+        if (!cancelled) setTotpReady(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   // Online/offline detection
   useEffect(() => {
@@ -232,37 +426,176 @@ export default function ScanQR() {
     };
   }, []);
 
-  // Sync offline queue when back online
-  const [syncing, setSyncing] = useState(false);
-  const syncOfflineQueue = useCallback(async () => {
-    const queue = getOfflineQueue();
-    if (!queue.length) return;
-    setSyncing(true);
-    let synced = 0;
-    for (const scan of queue) {
-      try {
-        const { data, error } = await supabase.functions.invoke("attendance-otp", {
-          body: { action: "initiate", ...scan },
-        });
-        if (!error && !data?.error) synced++;
-      } catch {}
+  // Sync offline queue: reconnecting requires an OTP before attendance is
+  // actually recorded. The user enters one code which is applied to every
+  // still-valid queued scan (the replay guard is scoped per session).
+  const beginSync = useCallback(async () => {
+    if (!getOfflineQueue().length) return;
+    try {
+      const status = await callOtp({ action: "totp-status" });
+      if (!status?.enabled) {
+        setScanStep("no-totp");
+        return;
+      }
+    } catch {
+      toast({ title: t("common.error"), variant: "destructive" });
+      return;
     }
-    clearOfflineQueue();
-    setOfflineCount(0);
-    setSyncing(false);
-    if (synced > 0) {
-      toast({ title: t("offline.syncSuccess"), description: `${synced}/${queue.length}` });
-    }
-  }, [toast, t]);
-
-  const resetToScan = () => {
-    setScanStep("scan");
-    setResult(null);
+    setSyncMode(true);
     setPendingSessionId(null);
     setPendingSecret(null);
     setOtpCode("");
-    
-  };
+    setScanStep("enter-otp");
+  }, [t, toast]);
+
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      if (otpGuard.blocked) throw new Error("RATE_LIMITED");
+      const queue = getOfflineQueue();
+      let synced = 0;
+      let failed = 0;
+      const remaining: OfflineScan[] = [];
+
+      for (let i = 0; i < queue.length; i++) {
+        const scan = queue[i];
+
+        if (!scan.registration_number || !scan.selfie) {
+          failed++;
+          continue;
+        }
+
+        try {
+          const init = await callOtp({
+            action: "initiate",
+            session_id: scan.session_id,
+            secret: scan.secret,
+            registration_number: scan.registration_number,
+            latitude: scan.latitude,
+            longitude: scan.longitude,
+          });
+
+          if (!init?.needs_totp) {
+            failed++;
+            continue;
+          }
+
+          let faceResult;
+          try {
+            faceResult = await verifySelfieDataUrl(
+              profile?.avatar_url,
+              scan.selfie,
+              profile?.gender,
+            );
+          } catch (e) {
+            const message = e instanceof Error ? e.message : "";
+            if (message === "AVATAR_MISSING" || message === "AVATAR_FACE_NOT_FOUND") {
+              failed++;
+              continue;
+            }
+            remaining.push(...queue.slice(i));
+            break;
+          }
+
+          if (
+            !faceResult.faceDetected ||
+            faceResult.faceMatchDistance == null ||
+            faceResult.faceMatchDistance > FACE_MATCH_THRESHOLD ||
+            faceResult.genderMatch === false
+          ) {
+            failed++;
+            continue;
+          }
+
+          await callOtp({
+            action: "verify-scan-totp",
+            session_id: scan.session_id,
+            code: otpCode,
+            registration_number: scan.registration_number,
+            latitude: scan.latitude,
+            longitude: scan.longitude,
+            selfie: scan.selfie,
+            face_match_distance: faceResult.faceMatchDistance,
+            gender: faceResult.gender,
+            gender_match: faceResult.genderMatch,
+          });
+          synced++;
+        } catch (e) {
+          const message = e instanceof Error ? e.message : "error";
+          if (message === "INVALID_OTP" || message === "RATE_LIMITED") {
+            remaining.push(...queue.slice(i));
+            break;
+          }
+          if (message === "DUPLICATE" || message === "REPLAY_DETECTED") {
+            synced++;
+            continue;
+          }
+          const permanent = [
+            "OUTSIDE_RADIUS",
+            "QR_EXPIRED",
+            "Not enrolled",
+            "Session not active",
+            "Session not found",
+            "Invalid QR code",
+            "Invalid session ID",
+            "TOTP not set up",
+            "REG_NO_MISMATCH",
+            "STUDENT_INACTIVE",
+            "INVALID_SELFIE",
+            "SELFIE_TOO_LARGE",
+          ];
+          if (permanent.includes(message)) {
+            failed++;
+            continue;
+          }
+          remaining.push(...queue.slice(i));
+          break;
+        }
+      }
+
+      if (remaining.length) saveOfflineQueue(remaining);
+      else clearOfflineQueue();
+
+      return { synced, failed, remaining: remaining.length };
+    },
+    onSuccess: ({ synced, failed, remaining }) => {
+      setOfflineCount(remaining);
+      setSyncMode(false);
+      setOtpCode("");
+      otpGuard.refresh();
+
+      if (synced > 0) {
+        setResult("success");
+        setScanStep("verified");
+        toast({
+          title: t("offline.syncSuccess"),
+          description: `${synced}/${synced + failed}`,
+        });
+        if (failed > 0) {
+          toast({
+            title: t("offline.syncPartial"),
+            description: `${failed}`,
+            variant: "destructive",
+          });
+        }
+      } else {
+        setScanStep("scan");
+        toast({
+          title: t("common.error"),
+          description: failed ? `${failed}` : undefined,
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (e: Error) => {
+      setSyncMode(false);
+      setScanStep("scan");
+      if (e.message === "RATE_LIMITED") {
+        toast({ title: t("otp.tooManyAttempts"), variant: "destructive" });
+      } else {
+        toast({ title: t("common.error"), description: e.message, variant: "destructive" });
+      }
+    },
+  });
 
   return (
     <div className="space-y-6 max-w-md mx-auto">
@@ -283,9 +616,9 @@ export default function ScanQR() {
               <span>{t("offline.pendingScans")}: {offlineCount}</span>
             </div>
             {isOnline && (
-              <Button size="sm" onClick={syncOfflineQueue} disabled={syncing}>
+              <Button size="sm" onClick={beginSync} disabled={syncMutation.isPending}>
                 <Upload className="h-3 w-3 mr-1" />
-                {syncing ? t("common.loading") : t("offline.syncNow")}
+                {syncMutation.isPending ? t("common.loading") : t("offline.syncNow")}
               </Button>
             )}
           </CardContent>
@@ -300,6 +633,20 @@ export default function ScanQR() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {scanStep === "scan" && (!profile?.avatar_url || totpReady === false) && (
+            <div className="flex items-start gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-amber-700 dark:text-amber-400">
+              <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
+              <div className="min-w-0 flex-1 text-sm">
+                <p className="font-medium">{t("qr.setupRequired")}</p>
+                {!profile?.avatar_url && <p className="text-xs opacity-90">{t("qr.setupAvatar")}</p>}
+                {totpReady === false && <p className="text-xs opacity-90">{t("qr.setupTotp")}</p>}
+                <Button asChild size="sm" variant="outline" className="mt-2 h-7 text-xs">
+                  <Link to="/settings">{t("qr.openSettings")}</Link>
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Scanner viewport */}
           {scanStep === "scan" && (
             <div
@@ -309,6 +656,60 @@ export default function ScanQR() {
             />
           )}
 
+          {/* Registration number step */}
+          {scanStep === "enter-reg-no" && (
+            <form className="space-y-4" onSubmit={handleRegNoSubmit}>
+              <div className="flex items-center gap-3 rounded-lg bg-primary/10 p-4 text-primary">
+                <UserCheck className="h-6 w-6" />
+                <div>
+                  <p className="font-medium">{t("qr.enterRegNo")}</p>
+                  <p className="text-sm text-muted-foreground">{t("qr.enterRegNoDesc")}</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="registration-number">{t("qr.enterRegNo")}</Label>
+                <Input
+                  id="registration-number"
+                  value={registrationNumber}
+                  onChange={(event) => {
+                    setRegistrationNumber(event.target.value);
+                    setRegNoError(null);
+                  }}
+                  placeholder={t("qr.regNoPlaceholder")}
+                  autoComplete="off"
+                  autoFocus
+                />
+                {regNoError && (
+                  <p className="text-sm text-destructive">{regNoError}</p>
+                )}
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full"
+                size="lg"
+                disabled={initiateMutation.isPending}
+              >
+                {initiateMutation.isPending ? t("common.loading") : t("common.continue")}
+              </Button>
+
+              <Button type="button" variant="ghost" className="w-full" onClick={resetToScan}>
+                {t("common.cancel")}
+              </Button>
+            </form>
+          )}
+
+          {/* Selfie verification step */}
+          {scanStep === "selfie" && (
+            <SelfieCapture
+              avatarUrl={profile?.avatar_url}
+              profileGender={profile?.gender}
+              requireVerification={!offlineFlow}
+              onVerified={handleSelfieVerified}
+              onCancel={resetToScan}
+            />
+          )}
 
           {/* OTP Entry step */}
           {scanStep === "enter-otp" && (
@@ -316,8 +717,14 @@ export default function ScanQR() {
               <div className="flex items-center gap-3 p-4 rounded-lg bg-primary/10 text-primary">
                 <KeyRound className="h-6 w-6" />
                 <div>
-                  <p className="font-medium">{t("otp.enterCode")}</p>
-                  <p className="text-sm text-muted-foreground">{t("otp.enterCodeFromSettings")}</p>
+                  <p className="font-medium">
+                    {syncMode ? t("offline.syncNow") : t("otp.enterCode")}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {syncMode
+                      ? `${t("offline.pendingScans")}: ${offlineCount}`
+                      : t("otp.openAuthApp")}
+                  </p>
                 </div>
               </div>
 
@@ -327,11 +734,11 @@ export default function ScanQR() {
                   <ShieldOff className="h-5 w-5 mt-0.5 shrink-0" />
                   <div className="text-sm">
                     <p className="font-medium">
-                      {t("otp.tooManyAttempts") || "Too many failed attempts"}
+                      {t("otp.tooManyAttempts")}
                     </p>
                     <p className="text-xs opacity-90">
-                      {(t("otp.tryAgainIn") || "Try again in")}{" "}
-                      <span className="font-mono">{otpGuard.cooldownSecondsLeft}s</span>
+                      {t("otp.tryAgainIn")}{" "}
+                      <span className="font-mono">{otpGuard.cooldownSecondsLeft}{t("courses.secondsShort")}</span>
                     </p>
                   </div>
                 </div>
@@ -340,10 +747,10 @@ export default function ScanQR() {
                   <ShieldAlert className="h-5 w-5 mt-0.5 shrink-0" />
                   <div className="text-sm">
                     <p className="font-medium">
-                      {t("otp.warningAttempts") || "Multiple failed attempts detected"}
+                      {t("otp.warningAttempts")}
                     </p>
                     <p className="text-xs opacity-90">
-                      {otpGuard.recentFailures}/{5} {t("otp.failuresWindow") || "failures in last 5 min"}
+                      {otpGuard.recentFailures}/{5} {t("otp.failuresWindow")}
                     </p>
                   </div>
                 </div>
@@ -365,12 +772,17 @@ export default function ScanQR() {
               <Button
                 className="w-full"
                 size="lg"
-                onClick={() => verifyMutation.mutate()}
-                disabled={otpCode.length !== 6 || verifyMutation.isPending || otpGuard.blocked}
+                onClick={() => (syncMode ? syncMutation.mutate() : verifyMutation.mutate())}
+                disabled={
+                  otpCode.length !== 6 ||
+                  verifyMutation.isPending ||
+                  syncMutation.isPending ||
+                  otpGuard.blocked
+                }
               >
                 {otpGuard.blocked
-                  ? `${t("otp.waitSeconds") || "Wait"} ${otpGuard.cooldownSecondsLeft}s`
-                  : verifyMutation.isPending
+                  ? `${t("otp.waitSeconds")} ${otpGuard.cooldownSecondsLeft}s`
+                  : verifyMutation.isPending || syncMutation.isPending
                     ? t("common.loading")
                     : t("otp.verify")}
               </Button>
@@ -458,7 +870,7 @@ export default function ScanQR() {
           {scanStep === "scan" && !scanning && (
             <Button className="w-full" size="lg" onClick={startScanner}>
               <Camera className="h-4 w-4 mr-2" />
-              {result ? "Scan Again" : t("qr.scan")}
+              {result ? t("qr.scanAgain") : t("qr.scan")}
             </Button>
           )}
           {scanStep === "scan" && scanning && (

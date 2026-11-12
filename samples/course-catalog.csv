@@ -1,0 +1,13 @@
+module_code,module_name,department,level,semester,description
+CS101,Introduction to Programming,CS,BTCCD,S1,Foundations of programming and problem solving
+CS102,Computer Organization,CS,BTCCD,S2,Computer hardware and low-level systems
+CS201,Data Structures and Algorithms,CS,TCCD,S1,Lists trees graphs and algorithm analysis
+CS202,Database Systems,CS,TCCD,S2,Relational databases and SQL
+CS301,Software Engineering,CS,ODCD,S1,Software design testing and project delivery
+CS302,Network Security,CS,ODCD,S2,Network defence and security fundamentals
+EE101,Electrical Principles,EE,BTCCD,S1,Basic electrical theory and measurement
+EE102,Circuit Analysis,EE,BTCCD,S2,Direct and alternating current circuits
+BA101,Principles of Management,BA,BTCCD,S1,Management functions and organisational behaviour
+MATH101,Basic Mathematics,MATH,BTCCD,S1,Algebra functions and introductory calculus
+PHY101,Physics Fundamentals,PHY,BTCCD,S1,Mechanics waves and basic electricity
+CD101,Community Development,CD,BTCCD,S1,Community needs assessment and participation

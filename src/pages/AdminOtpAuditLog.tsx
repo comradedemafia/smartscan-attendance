@@ -106,7 +106,7 @@ export default function AdminOtpAuditLog() {
   if (!isAdmin) {
     return (
       <div className="p-6 text-center text-muted-foreground">
-        Admins only.
+        {t("otpAudit.adminsOnly")}
       </div>
     );
   }
@@ -138,7 +138,7 @@ export default function AdminOtpAuditLog() {
                 setUserId(e.target.value);
                 setPage(1);
               }}
-              placeholder="uuid…"
+              placeholder={t("common.uuidPlaceholder")}
               className="h-9 text-xs font-mono"
             />
           </div>
@@ -152,7 +152,7 @@ export default function AdminOtpAuditLog() {
                 setSessionId(e.target.value);
                 setPage(1);
               }}
-              placeholder="uuid…"
+              placeholder={t("common.uuidPlaceholder")}
               className="h-9 text-xs font-mono"
             />
           </div>
@@ -206,7 +206,7 @@ export default function AdminOtpAuditLog() {
             </Button>
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">From</label>
+            <label className="text-xs font-medium text-muted-foreground">{t("reports.from")}</label>
             <Input
               type="date"
               value={fromDate}
@@ -215,7 +215,7 @@ export default function AdminOtpAuditLog() {
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">To</label>
+            <label className="text-xs font-medium text-muted-foreground">{t("reports.to")}</label>
             <Input
               type="date"
               value={toDate}

@@ -6,13 +6,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Download, ShieldAlert, ChevronDown, ChevronRight } from "lucide-react";
+import { format } from "date-fns";
 import { computeDiff, filterAuditRows, type AuditRow as AuditRowT } from "@/lib/auditLog";
+import { useI18n } from "@/lib/i18n";
 
 type AuditRow = AuditRowT;
 
 const PAGE_SIZE = 25;
 
 export default function AdminAuditLog() {
+  const { t, dateLocale } = useI18n();
+  const actionLabel = (value: string) => value === "INSERT" ? t("audit.actionInsert") : value === "UPDATE" ? t("audit.actionUpdate") : value === "DELETE" ? t("audit.actionDelete") : value;
+  const roleLabel = (value?: string | null) => value === "admin" ? t("common.admin") : value === "lecturer" ? t("auth.lecturer") : value === "student" ? t("auth.student") : value || "—";
   const [search, setSearch] = useState("");
   const [entity, setEntity] = useState<string>("all");
   const [action, setAction] = useState<string>("all");
@@ -95,27 +100,27 @@ export default function AdminAuditLog() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight font-['Space_Grotesk'] flex items-center gap-2">
-            <ShieldAlert className="h-6 w-6 text-primary" /> System Audit Log
+            <ShieldAlert className="h-6 w-6 text-primary" /> {t("audit.title")}
           </h1>
-          <p className="text-sm text-muted-foreground">Track every action performed by every user.</p>
+          <p className="text-sm text-muted-foreground">{t("audit.subtitle")}</p>
         </div>
         <Button onClick={exportCsv} disabled={!filtered.length}>
-          <Download className="h-4 w-4 mr-2" /> Export CSV
+          <Download className="h-4 w-4 mr-2" /> {t("audit.exportCsv")}
         </Button>
       </div>
 
       <Card>
         <CardContent className="p-4 grid gap-3 md:grid-cols-5">
-          <Input placeholder="Search actor / entity…" value={search} onChange={(e) => resetPage(setSearch)(e.target.value)} />
+          <Input placeholder={t("audit.searchPlaceholder")} value={search} onChange={(e) => resetPage(setSearch)(e.target.value)} />
           <select className="h-10 rounded-md border bg-background px-3 text-sm" value={entity} onChange={(e) => resetPage(setEntity)(e.target.value)}>
-            <option value="all">All entities</option>
+            <option value="all">{t("common.allEntities")}</option>
             {entities.map((e) => <option key={e} value={e}>{e}</option>)}
           </select>
           <select className="h-10 rounded-md border bg-background px-3 text-sm" value={action} onChange={(e) => resetPage(setAction)(e.target.value)}>
-            <option value="all">All actions</option>
-            <option value="INSERT">INSERT</option>
-            <option value="UPDATE">UPDATE</option>
-            <option value="DELETE">DELETE</option>
+            <option value="all">{t("common.allActions")}</option>
+            <option value="INSERT">{t("audit.actionInsert")}</option>
+            <option value="UPDATE">{t("audit.actionUpdate")}</option>
+            <option value="DELETE">{t("audit.actionDelete")}</option>
           </select>
           <Input type="date" value={from} onChange={(e) => resetPage(setFrom)(e.target.value)} />
           <Input type="date" value={to} onChange={(e) => resetPage(setTo)(e.target.value)} />
@@ -123,23 +128,23 @@ export default function AdminAuditLog() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Events ({filtered.length})</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">{t("audit.events")} ({filtered.length})</CardTitle></CardHeader>
         <CardContent className="p-0 overflow-x-auto">
           {isLoading ? (
-            <p className="p-4 text-muted-foreground">Loading…</p>
+            <p className="p-4 text-muted-foreground">{t("common.loading")}</p>
           ) : filtered.length === 0 ? (
-            <p className="p-4 text-muted-foreground">No audit events found.</p>
+            <p className="p-4 text-muted-foreground">{t("audit.noEvents")}</p>
           ) : (
             <table className="w-full text-sm">
               <thead className="bg-muted/50 text-xs uppercase">
                 <tr>
                   <th className="w-8 p-3"></th>
-                  <th className="text-left p-3">When</th>
-                  <th className="text-left p-3">Actor</th>
-                  <th className="text-left p-3">Role</th>
-                  <th className="text-left p-3">Action</th>
-                  <th className="text-left p-3">Entity</th>
-                  <th className="text-left p-3">Entity ID</th>
+                  <th className="text-left p-3">{t("common.when")}</th>
+                  <th className="text-left p-3">{t("common.actor")}</th>
+                  <th className="text-left p-3">{t("common.role")}</th>
+                  <th className="text-left p-3">{t("common.action")}</th>
+                  <th className="text-left p-3">{t("common.entity")}</th>
+                  <th className="text-left p-3">{t("common.entityId")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -151,12 +156,12 @@ export default function AdminAuditLog() {
                     <Fragment key={r.id}>
                       <tr className="border-t hover:bg-muted/30 cursor-pointer" onClick={() => setExpanded((s) => ({ ...s, [r.id]: !s[r.id] }))}>
                         <td className="p-3">{isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</td>
-                        <td className="p-3 whitespace-nowrap">{new Date(r.created_at).toLocaleString()}</td>
-                        <td className="p-3">{a.full_name || r.actor_id || <span className="text-muted-foreground">system</span>}</td>
-                        <td className="p-3"><Badge variant="outline" className="text-[10px]">{r.actor_role || "—"}</Badge></td>
+                        <td className="p-3 whitespace-nowrap">{format(new Date(r.created_at), "PPpp", { locale: dateLocale })}</td>
+                        <td className="p-3">{a.full_name || r.actor_id || <span className="text-muted-foreground">{t("common.system")}</span>}</td>
+                        <td className="p-3"><Badge variant="outline" className="text-[10px]">{roleLabel(r.actor_role)}</Badge></td>
                         <td className="p-3">
                           <Badge variant={r.action === "DELETE" ? "destructive" : r.action === "INSERT" ? "default" : "secondary"} className="text-[10px]">
-                            {r.action}
+                            {actionLabel(r.action)}
                           </Badge>
                         </td>
                         <td className="p-3 font-mono text-xs">{r.entity_type}</td>
@@ -167,14 +172,14 @@ export default function AdminAuditLog() {
                           <td></td>
                           <td colSpan={6} className="p-3">
                             {diff.length === 0 ? (
-                              <p className="text-xs text-muted-foreground">No field-level changes recorded.</p>
+                              <p className="text-xs text-muted-foreground">{t("audit.noFieldChanges")}</p>
                             ) : (
                               <table className="w-full text-xs border rounded-md overflow-hidden">
                                 <thead className="bg-muted/40">
                                   <tr>
-                                    <th className="text-left p-2">Field</th>
-                                    <th className="text-left p-2">Old</th>
-                                    <th className="text-left p-2">New</th>
+                                    <th className="text-left p-2">{t("common.field")}</th>
+                                    <th className="text-left p-2">{t("common.old")}</th>
+                                    <th className="text-left p-2">{t("common.new")}</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -200,11 +205,11 @@ export default function AdminAuditLog() {
           {filtered.length > 0 && (
             <div className="flex items-center justify-between p-3 border-t text-sm">
               <span className="text-muted-foreground">
-                Page {currentPage} of {totalPages} • {filtered.length} events
+                {t("audit.page")} {currentPage} {t("audit.of")} {totalPages} • {filtered.length} {t("audit.eventsCount")}
               </span>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Prev</Button>
-                <Button variant="outline" size="sm" disabled={currentPage >= totalPages} onClick={() => setPage(currentPage + 1)}>Next</Button>
+                <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>{t("common.prev")}</Button>
+                <Button variant="outline" size="sm" disabled={currentPage >= totalPages} onClick={() => setPage(currentPage + 1)}>{t("common.next")}</Button>
               </div>
             </div>
           )}

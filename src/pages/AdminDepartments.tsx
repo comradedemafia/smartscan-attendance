@@ -13,12 +13,53 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Users, BookOpen, Plus, ChevronDown, ChevronRight, AlertCircle, Edit, Trash2, UserPlus, GraduationCap, ArrowRightLeft, X } from "lucide-react";
+import {
+  buildCourseCatalogTemplateCsv,
+  parseCourseCatalogFile,
+  type CourseCatalogParseResult,
+} from "@/lib/courseCatalogCsv";
+import { Building2, Users, BookOpen, Plus, ChevronDown, ChevronRight, AlertCircle, Edit, Trash2, UserPlus, GraduationCap, ArrowRightLeft, X, Upload, Download, FileSpreadsheet, Loader2, CheckCircle2 } from "lucide-react";
 
-type Department = { id: string; name: string; description: string | null };
+type Department = { id: string; name: string; code: string; description: string | null };
 type Level = { id: string; name: string; code: string; department_id: string; sort_order: number };
 type Semester = { id: string; name: string; code: string; level_id: string; sort_order: number };
 type Lecturer = { lecturer_id: string; full_name: string; university_id: string; courses: { id: string; name: string; code: string }[] };
+
+function catalogKey(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function levelCatalogKeys(level: Level): string[] {
+  const ntaLevel = level.sort_order + 3;
+  return [
+    level.code,
+    level.name,
+    `nta ${ntaLevel}`,
+    `nta level ${ntaLevel}`,
+    `level ${ntaLevel}`,
+    String(ntaLevel),
+  ].map(catalogKey);
+}
+
+function semesterCatalogKeys(semester: Semester): string[] {
+  const number = semester.code.match(/\d+/)?.[0] ?? semester.name.match(/\d+/)?.[0] ?? "";
+  return [
+    semester.code,
+    semester.name,
+    number ? `s${number}` : "",
+    number ? `semester ${number}` : "",
+  ].map(catalogKey);
+}
+
+function downloadCsv(filename: string, content: string) {
+  const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
 export default function AdminDepartments() {
   const { user } = useAuth();
@@ -34,6 +75,7 @@ export default function AdminDepartments() {
   const [openDeptDialog, setOpenDeptDialog] = useState(false);
   const [editingDept, setEditingDept] = useState<Department | null>(null);
   const [deptName, setDeptName] = useState("");
+  const [deptCode, setDeptCode] = useState("");
   const [deptDesc, setDeptDesc] = useState("");
 
   // Semester dialog
@@ -64,6 +106,19 @@ export default function AdminDepartments() {
   const [confirmDeleteCourseId, setConfirmDeleteCourseId] = useState<string | null>(null);
   const [confirmRemoveLecturer, setConfirmRemoveLecturer] = useState<{ courseId: string; lecturerId: string } | null>(null);
 
+  // Course catalog import
+  const [openCatalogDialog, setOpenCatalogDialog] = useState(false);
+  const [catalogFileName, setCatalogFileName] = useState("");
+  const [catalogParsing, setCatalogParsing] = useState(false);
+  const [catalogParseResult, setCatalogParseResult] = useState<CourseCatalogParseResult | null>(null);
+  const [catalogImporting, setCatalogImporting] = useState(false);
+  const [catalogImportSummary, setCatalogImportSummary] = useState<{
+    inserted: number;
+    updated: number;
+    failed: number;
+    errors: string[];
+  } | null>(null);
+
   // Register lecturer dialog
   const [openRegisterDialog, setOpenRegisterDialog] = useState(false);
   const [regName, setRegName] = useState("");
@@ -72,6 +127,7 @@ export default function AdminDepartments() {
   const [regGender, setRegGender] = useState("M");
   const [regDeptId, setRegDeptId] = useState("");
   const [regPhone, setRegPhone] = useState("");
+  const [regTempPassword, setRegTempPassword] = useState("");
 
   // Edit lecturer dialog
   const [openEditLecturerDialog, setOpenEditLecturerDialog] = useState(false);
@@ -194,10 +250,10 @@ export default function AdminDepartments() {
   const saveDeptMutation = useMutation({
     mutationFn: async () => {
       if (editingDept) {
-        const { error } = await supabase.from("departments").update({ name: deptName, description: deptDesc || null } as any).eq("id", editingDept.id);
+        const { error } = await supabase.from("departments").update({ name: deptName, code: deptCode.trim().toUpperCase(), description: deptDesc || null } as any).eq("id", editingDept.id);
         if (error) throw error;
       } else {
-        const { data: newDept, error } = await supabase.from("departments").insert({ name: deptName, description: deptDesc || null } as any).select("id").single();
+        const { data: newDept, error } = await supabase.from("departments").insert({ name: deptName, code: deptCode.trim().toUpperCase(), description: deptDesc || null } as any).select("id").single();
         if (error) throw error;
         // Auto-create the 3 NTA levels for the new department, plus 2 semesters per level
         if (newDept) {
@@ -386,26 +442,27 @@ export default function AdminDepartments() {
   // Register new lecturer
   const registerLecturerMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.auth.signUp({
-        email: regEmail,
-        password: Array.from(crypto.getRandomValues(new Uint8Array(24)), b => 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%&*'[b % 67]).join(''),
-        options: {
-          data: {
-            university_id: regUniId,
-            full_name: regName,
-            role: "lecturer",
-            gender: regGender,
-            department_id: regDeptId || undefined,
-            phone: regPhone || undefined,
-          },
+      const { data, error } = await supabase.functions.invoke("admin-manage-users", {
+        body: {
+          action: "create",
+          role: "lecturer",
+          full_name: regName,
+          university_id: regUniId,
+          email: regEmail,
+          phone: regPhone || undefined,
+          gender: regGender,
+          department_id: regDeptId || undefined,
         },
       });
       if (error) throw error;
+      const payload = data as { error?: string; password?: string } | null;
+      if (payload?.error) throw new Error(payload.error);
+      return payload;
     },
-    onSuccess: () => {
+    onSuccess: (payload) => {
       queryClient.invalidateQueries({ queryKey: ["all-lecturers"] });
       toast({ title: t("common.success"), description: t("dept.lecturerRegistered") });
-      setOpenRegisterDialog(false);
+      setRegTempPassword(payload?.password ?? "");
       setRegName(""); setRegEmail(""); setRegUniId(""); setRegGender("M"); setRegDeptId(""); setRegPhone("");
     },
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
@@ -449,15 +506,15 @@ export default function AdminDepartments() {
   });
 
   // ─── Form helpers ───
-  const resetDeptForm = () => { setOpenDeptDialog(false); setEditingDept(null); setDeptName(""); setDeptDesc(""); };
-  const openEditDept = (dept: Department) => { setEditingDept(dept); setDeptName(dept.name); setDeptDesc(dept.description || ""); setOpenDeptDialog(true); };
+  const resetDeptForm = () => { setOpenDeptDialog(false); setEditingDept(null); setDeptName(""); setDeptCode(""); setDeptDesc(""); };
+  const openEditDept = (dept: Department) => { setEditingDept(dept); setDeptName(dept.name); setDeptCode(dept.code); setDeptDesc(dept.description || ""); setOpenDeptDialog(true); };
   const resetCourseForm = () => { setOpenCourseDialog(false); setEditingCourse(null); setCourseName(""); setCourseCode(""); setCourseDesc(""); setCourseDeptId(""); setCourseLevelId(""); setCourseSemesterId(""); };
   const openEditCourse = (course: any) => { setEditingCourse(course); setCourseName(course.name); setCourseCode(course.code); setCourseDesc(course.description || ""); setCourseDeptId(course.department_id || ""); setCourseLevelId(course.level_id || ""); setCourseSemesterId(course.semester_id || ""); setOpenCourseDialog(true); };
   const openAddCourseForSemester = (deptId: string, levelId: string, semesterId: string) => { resetCourseForm(); setCourseDeptId(deptId); setCourseLevelId(levelId); setCourseSemesterId(semesterId); setOpenCourseDialog(true); };
   const openAddSemesterForLevel = (levelId: string) => { setEditingSemester(null); setSemesterName(""); setSemesterCode(""); setSemesterLevelId(levelId); setOpenSemesterDialog(true); };
   const openEditSemester = (sem: Semester) => { setEditingSemester(sem); setSemesterName(sem.name); setSemesterCode(sem.code); setSemesterLevelId(sem.level_id); setOpenSemesterDialog(true); };
   const openAssignForDept = (deptId: string) => { setAssignDeptId(deptId); setAssignLevelId(""); setAssignCourseId(""); setAssignLecturerId(""); setOpenAssignDialog(true); };
-  const openRegisterForDept = (deptId: string) => { setRegDeptId(deptId); setRegName(""); setRegEmail(""); setRegUniId(""); setRegGender("M"); setRegPhone(""); setOpenRegisterDialog(true); };
+  const openRegisterForDept = (deptId: string) => { setRegDeptId(deptId); setRegName(""); setRegEmail(""); setRegUniId(""); setRegGender("M"); setRegPhone(""); setRegTempPassword(""); setOpenRegisterDialog(true); };
   const openEditLecturer = (l: any) => {
     const prof = allLecturers.find((p: any) => p.id === l.lecturer_id) || l;
     setEditLecturerId(l.lecturer_id);
@@ -465,6 +522,87 @@ export default function AdminDepartments() {
     setEditLecturerPhone(prof.phone || "");
     setEditLecturerGender(prof.gender || "M");
     setOpenEditLecturerDialog(true);
+  };
+
+  const handleCatalogFile = async (file: File | undefined) => {
+    if (!file) return;
+    setCatalogFileName(file.name);
+    setCatalogParseResult(null);
+    setCatalogImportSummary(null);
+    setCatalogParsing(true);
+    try {
+      setCatalogParseResult(await parseCourseCatalogFile(file));
+    } catch (error) {
+      toast({
+        title: t("common.error"),
+        description: error instanceof Error ? error.message : t("dept.catalogImportFailed"),
+        variant: "destructive",
+      });
+    } finally {
+      setCatalogParsing(false);
+    }
+  };
+
+  const importCatalog = async () => {
+    const validRows = catalogPreview.filter((row) => row.errors.length === 0);
+    if (validRows.length === 0) {
+      toast({ title: t("common.error"), description: t("dept.catalogNothingToImport") });
+      return;
+    }
+
+    setCatalogImporting(true);
+    setCatalogImportSummary(null);
+    let inserted = 0;
+    let updated = 0;
+    const errors: string[] = [];
+
+    for (const row of validRows) {
+      const payload = {
+        code: row.code,
+        name: row.name,
+        description: row.description,
+        department_id: row.department_id,
+        level_id: row.level_id,
+        semester_id: row.semester_id,
+      };
+
+      if (row.existing && row.existing_id) {
+        const { error } = await supabase.from("courses").update(payload as any).eq("id", row.existing_id);
+        if (error) {
+          errors.push(`${row.code}: ${error.message}`);
+        } else {
+          updated++;
+        }
+      } else {
+        const { error } = await supabase
+          .from("courses")
+          .insert({ ...payload, created_by: user!.id } as any);
+        if (error) {
+          errors.push(`${row.code}: ${error.message}`);
+        } else {
+          inserted++;
+        }
+      }
+    }
+
+    setCatalogImporting(false);
+    setCatalogImportSummary({ inserted, updated, failed: errors.length, errors });
+    queryClient.invalidateQueries({ queryKey: ["all-courses-admin"] });
+    queryClient.invalidateQueries({ queryKey: ["registry-courses"] });
+    queryClient.invalidateQueries({ queryKey: ["dept-lecturers-admin"] });
+
+    if (errors.length === 0) {
+      toast({
+        title: t("common.success"),
+        description: t("dept.catalogImported", { inserted, updated }),
+      });
+    } else {
+      toast({
+        title: t("common.error"),
+        description: t("dept.catalogImportPartial", { failed: errors.length }),
+        variant: "destructive",
+      });
+    }
   };
 
   const deptCourses = (deptId: string) => allCourses.filter((c: any) => c.department_id === deptId);
@@ -484,6 +622,47 @@ export default function AdminDepartments() {
   // Levels & semesters available for selected dept/level in course dialog
   const courseDeptLevels = courseDeptId ? deptLevels(courseDeptId) : [];
   const courseLevelSemesters = courseLevelId ? levelSemesters(courseLevelId) : [];
+
+  const catalogPreview = (catalogParseResult?.rows ?? []).map((row) => {
+    const errors = [...row.errors];
+    const department = departments.find((dept) => {
+      const key = catalogKey(row.department);
+      return catalogKey(dept.code) === key || catalogKey(dept.name) === key;
+    });
+    if (!department) errors.push(t("dept.catalogUnknownDepartment", { value: row.department }));
+
+    const level = department
+      ? allLevels.find(
+          (candidate) =>
+            candidate.department_id === department.id &&
+            levelCatalogKeys(candidate).includes(catalogKey(row.level)),
+        )
+      : undefined;
+    if (department && !level) errors.push(t("dept.catalogUnknownLevel", { value: row.level }));
+
+    const semester = level
+      ? allSemesters.find(
+          (candidate) =>
+            candidate.level_id === level.id &&
+            semesterCatalogKeys(candidate).includes(catalogKey(row.semester)),
+        )
+      : undefined;
+    if (level && !semester) errors.push(t("dept.catalogUnknownSemester", { value: row.semester }));
+
+    const existing = allCourses.find((course: any) => String(course.code).toUpperCase() === row.code);
+
+    return {
+      ...row,
+      department_id: department?.id ?? null,
+      level_id: level?.id ?? null,
+      semester_id: semester?.id ?? null,
+      existing: Boolean(existing),
+      existing_id: existing?.id ?? null,
+      errors,
+    };
+  });
+  const catalogValidCount = catalogPreview.filter((row) => row.errors.length === 0).length;
+  const catalogErrorCount = catalogPreview.length - catalogValidCount;
 
   // Cascading filter helpers
   const filterDeptLevels = filterDeptId !== "all" ? deptLevels(filterDeptId) : [];
@@ -510,7 +689,18 @@ export default function AdminDepartments() {
           <h1 className="text-2xl font-bold tracking-tight font-['Space_Grotesk']">{t("dept.departments")}</h1>
           <p className="text-muted-foreground">{t("dept.adminDesc")}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setCatalogFileName("");
+              setCatalogParseResult(null);
+              setCatalogImportSummary(null);
+              setOpenCatalogDialog(true);
+            }}
+          >
+            <Upload className="h-4 w-4 mr-2" />{t("dept.importModules")}
+          </Button>
           <Dialog open={openDeptDialog} onOpenChange={(o) => { if (!o) resetDeptForm(); setOpenDeptDialog(o); }}>
             <DialogTrigger asChild>
               <Button><Plus className="h-4 w-4 mr-2" />{t("dept.addDepartment")}</Button>
@@ -518,9 +708,10 @@ export default function AdminDepartments() {
             <DialogContent>
               <DialogHeader><DialogTitle>{editingDept ? t("dept.editDepartment") : t("dept.addDepartment")}</DialogTitle></DialogHeader>
               <div className="space-y-4">
-                <div className="space-y-2"><Label>{t("dept.deptName")}</Label><Input value={deptName} onChange={(e) => setDeptName(e.target.value)} placeholder="Community Development (CD)" /></div>
-                <div className="space-y-2"><Label>{t("courses.description")}</Label><Input value={deptDesc} onChange={(e) => setDeptDesc(e.target.value)} placeholder="Optional description" /></div>
-                <Button className="w-full" onClick={() => saveDeptMutation.mutate()} disabled={!deptName || saveDeptMutation.isPending}>
+                <div className="space-y-2"><Label>{t("dept.deptName")}</Label><Input value={deptName} onChange={(e) => setDeptName(e.target.value)} placeholder={t("dept.deptNamePlaceholder")} /></div>
+                <div className="space-y-2"><Label>{t("dept.deptCode")}</Label><Input value={deptCode} onChange={(e) => setDeptCode(e.target.value)} placeholder={t("dept.deptCodePlaceholder")} /></div>
+                <div className="space-y-2"><Label>{t("courses.description")}</Label><Input value={deptDesc} onChange={(e) => setDeptDesc(e.target.value)} placeholder={t("courses.descriptionPlaceholder")} /></div>
+                <Button className="w-full" onClick={() => saveDeptMutation.mutate()} disabled={!deptName || !deptCode.trim() || saveDeptMutation.isPending}>
                   {editingDept ? t("common.save") : t("dept.addDepartment")}
                 </Button>
               </div>
@@ -534,9 +725,9 @@ export default function AdminDepartments() {
         <DialogContent>
           <DialogHeader><DialogTitle>{editingCourse ? t("dept.editCourse") : t("dept.addCourse")}</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2"><Label>{t("courses.code")}</Label><Input value={courseCode} onChange={(e) => setCourseCode(e.target.value)} placeholder="CS101" /></div>
-            <div className="space-y-2"><Label>{t("courses.name")}</Label><Input value={courseName} onChange={(e) => setCourseName(e.target.value)} placeholder="Introduction to CS" /></div>
-            <div className="space-y-2"><Label>{t("courses.description")}</Label><Input value={courseDesc} onChange={(e) => setCourseDesc(e.target.value)} placeholder="Optional" /></div>
+            <div className="space-y-2"><Label>{t("courses.code")}</Label><Input value={courseCode} onChange={(e) => setCourseCode(e.target.value)} placeholder={t("courses.codePlaceholder")} /></div>
+            <div className="space-y-2"><Label>{t("courses.name")}</Label><Input value={courseName} onChange={(e) => setCourseName(e.target.value)} placeholder={t("courses.namePlaceholder")} /></div>
+            <div className="space-y-2"><Label>{t("courses.description")}</Label><Input value={courseDesc} onChange={(e) => setCourseDesc(e.target.value)} placeholder={t("courses.descriptionPlaceholder")} /></div>
             <div className="space-y-2">
               <Label>{t("auth.department")}</Label>
               <Select value={courseDeptId} onValueChange={(v) => { setCourseDeptId(v); setCourseLevelId(""); }}>
@@ -565,6 +756,130 @@ export default function AdminDepartments() {
             <Button className="w-full" onClick={() => saveCourseMutation.mutate()} disabled={!courseName || !courseCode || saveCourseMutation.isPending}>
               {editingCourse ? t("common.save") : t("dept.addCourse")}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Modules Dialog */}
+      <Dialog open={openCatalogDialog} onOpenChange={setOpenCatalogDialog}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader><DialogTitle>{t("dept.importModules")}</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">{t("dept.importModulesDesc")}</p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <div className="flex-1 space-y-2">
+                <Label htmlFor="catalog-file">{t("dept.chooseCatalogFile")}</Label>
+                <Input
+                  id="catalog-file"
+                  type="file"
+                  accept=".csv,.xlsx,.xls,.xlsm,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                  onChange={(event) => {
+                    void handleCatalogFile(event.target.files?.[0]);
+                    event.target.value = "";
+                  }}
+                />
+                {catalogFileName && <p className="text-xs text-muted-foreground">{catalogFileName}</p>}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => downloadCsv("course-catalog-template.csv", buildCourseCatalogTemplateCsv())}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                {t("dept.downloadCatalogTemplate")}
+              </Button>
+            </div>
+
+            {catalogParsing && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {t("registry.parsing")}
+              </div>
+            )}
+
+            {catalogParseResult && (
+              <div className="space-y-3">
+                {catalogParseResult.missingRequiredColumns.length > 0 && (
+                  <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>{t("dept.catalogMissingColumns", { columns: catalogParseResult.missingRequiredColumns.join(", ") })}</span>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <Badge variant="secondary">{t("dept.catalogReady", { count: catalogValidCount })}</Badge>
+                  {catalogErrorCount > 0 && (
+                    <Badge variant="destructive">{t("dept.catalogErrors", { count: catalogErrorCount })}</Badge>
+                  )}
+                </div>
+
+                {catalogPreview.length === 0 ? (
+                  <div className="flex items-center gap-2 rounded-md border p-3 text-sm text-muted-foreground">
+                    <FileSpreadsheet className="h-4 w-4" />
+                    {t("dept.catalogNoRows")}
+                  </div>
+                ) : (
+                  <div className="max-h-72 divide-y overflow-auto rounded-md border">
+                    {catalogPreview.slice(0, 100).map((row) => (
+                      <div key={`${row.row_number}-${row.code}`} className="px-3 py-2 text-sm">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div>
+                              <span className="mr-2 font-mono text-xs text-muted-foreground">{row.code || "—"}</span>
+                              <span className="font-medium">{row.name || "—"}</span>
+                            </div>
+                            <p className="truncate text-xs text-muted-foreground">
+                              {row.department || "—"} · {row.level || "—"} · {row.semester || "—"}
+                            </p>
+                          </div>
+                          <Badge variant={row.existing ? "secondary" : "outline"} className="shrink-0 text-[10px]">
+                            {row.existing ? t("dept.catalogUpdate") : t("dept.catalogNew")}
+                          </Badge>
+                        </div>
+                        {row.errors.length > 0 && (
+                          <p className="mt-1 text-xs text-destructive">{row.errors.join("; ")}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {catalogPreview.length > 100 && (
+                  <p className="text-xs text-muted-foreground">
+                    {t("registry.preview")}: 100 / {catalogPreview.length}
+                  </p>
+                )}
+
+                {catalogImportSummary && (
+                  <div className="space-y-1 rounded-md border p-3 text-sm">
+                    <div>
+                      {t("dept.catalogImportSummary", {
+                        inserted: catalogImportSummary.inserted,
+                        updated: catalogImportSummary.updated,
+                        failed: catalogImportSummary.failed,
+                      })}
+                    </div>
+                    {catalogImportSummary.errors.length > 0 && (
+                      <div className="max-h-24 overflow-auto text-xs text-destructive">
+                        {catalogImportSummary.errors.map((error) => <div key={error}>{error}</div>)}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <Button
+                  className="w-full"
+                  onClick={() => void importCatalog()}
+                  disabled={catalogImporting || catalogValidCount === 0}
+                >
+                  {catalogImporting ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                  )}
+                  {t("dept.importValidRows", { count: catalogValidCount })}
+                </Button>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
@@ -604,7 +919,13 @@ export default function AdminDepartments() {
       </Dialog>
 
       {/* Register Lecturer Dialog */}
-      <Dialog open={openRegisterDialog} onOpenChange={setOpenRegisterDialog}>
+      <Dialog
+        open={openRegisterDialog}
+        onOpenChange={(open) => {
+          setOpenRegisterDialog(open);
+          if (!open) setRegTempPassword("");
+        }}
+      >
         <DialogContent>
           <DialogHeader><DialogTitle>{t("dept.registerLecturer")}</DialogTitle></DialogHeader>
           <div className="space-y-4">
@@ -622,6 +943,12 @@ export default function AdminDepartments() {
               </Select>
             </div>
             <div className="space-y-2"><Label>{t("auth.phone")}</Label><Input value={regPhone} onChange={(e) => setRegPhone(e.target.value)} placeholder="+255..." /></div>
+            {regTempPassword && (
+              <div className="rounded-md border border-border bg-muted/40 p-3">
+                <div className="text-xs font-medium text-muted-foreground">{t("admin.tempPassword")}</div>
+                <div className="mt-1 font-mono text-sm">{regTempPassword}</div>
+              </div>
+            )}
             <Button className="w-full" onClick={() => registerLecturerMutation.mutate()} disabled={!regName || !regEmail || !regUniId || registerLecturerMutation.isPending}>
               {t("dept.registerLecturer")}
             </Button>
@@ -989,11 +1316,11 @@ export default function AdminDepartments() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>{t("dept.semesterName")}</Label>
-              <Input value={semesterName} onChange={(e) => setSemesterName(e.target.value)} placeholder="Semester 1" />
+              <Input value={semesterName} onChange={(e) => setSemesterName(e.target.value)} placeholder={t("dept.semesterNamePlaceholder")} />
             </div>
             <div className="space-y-2">
               <Label>{t("dept.semesterCode")}</Label>
-              <Input value={semesterCode} onChange={(e) => setSemesterCode(e.target.value)} placeholder="S1" />
+              <Input value={semesterCode} onChange={(e) => setSemesterCode(e.target.value)} placeholder={t("dept.semesterCodePlaceholder")} />
             </div>
             <Button className="w-full" onClick={() => saveSemesterMutation.mutate()} disabled={!semesterName || !semesterCode || !semesterLevelId || saveSemesterMutation.isPending}>
               {editingSemester ? t("common.save") : t("dept.addSemester")}

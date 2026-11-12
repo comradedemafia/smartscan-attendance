@@ -5,18 +5,12 @@
 // - Marks must_change_password=true so the lecturer is forced to change password on first login.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { corsHeadersFor } from "../_shared/cors.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-function jsonResponse(body: unknown, status = 200) {
+function jsonResponse(req: Request, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeadersFor(req), "Content-Type": "application/json" },
   });
 }
 
@@ -42,10 +36,10 @@ function validate(p: Partial<Payload>): string | null {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeadersFor(req) });
   }
   if (req.method !== "POST") {
-    return jsonResponse({ error: "method_not_allowed" }, 405);
+    return jsonResponse(req, { error: "method_not_allowed" }, 405);
   }
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -54,7 +48,7 @@ Deno.serve(async (req) => {
 
   const authHeader = req.headers.get("Authorization") ?? "";
   if (!authHeader.startsWith("Bearer ")) {
-    return jsonResponse({ error: "unauthorized" }, 401);
+    return jsonResponse(req, { error: "unauthorized" }, 401);
   }
 
   // Verify caller identity using anon key + their JWT
@@ -63,7 +57,7 @@ Deno.serve(async (req) => {
   });
   const { data: userRes, error: userErr } = await userClient.auth.getUser();
   if (userErr || !userRes?.user) {
-    return jsonResponse({ error: "unauthorized" }, 401);
+    return jsonResponse(req, { error: "unauthorized" }, 401);
   }
   const callerId = userRes.user.id;
 
@@ -78,18 +72,18 @@ Deno.serve(async (req) => {
     .eq("role", "admin")
     .maybeSingle();
   if (roleErr || !roleRow) {
-    return jsonResponse({ error: "forbidden" }, 403);
+    return jsonResponse(req, { error: "forbidden" }, 403);
   }
 
   let payload: Payload;
   try {
     payload = await req.json();
   } catch {
-    return jsonResponse({ error: "invalid_json" }, 400);
+    return jsonResponse(req, { error: "invalid_json" }, 400);
   }
 
   const vErr = validate(payload);
-  if (vErr) return jsonResponse({ error: vErr }, 400);
+  if (vErr) return jsonResponse(req, { error: vErr }, 400);
 
   // Create the auth user (email pre-confirmed so they can sign in immediately)
   const { data: created, error: createErr } = await adminClient.auth.admin
@@ -104,7 +98,7 @@ Deno.serve(async (req) => {
       },
     });
   if (createErr || !created.user) {
-    return jsonResponse({ error: createErr?.message ?? "create_failed" }, 400);
+    return jsonResponse(req, { error: createErr?.message ?? "create_failed" }, 400);
   }
 
   const newUserId = created.user.id;
@@ -132,12 +126,13 @@ Deno.serve(async (req) => {
     .eq("id", newUserId);
   if (profileErr) {
     return jsonResponse(
+      req,
       { error: `profile_update_failed: ${profileErr.message}` },
       400,
     );
   }
 
-  return jsonResponse({
+  return jsonResponse(req, {
     ok: true,
     user_id: newUserId,
     email: payload.email,

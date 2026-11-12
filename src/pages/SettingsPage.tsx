@@ -19,6 +19,7 @@ export default function SettingsPage() {
   const { t, language, setLanguage } = useI18n();
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
+  const roleLabel = role === "admin" ? t("common.admin") : role === "lecturer" ? t("auth.lecturer") : role === "student" ? t("auth.student") : "—";
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [uploading, setUploading] = useState(false);
@@ -167,7 +168,7 @@ export default function SettingsPage() {
                   {t("settings.removePhoto")}
                 </Button>
               )}
-              <p className="text-xs text-muted-foreground">JPG, PNG, WEBP · Max 5MB</p>
+              <p className="text-xs text-muted-foreground">{t("settings.photoHint")}</p>
             </div>
           </div>
         </CardContent>
@@ -193,7 +194,7 @@ export default function SettingsPage() {
           </div>
           <div>
             <Label className="text-muted-foreground text-xs">{t("auth.role")}</Label>
-            <p className="font-medium capitalize">{role || "—"}</p>
+            <p className="font-medium capitalize">{roleLabel}</p>
           </div>
         </CardContent>
       </Card>
@@ -271,12 +272,12 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-3">
-            <span className={language === "en" ? "font-medium" : "text-muted-foreground"}>English</span>
+            <span className={language === "en" ? "font-medium" : "text-muted-foreground"}>{t("settings.english")}</span>
             <Switch
               checked={language === "sw"}
               onCheckedChange={(checked) => setLanguage(checked ? "sw" : "en")}
             />
-            <span className={language === "sw" ? "font-medium" : "text-muted-foreground"}>Kiswahili</span>
+            <span className={language === "sw" ? "font-medium" : "text-muted-foreground"}>{t("settings.swahili")}</span>
           </div>
         </CardContent>
       </Card>

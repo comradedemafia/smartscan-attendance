@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import LanguageToggle from "@/components/LanguageToggle";
 import { ShieldCheck } from "lucide-react";
 
 const POLICY = {
@@ -20,7 +21,7 @@ const POLICY = {
 };
 
 export default function MustChangePassword() {
-  const { user, refreshProfile } = useAuth();
+  const { refreshProfile } = useAuth();
   const { t } = useI18n();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -44,23 +45,21 @@ export default function MustChangePassword() {
     try {
       const { error: upErr } = await supabase.auth.updateUser({ password: pwd });
       if (upErr) throw upErr;
-      const { error: pErr } = await supabase
-        .from("profiles")
-        .update({ must_change_password: false })
-        .eq("id", user!.id);
-      if (pErr) throw pErr;
+      // The `on_auth_user_password_changed` trigger clears the
+      // must_change_password flag server-side once the password is updated.
       await refreshProfile();
       toast({ title: t("common.success"), description: t("auth.passwordUpdated") });
       navigate("/", { replace: true });
-    } catch (e: any) {
-      setErr(e.message);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="relative min-h-screen flex items-center justify-center bg-background p-4">
+      <LanguageToggle className="absolute top-4 right-4" />
       <div className="w-full max-w-md space-y-6">
         <div className="flex flex-col items-center gap-2 text-primary">
           <ShieldCheck className="h-10 w-10" />

@@ -14,9 +14,14 @@ interface ExportData {
   subtitle?: string;
   dateRange?: { from?: string; to?: string };
   filters?: string[];
+  labels?: { filters?: string; generated?: string; period?: string; sheet?: string };
+  locale?: string;
 }
 
-export function exportToPDF({ title, columns, rows, subtitle, dateRange, filters }: ExportData) {
+export function exportToPDF({ title, columns, rows, subtitle, dateRange, filters, labels, locale }: ExportData) {
+  const filtersLabel = labels?.filters ?? "Filters";
+  const generatedLabel = labels?.generated ?? "Generated";
+  const periodLabel = labels?.period ?? "Period";
   const doc = new jsPDF();
 
   doc.setFontSize(18);
@@ -34,7 +39,7 @@ export function exportToPDF({ title, columns, rows, subtitle, dateRange, filters
   if (dateRange && (dateRange.from || dateRange.to)) {
     doc.setFontSize(10);
     doc.setTextColor(80);
-    const range = `Period: ${dateRange.from || "…"}  →  ${dateRange.to || "…"}`;
+    const range = `${periodLabel}: ${dateRange.from || "…"}  →  ${dateRange.to || "…"}`;
     doc.text(range, 14, y);
     y += 5;
     doc.setTextColor(0);
@@ -43,14 +48,14 @@ export function exportToPDF({ title, columns, rows, subtitle, dateRange, filters
   if (filters && filters.length) {
     doc.setFontSize(9);
     doc.setTextColor(110);
-    doc.text(`Filters: ${filters.join(" · ")}`, 14, y);
+    doc.text(`${filtersLabel}: ${filters.join(" · ")}`, 14, y);
     y += 5;
     doc.setTextColor(0);
   }
 
   doc.setFontSize(8);
   doc.setTextColor(140);
-  doc.text(`Generated: ${new Date().toLocaleString()}`, 14, y);
+  doc.text(`${generatedLabel}: ${new Date().toLocaleString(locale)}`, 14, y);
   doc.setTextColor(0);
   y += 4;
 
@@ -70,16 +75,20 @@ export function exportToPDF({ title, columns, rows, subtitle, dateRange, filters
   doc.save(`${title.replace(/\s+/g, "_")}_${dateStr}.pdf`);
 }
 
-export function exportToExcel({ title, columns, rows, subtitle, dateRange, filters }: ExportData) {
+export function exportToExcel({ title, columns, rows, subtitle, dateRange, filters, labels, locale }: ExportData) {
+  const filtersLabel = labels?.filters ?? "Filters";
+  const generatedLabel = labels?.generated ?? "Generated";
+  const periodLabel = labels?.period ?? "Period";
+  const sheetLabel = labels?.sheet ?? "Report";
   const headerRows: any[][] = [[title]];
   if (subtitle) headerRows.push([subtitle]);
   if (dateRange && (dateRange.from || dateRange.to)) {
-    headerRows.push([`Period: ${dateRange.from || "…"} → ${dateRange.to || "…"}`]);
+    headerRows.push([`${periodLabel}: ${dateRange.from || "…"} → ${dateRange.to || "…"}`]);
   }
   if (filters && filters.length) {
-    headerRows.push([`Filters: ${filters.join(" · ")}`]);
+    headerRows.push([`${filtersLabel}: ${filters.join(" · ")}`]);
   }
-  headerRows.push([`Generated: ${new Date().toLocaleString()}`]);
+  headerRows.push([`${generatedLabel}: ${new Date().toLocaleString(locale)}`]);
   headerRows.push([]);
 
   const wsData = [
@@ -94,7 +103,7 @@ export function exportToExcel({ title, columns, rows, subtitle, dateRange, filte
   ws["!cols"] = columns.map(() => ({ wch: 20 }));
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Report");
+  XLSX.utils.book_append_sheet(wb, ws, sheetLabel);
 
   const dateStr = new Date().toISOString().split("T")[0];
   XLSX.writeFile(wb, `${title.replace(/\s+/g, "_")}_${dateStr}.xlsx`);

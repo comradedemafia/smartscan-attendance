@@ -16,7 +16,7 @@ import { QRCodeSVG } from "qrcode.react";
 export default function SessionQR() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const { user } = useAuth();
-  const { t } = useI18n();
+  const { t, dateLocale } = useI18n();
   const { toast } = useToast();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -119,12 +119,12 @@ export default function SessionQR() {
       try {
         await supabase.rpc("notify_enrolled_students", {
           _session_id: sessionId!,
-          _title: "🟢 QR Code Active",
-          _message: `QR Code is now active for "${session?.title}". Scan now!`,
+          _title: t("notify.qrActiveTitle"),
+          _message: t("notify.qrActiveMessage", { title: session?.title ?? "" }),
           _type: "qr",
         });
-      } catch {}
-      toast({ title: t("common.success"), description: "QR Code activated!" });
+      } catch { /* ignore notification failure */ }
+      toast({ title: t("common.success"), description: t("common.qrActivated") });
     },
     onError: (e: any) => {
       toast({ title: t("common.error"), description: e.message, variant: "destructive" });
@@ -286,7 +286,7 @@ export default function SessionQR() {
                 {sessionEnded ? t("sessions.terminated") : t("qr.expired")}
               </p>
               <p className="text-sm text-muted-foreground">
-                This session has ended and cannot be launched again.
+                {t("sessions.endedCannotLaunch")}
               </p>
             </div>
           ) : isExpired ? (
@@ -339,7 +339,7 @@ export default function SessionQR() {
         <CardContent>
           {attendees.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4 text-center">
-              No students have scanned yet
+              {t("sessions.noScansYet")}
             </p>
           ) : (
             <div className="divide-y divide-border max-h-[400px] overflow-y-auto">
@@ -349,12 +349,12 @@ export default function SessionQR() {
                     <span className="text-xs font-mono text-muted-foreground w-6">{i + 1}.</span>
                     <CheckCircle2 className="h-4 w-4 text-primary" />
                     <div>
-                      <p className="text-sm font-medium">{a.profile?.full_name || "Unknown"}</p>
+                      <p className="text-sm font-medium">{a.profile?.full_name || t("common.unknown")}</p>
                       <p className="text-xs text-muted-foreground">{a.profile?.university_id}</p>
                     </div>
                   </div>
                   <span className="text-xs text-muted-foreground">
-                    {new Date(a.scanned_at).toLocaleTimeString()}
+                    {new Date(a.scanned_at).toLocaleTimeString(dateLocale.code)}
                   </span>
                 </div>
               ))}

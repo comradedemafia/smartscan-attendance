@@ -21,6 +21,9 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
+      // Legacy pages still rely on `any`; surface as warnings so they can be
+      // tightened incrementally without blocking CI.
+      "@typescript-eslint/no-explicit-any": "warn",
     },
   },
 );

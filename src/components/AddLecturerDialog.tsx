@@ -78,7 +78,7 @@ export default function AddLecturerDialog({ departments, levels }: Props) {
 
   const handleCreate = async () => {
     if (!fullName.trim() || !universityId.trim() || !email.trim()) {
-      toast({ title: t("common.error"), description: "Name, ID, and email are required", variant: "destructive" });
+      toast({ title: t("common.error"), description: t("common.nameIdEmailRequired"), variant: "destructive" });
       return;
     }
     setSubmitting(true);
@@ -129,16 +129,16 @@ export default function AddLecturerDialog({ departments, levels }: Props) {
         <div className="space-y-3">
           <div className="space-y-1.5">
             <Label className="text-xs">{t("auth.fullName")}</Label>
-            <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Jane Mwalimu" />
+            <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder={t("auth.fullNamePlaceholder")} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">{t("auth.universityId")}</Label>
-              <Input value={universityId} onChange={(e) => setUniversityId(e.target.value)} placeholder="STF-2025-001" />
+              <Input value={universityId} onChange={(e) => setUniversityId(e.target.value)} placeholder={t("auth.staffIdPlaceholder")} />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">{t("auth.email")}</Label>
-              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jane@uni.ac.tz" />
+              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("auth.emailPlaceholder")} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -150,7 +150,7 @@ export default function AddLecturerDialog({ departments, levels }: Props) {
                   const val = e.target.value.replace(/\D/g, "");
                   if (val.length <= 10 && (val === "" || val.startsWith("0"))) setPhone(val);
                 }}
-                placeholder="0712345678"
+                placeholder={t("auth.phonePlaceholder")}
                 maxLength={10}
               />
             </div>
@@ -199,7 +199,7 @@ export default function AddLecturerDialog({ departments, levels }: Props) {
                 variant="outline"
                 size="icon"
                 onClick={() => setTempPassword(generateTempPassword())}
-                title="Regenerate"
+                title={t("admin.regenerate")}
               >
                 <RefreshCcw className="h-3.5 w-3.5" />
               </Button>

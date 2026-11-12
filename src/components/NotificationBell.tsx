@@ -12,7 +12,7 @@ import { formatDistanceToNow } from "date-fns";
 
 export default function NotificationBell() {
   const { user } = useAuth();
-  const { t } = useI18n();
+  const { t, dateLocale } = useI18n();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
@@ -105,10 +105,10 @@ export default function NotificationBell() {
 
   const typeBadge = (type: string) => {
     switch (type) {
-      case "session": return <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Session</Badge>;
-      case "qr": return <Badge variant="secondary" className="text-[10px] px-1.5 py-0">QR</Badge>;
-      case "alert": return <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Alert</Badge>;
-      default: return <Badge variant="outline" className="text-[10px] px-1.5 py-0">Info</Badge>;
+      case "session": return <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{t("notifications.session")}</Badge>;
+      case "qr": return <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{t("notifications.qr")}</Badge>;
+      case "alert": return <Badge variant="destructive" className="text-[10px] px-1.5 py-0">{t("notifications.alert")}</Badge>;
+      default: return <Badge variant="outline" className="text-[10px] px-1.5 py-0">{t("notifications.info")}</Badge>;
     }
   };
 
@@ -168,7 +168,7 @@ export default function NotificationBell() {
                   </div>
                   <p className="text-xs text-muted-foreground line-clamp-2">{n.message}</p>
                   <p className="text-[10px] text-muted-foreground/60">
-                    {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
+                    {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: dateLocale })}
                   </p>
                 </div>
                 <Button

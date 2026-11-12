@@ -1,0 +1,13 @@
+jina,reg_number,admission_number,course,department,module_code,gender,email,phone,academic_year,study_year,semester,status
+Amina Hassan,2026-CS-0001,ADM-2026-0001,BSc Computer Science,CS,"CS101, CS102",F,amina.hassan@example.edu,+255700000001,2025/2026,1,Semester 1,active
+Baraka Mwinyi,2026-CS-0002,ADM-2026-0002,BSc Computer Science,CS,"CS101, MATH101",M,baraka.mwinyi@example.edu,+255700000002,2025/2026,1,Semester 1,active
+Neema Mushi,2026-CS-0003,ADM-2026-0003,BSc Computer Science,CS,"CS201, CS202",F,neema.mushi@example.edu,+255700000003,2025/2026,2,Semester 1,active
+Juma Ally,2026-CS-0004,ADM-2026-0004,BSc Computer Science,CS,"CS301, CS302",M,juma.ally@example.edu,+255700000004,2025/2026,3,Semester 1,active
+Zawadi Mrema,2026-EE-0001,ADM-2026-0005,BSc Electrical Engineering,EE,"EE101, EE102",F,zawadi.mrema@example.edu,+255700000005,2025/2026,1,Semester 1,active
+Ibrahim Suleiman,2026-EE-0002,ADM-2026-0006,BSc Electrical Engineering,EE,"EE101, MATH101",M,ibrahim.suleiman@example.edu,+255700000006,2025/2026,1,Semester 1,active
+Rehema Joseph,2026-BA-0001,ADM-2026-0007,Bachelor of Business Administration,BA,BA101,F,rehema.joseph@example.edu,+255700000007,2025/2026,1,Semester 1,active
+Daniel Mwakalinga,2026-BA-0002,ADM-2026-0008,Bachelor of Business Administration,BA,BA101,M,daniel.mwakalinga@example.edu,+255700000008,2025/2026,1,Semester 1,active
+Halima Said,2026-MATH-0001,ADM-2026-0009,BSc Mathematics,MATH,"MATH101, PHY101",F,halima.said@example.edu,+255700000009,2025/2026,1,Semester 1,active
+Emmanuel Kessy,2026-PHY-0001,ADM-2026-0010,BSc Physics,PHY,"PHY101, MATH101",M,emmanuel.kessy@example.edu,+255700000010,2025/2026,1,Semester 1,active
+Fatuma Abdallah,2026-CD-0001,ADM-2026-0011,Bachelor of Community Development,CD,CD101,F,fatuma.abdallah@example.edu,+255700000011,2025/2026,1,Semester 1,active
+Peter John,2026-CD-0002,ADM-2026-0012,Bachelor of Community Development,CD,"CD101, BA101",M,peter.john@example.edu,+255700000012,2025/2026,1,Semester 1,active

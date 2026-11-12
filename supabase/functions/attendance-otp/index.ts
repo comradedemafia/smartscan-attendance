@@ -1,10 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import { corsHeadersFor } from "../_shared/cors.ts";
 
 // ─── Configurable TOTP settings (via env vars) ─────────────────────────────
 // Defaults match RFC 6238 + Google Authenticator: 30s step, 6 digits, ±1 window.
@@ -180,6 +175,8 @@ function validateLocation(
 }
 
 Deno.serve(async (req) => {
+  const corsHeaders = corsHeadersFor(req);
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -238,10 +235,48 @@ Deno.serve(async (req) => {
 
     // ─── INITIATE: After QR scan, validate QR, GPS, and check TOTP status ───
     if (action === "initiate") {
-      const { session_id, secret, latitude, longitude } = body;
-      if (!session_id || !secret) {
+      const { session_id, secret, latitude, longitude, registration_number } = body;
+      if (
+        !session_id ||
+        !secret ||
+        typeof registration_number !== "string" ||
+        !registration_number.trim()
+      ) {
         return new Response(JSON.stringify({ error: "Missing fields" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: profile } = await adminClient
+        .from("profiles")
+        .select("university_id")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (!profile) {
+        return new Response(JSON.stringify({ error: "Profile not found" }), {
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (
+        profile.university_id.trim().toLowerCase() !==
+        registration_number.trim().toLowerCase()
+      ) {
+        return new Response(JSON.stringify({ error: "REG_NO_MISMATCH" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: registryRow } = await adminClient
+        .from("student_registry")
+        .select("status")
+        .eq("university_id", profile.university_id)
+        .maybeSingle();
+
+      if (registryRow && registryRow.status !== "active") {
+        return new Response(JSON.stringify({ error: "STUDENT_INACTIVE", status: registryRow.status }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
@@ -312,14 +347,14 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Check if student has TOTP set up
-      const { data: profile } = await adminClient
-        .from("profiles")
-        .select("totp_secret")
-        .eq("id", user.id)
-        .single();
+      // Check if student has a verified TOTP secret
+      const { data: totpRow } = await adminClient
+        .from("user_totp_secrets")
+        .select("verified, secret")
+        .eq("user_id", user.id)
+        .maybeSingle();
 
-      const hasTotp = !!profile?.totp_secret;
+      const hasTotp = !!totpRow?.verified && !!totpRow?.secret;
 
       if (hasTotp) {
         return new Response(JSON.stringify({
@@ -340,8 +375,24 @@ Deno.serve(async (req) => {
 
     // ─── VERIFY-SCAN-TOTP: Student enters TOTP code to record attendance ───
     } else if (action === "verify-scan-totp") {
-      const { session_id, code, latitude, longitude } = body;
-      if (!session_id || !code) {
+      const {
+        session_id,
+        code,
+        latitude,
+        longitude,
+        registration_number,
+        selfie,
+        face_match_distance,
+        gender: face_gender,
+        gender_match,
+      } = body;
+      if (
+        !session_id ||
+        !code ||
+        typeof registration_number !== "string" ||
+        !registration_number.trim() ||
+        typeof selfie !== "string"
+      ) {
         return new Response(JSON.stringify({ error: "Missing fields" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -351,6 +402,94 @@ Deno.serve(async (req) => {
         await logOtpAttempt(false, session_id ?? null, null, "INVALID_FORMAT");
         return new Response(JSON.stringify({ error: "Invalid OTP format" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: profile } = await adminClient
+        .from("profiles")
+        .select("university_id, gender, avatar_url")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (!profile) {
+        return new Response(JSON.stringify({ error: "Profile not found" }), {
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (
+        profile.university_id.trim().toLowerCase() !==
+        registration_number.trim().toLowerCase()
+      ) {
+        await logOtpAttempt(false, session_id, null, "REG_NO_MISMATCH");
+        return new Response(JSON.stringify({ error: "REG_NO_MISMATCH" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: registryRow } = await adminClient
+        .from("student_registry")
+        .select("status")
+        .eq("university_id", profile.university_id)
+        .maybeSingle();
+
+      if (registryRow && registryRow.status !== "active") {
+        return new Response(JSON.stringify({ error: "STUDENT_INACTIVE", status: registryRow.status }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (!profile.avatar_url) {
+        return new Response(JSON.stringify({ error: "AVATAR_MISSING" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const selfieMatch = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(selfie);
+      if (!selfieMatch) {
+        return new Response(JSON.stringify({ error: "INVALID_SELFIE" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const selfieBytes = Uint8Array.from(atob(selfieMatch[2]), (char) => char.charCodeAt(0));
+      if (selfieBytes.length > 2 * 1024 * 1024) {
+        return new Response(JSON.stringify({ error: "SELFIE_TOO_LARGE" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (
+        typeof face_match_distance !== "number" ||
+        !Number.isFinite(face_match_distance) ||
+        face_match_distance < 0 ||
+        face_match_distance > 0.6
+      ) {
+        await logOtpAttempt(false, session_id, null, "FACE_MISMATCH");
+        return new Response(JSON.stringify({ error: "FACE_MISMATCH" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (face_gender !== null && face_gender !== "male" && face_gender !== "female") {
+        return new Response(JSON.stringify({ error: "INVALID_FACE_DATA" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (gender_match !== null && typeof gender_match !== "boolean") {
+        return new Response(JSON.stringify({ error: "INVALID_FACE_DATA" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const expectedGender =
+        profile.gender === "M" ? "male" : profile.gender === "F" ? "female" : null;
+
+      if (expectedGender && gender_match !== true) {
+        await logOtpAttempt(false, session_id, null, "GENDER_MISMATCH");
+        return new Response(JSON.stringify({ error: "GENDER_MISMATCH" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
@@ -392,21 +531,21 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Get TOTP secret
-      const { data: profile } = await adminClient
-        .from("profiles")
-        .select("totp_secret")
-        .eq("id", user.id)
-        .single();
+      // Get verified TOTP secret
+      const { data: totpRow } = await adminClient
+        .from("user_totp_secrets")
+        .select("secret, verified")
+        .eq("user_id", user.id)
+        .maybeSingle();
 
-      if (!profile?.totp_secret) {
+      if (!totpRow?.verified || !totpRow?.secret) {
         await logOtpAttempt(false, session_id, null, "TOTP_NOT_SETUP");
         return new Response(JSON.stringify({ error: "TOTP not set up" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      const result = await verifyTOTPDetailed(profile.totp_secret, code);
+      const result = await verifyTOTPDetailed(totpRow.secret, code);
       if (!result.valid || result.counter === null) {
         await logOtpAttempt(false, session_id, null, "INVALID_OTP");
         return new Response(JSON.stringify({ error: "INVALID_OTP" }), {
@@ -459,7 +598,30 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Record attendance with GPS coordinates
+      const selfieExtension = selfieMatch[1] === "jpeg" ? "jpg" : selfieMatch[1];
+      const selfiePath = `${user.id}/${session_id}.${selfieExtension}`;
+
+      const { error: uploadError } = await adminClient.storage
+        .from("attendance-selfies")
+        .upload(selfiePath, selfieBytes.buffer, {
+          contentType: `image/${selfieMatch[1]}`,
+          upsert: true,
+        });
+
+      if (uploadError) {
+        console.error("Selfie upload error:", uploadError);
+        await adminClient
+          .from("otp_replay_guard")
+          .delete()
+          .eq("session_id", session_id)
+          .eq("user_id", user.id)
+          .eq("counter", result.counter);
+        await logOtpAttempt(false, session_id, result.offset, "SELFIE_UPLOAD_FAILED");
+        return new Response(JSON.stringify({ error: "SELFIE_UPLOAD_FAILED" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const { error: insertError } = await adminClient
         .from("attendance_records")
         .insert({
@@ -468,10 +630,22 @@ Deno.serve(async (req) => {
           status: "present",
           latitude: latitude || null,
           longitude: longitude || null,
+          selfie_path: selfiePath,
+          face_match_distance,
+          gender_match,
+          face_gender,
+          face_verified: true,
         });
 
       if (insertError) {
         console.error("Attendance insert error:", insertError);
+        await adminClient.storage.from("attendance-selfies").remove([selfiePath]);
+        await adminClient
+          .from("otp_replay_guard")
+          .delete()
+          .eq("session_id", session_id)
+          .eq("user_id", user.id)
+          .eq("counter", result.counter);
         await logOtpAttempt(false, session_id, result.offset, "ATTENDANCE_INSERT_FAILED");
         return new Response(JSON.stringify({ error: "Failed to record attendance" }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -483,29 +657,21 @@ Deno.serve(async (req) => {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
 
-    // ─── GET-TOTP-CODE: Return current TOTP code for display in Settings ───
-    } else if (action === "get-totp-code") {
-      const { data: profile } = await adminClient
-        .from("profiles")
-        .select("totp_secret")
-        .eq("id", user.id)
-        .single();
+    // ─── TOTP-STATUS: Whether the caller has a verified authenticator ───
+    } else if (action === "totp-status") {
+      const { data: totpRow } = await adminClient
+        .from("user_totp_secrets")
+        .select("verified, secret")
+        .eq("user_id", user.id)
+        .maybeSingle();
 
-      if (!profile?.totp_secret) {
-        return new Response(JSON.stringify({ error: "TOTP not set up" }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const code = await generateTOTP(profile.totp_secret);
-      const timeStep = 30;
-      const secondsRemaining = timeStep - (Math.floor(Date.now() / 1000) % timeStep);
-
-      return new Response(JSON.stringify({ code, seconds_remaining: secondsRemaining }), {
+      return new Response(JSON.stringify({
+        enabled: !!totpRow?.verified && !!totpRow?.secret,
+      }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
 
-    // ─── SETUP-TOTP: Generate TOTP secret ───
+    // ─── SETUP-TOTP: Generate a pending TOTP secret (not yet active) ───
     } else if (action === "setup-totp") {
       const bytes = new Uint8Array(20);
       crypto.getRandomValues(bytes);
@@ -523,9 +689,15 @@ Deno.serve(async (req) => {
       }
 
       const { error } = await adminClient
-        .from("profiles")
-        .update({ totp_secret: secret })
-        .eq("id", user.id);
+        .from("user_totp_secrets")
+        .upsert(
+          {
+            user_id: user.id,
+            pending_secret: secret,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id" },
+        );
 
       if (error) {
         return new Response(JSON.stringify({ error: "Failed to save TOTP secret" }), {
@@ -533,11 +705,18 @@ Deno.serve(async (req) => {
         });
       }
 
-      return new Response(JSON.stringify({ secret, success: true }), {
+      const issuer = Deno.env.get("TOTP_ISSUER") ?? "SmartScan Attendance";
+      const account = user.email ?? user.id;
+      const otpauthUrl =
+        `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(account)}` +
+        `?secret=${secret}&issuer=${encodeURIComponent(issuer)}` +
+        `&algorithm=SHA1&digits=${TOTP_DIGITS}&period=${TOTP_TIME_STEP}`;
+
+      return new Response(JSON.stringify({ secret, otpauth_url: otpauthUrl, success: true }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
 
-    // ─── VERIFY-SETUP: Verify first TOTP code to confirm setup works ───
+    // ─── VERIFY-SETUP: Verify first TOTP code, then activate the secret ───
     } else if (action === "verify-setup") {
       const { code } = body;
       if (!code || typeof code !== "string" || code.length !== 6 || !/^\d{6}$/.test(code)) {
@@ -546,22 +725,39 @@ Deno.serve(async (req) => {
         });
       }
 
-      const { data: profile } = await adminClient
-        .from("profiles")
-        .select("totp_secret")
-        .eq("id", user.id)
-        .single();
+      const { data: totpRow } = await adminClient
+        .from("user_totp_secrets")
+        .select("pending_secret, secret, verified")
+        .eq("user_id", user.id)
+        .maybeSingle();
 
-      if (!profile?.totp_secret) {
+      const candidate = totpRow?.pending_secret ?? totpRow?.secret;
+      if (!candidate) {
         return new Response(JSON.stringify({ error: "TOTP not set up" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      const valid = await verifyTOTP(profile.totp_secret, code);
+      const valid = await verifyTOTP(candidate, code);
       if (!valid) {
         return new Response(JSON.stringify({ error: "INVALID_OTP" }), {
           status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { error } = await adminClient
+        .from("user_totp_secrets")
+        .update({
+          secret: candidate,
+          pending_secret: null,
+          verified: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", user.id);
+
+      if (error) {
+        return new Response(JSON.stringify({ error: "Failed to activate TOTP secret" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
@@ -569,12 +765,34 @@ Deno.serve(async (req) => {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
 
-    // ─── DISABLE-TOTP ───
+    // ─── DISABLE-TOTP: requires a valid current code (re-auth) ───
     } else if (action === "disable-totp") {
+      const { code } = body;
+      const { data: totpRow } = await adminClient
+        .from("user_totp_secrets")
+        .select("secret, verified")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      // If 2FA is active, the user must prove possession before disabling it.
+      if (totpRow?.verified && totpRow?.secret) {
+        if (!code || typeof code !== "string" || !/^\d{6}$/.test(code)) {
+          return new Response(JSON.stringify({ error: "OTP_REQUIRED" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const valid = await verifyTOTP(totpRow.secret, code);
+        if (!valid) {
+          return new Response(JSON.stringify({ error: "INVALID_OTP" }), {
+            status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+
       await adminClient
-        .from("profiles")
-        .update({ totp_secret: null })
-        .eq("id", user.id);
+        .from("user_totp_secrets")
+        .delete()
+        .eq("user_id", user.id);
 
       return new Response(JSON.stringify({ success: true }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },

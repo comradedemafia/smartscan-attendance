@@ -21,10 +21,20 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function Dashboard() {
   const { role, profile, user } = useAuth();
-  const { t } = useI18n();
+  const { t, dateLocale } = useI18n();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const roleLabel = role === "admin" ? t("common.admin") : role === "lecturer" ? t("auth.lecturer") : role === "student" ? t("auth.student") : "";
+  const sessionStatusLabel = (status: string) => {
+    switch (status) {
+      case "active": return t("sessions.active");
+      case "scheduled": return t("sessions.scheduled");
+      case "completed": return t("sessions.completed");
+      case "terminated": return t("sessions.statusTerminated");
+      default: return status;
+    }
+  };
 
   const isLecturer = role === "lecturer";
   const isStudent = role === "student";
@@ -228,13 +238,13 @@ export default function Dashboard() {
         if (newSessions?.[0]) {
           await supabase.rpc("notify_enrolled_students", {
             _session_id: newSessions[0].id,
-            _title: "📅 New Session",
-            _message: `New session "${sessionTitle}" has been scheduled`,
+            _title: t("notify.newSessionTitle"),
+            _message: t("notify.newSessionMessage", { title: sessionTitle }),
             _type: "session",
           });
         }
-      } catch {}
-      toast({ title: t("common.success"), description: "Session created" });
+      } catch { /* ignore notification failure */ }
+      toast({ title: t("common.success"), description: t("common.sessionCreated") });
       setSessionOpen(false); setSessionTitle(""); setSessionCourseId(""); setSessionLevelId(""); setSessionVenue(""); setSessionDuration("30");
     },
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
@@ -273,10 +283,10 @@ export default function Dashboard() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight font-['Space_Grotesk']">
-          {t("dashboard.welcome")}, {profile?.full_name || "User"}
+          {t("dashboard.welcome")}, {profile?.full_name || t("common.user")}
         </h1>
         <div className="flex items-center gap-2 mt-1">
-          <p className="text-muted-foreground capitalize">{role} {t("nav.dashboard")}</p>
+          <p className="text-muted-foreground capitalize">{roleLabel} {t("nav.dashboard")}</p>
           {!isAdmin && userDepartment && (
             <Badge variant="outline" className="flex items-center gap-1"><Building2 className="h-3 w-3" />{userDepartment.name}</Badge>
           )}
@@ -435,7 +445,7 @@ export default function Dashboard() {
                       )}
                       {c.selection_deadline && status !== "core" && (
                         <span className="text-[10px] text-muted-foreground hidden sm:inline">
-                          · {new Date(c.selection_deadline).toLocaleDateString()}
+                          · {format(new Date(c.selection_deadline), "PP", { locale: dateLocale })}
                         </span>
                       )}
                     </div>
@@ -480,16 +490,16 @@ export default function Dashboard() {
                 <DialogContent>
                   <DialogHeader><DialogTitle>{t("courses.create")}</DialogTitle></DialogHeader>
                   <form onSubmit={(e) => { e.preventDefault(); if (courseCode.trim() && courseName.trim()) createCourseMutation.mutate(); }} className="space-y-4">
-                    <div className="space-y-2"><Label>{t("courses.code")}</Label><Input value={courseCode} onChange={(e) => setCourseCode(e.target.value)} placeholder="CS101" required /></div>
-                    <div className="space-y-2"><Label>{t("courses.name")}</Label><Input value={courseName} onChange={(e) => setCourseName(e.target.value)} placeholder="Introduction to CS" required /></div>
+                    <div className="space-y-2"><Label>{t("courses.code")}</Label><Input value={courseCode} onChange={(e) => setCourseCode(e.target.value)} placeholder={t("courses.codePlaceholder")} required /></div>
+                    <div className="space-y-2"><Label>{t("courses.name")}</Label><Input value={courseName} onChange={(e) => setCourseName(e.target.value)} placeholder={t("courses.namePlaceholder")} required /></div>
                     <div className="space-y-2">
-                      <Label>Semester</Label>
+                      <Label>{t("common.semester")}</Label>
                       <select value={courseDeptId} onChange={(e) => setCourseDeptId(e.target.value)} className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
-                        <option value="">{userProfile?.department_id ? "My Semester (default)" : "Select Semester"}</option>
+                        <option value="">{userProfile?.department_id ? t("common.mySemesterDefault") : t("enroll.selectSemester")}</option>
                         {departments.map((d) => (<option key={d.id} value={d.id}>{d.name}</option>))}
                       </select>
                     </div>
-                    <div className="space-y-2"><Label>{t("courses.description")}</Label><Textarea value={courseDesc} onChange={(e) => setCourseDesc(e.target.value)} placeholder="Optional description" /></div>
+                    <div className="space-y-2"><Label>{t("courses.description")}</Label><Textarea value={courseDesc} onChange={(e) => setCourseDesc(e.target.value)} placeholder={t("courses.descriptionPlaceholder")} /></div>
                     <Button type="submit" className="w-full" disabled={createCourseMutation.isPending}>{t("courses.create")}</Button>
                   </form>
                 </DialogContent>
@@ -517,7 +527,7 @@ export default function Dashboard() {
                         {g.level && <Badge variant="outline" className="text-xs">{g.level.code}</Badge>}
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge variant="secondary" className="text-xs">{g.courses.length} modules</Badge>
+                        <Badge variant="secondary" className="text-xs">{g.courses.length} {t("dept.courses")}</Badge>
                         {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                       </div>
                     </div>
@@ -595,8 +605,8 @@ export default function Dashboard() {
                   <DialogHeader><DialogTitle>{t("sessions.create")}</DialogTitle></DialogHeader>
                   <form onSubmit={(e) => { e.preventDefault(); if (sessionTitle.trim() && sessionCourseId) createSessionMutation.mutate(); }} className="space-y-4">
                     <div className="space-y-2">
-                      <Label>Title</Label>
-                      <Input value={sessionTitle} onChange={(e) => setSessionTitle(e.target.value)} placeholder="Week 1 Lecture" required />
+                      <Label>{t("common.title")}</Label>
+                      <Input value={sessionTitle} onChange={(e) => setSessionTitle(e.target.value)} placeholder={t("sessions.titlePlaceholder")} required />
                     </div>
                     <div className="space-y-2">
                       <Label>{t("auth.programme")}</Label>
@@ -629,7 +639,7 @@ export default function Dashboard() {
                     </div>
                     <div className="space-y-2">
                       <Label>{t("sessions.venue")}</Label>
-                      <Input value={sessionVenue} onChange={(e) => setSessionVenue(e.target.value)} placeholder="Room 101" />
+                      <Input value={sessionVenue} onChange={(e) => setSessionVenue(e.target.value)} placeholder={t("sessions.venuePlaceholder")} />
                     </div>
                     <div className="space-y-2">
                       <Label>{t("sessions.duration")}</Label>
@@ -638,10 +648,10 @@ export default function Dashboard() {
                         onChange={(e) => setSessionDuration(e.target.value)}
                         className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                       >
-                        <option value="30">30 min</option>
-                        <option value="60">1 hr</option>
-                        <option value="90">1.5 hrs</option>
-                        <option value="120">2 hrs</option>
+                        <option value="30">30 {t("qr.minutes")}</option>
+                        <option value="60">60 {t("qr.minutes")}</option>
+                        <option value="90">90 {t("qr.minutes")}</option>
+                        <option value="120">120 {t("qr.minutes")}</option>
                       </select>
                     </div>
                     <Button type="submit" className="w-full" disabled={createSessionMutation.isPending}>{t("sessions.create")}</Button>
@@ -660,9 +670,9 @@ export default function Dashboard() {
                     <Clock className="h-4 w-4 text-primary shrink-0" />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium truncate">{session.title}</p>
-                      <p className="text-xs text-muted-foreground">{(session as any).courses?.code} • {format(new Date(session.session_date), "dd MMM yyyy")}</p>
+                      <p className="text-xs text-muted-foreground">{(session as any).courses?.code} • {format(new Date(session.session_date), "dd MMM yyyy", { locale: dateLocale })}</p>
                     </div>
-                    <Badge variant={session.status === "active" ? "default" : "secondary"} className="text-xs shrink-0">{session.status}</Badge>
+                    <Badge variant={session.status === "active" ? "default" : "secondary"} className="text-xs shrink-0">{sessionStatusLabel(session.status)}</Badge>
                   </div>
                 ))}
               </div>

@@ -19,21 +19,24 @@ import {
   Users, Search, UserCheck, UserX, BookOpen, Trash2, ChevronDown,
   GraduationCap, UsersRound, UserPlus, Upload, FileSpreadsheet, Mail, IdCard, Settings2,
   ArrowUpDown, ArrowUp, ArrowDown, X, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight,
-  Eye, Pencil, Phone, Calendar, Building2,
+  Eye, Pencil, Phone, Calendar, Building2, KeyRound, Shield, ShieldOff,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import AddLecturerDialog from "@/components/AddLecturerDialog";
+import UserFormDialog, { type ManagedUser } from "@/components/UserFormDialog";
+import ResetPasswordDialog, { type ResetUser } from "@/components/ResetPasswordDialog";
+import ResetTotpDialog from "@/components/ResetTotpDialog";
+import BulkCreateStudentsDialog from "@/components/BulkCreateStudentsDialog";
 
 export default function UsersAdmin() {
-  const { t } = useI18n();
-  const { role } = useAuth();
+  const { t, dateLocale } = useI18n();
+  const { user, role } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [section, setSection] = useState<"staff" | "students">("students");
+  const [section, setSection] = useState<"staff" | "students" | "admins">("students");
 
   // ─── Manage Students sub-state ────────────────────────────────────
   const [studentsTab, setStudentsTab] = useState<"list" | "enroll">("list");
@@ -60,9 +63,16 @@ export default function UsersAdmin() {
 
   // Staff view / edit / delete dialogs
   const [viewStaffId, setViewStaffId] = useState<string | null>(null);
-  const [editStaffId, setEditStaffId] = useState<string | null>(null);
   const [deleteStaffId, setDeleteStaffId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ full_name: "", university_id: "", email: "", phone: "", gender: "" });
+
+  // Unified create/edit/reset/bulk dialogs
+  const [userFormOpen, setUserFormOpen] = useState(false);
+  const [userFormMode, setUserFormMode] = useState<"create" | "edit">("create");
+  const [userFormRole, setUserFormRole] = useState<"student" | "lecturer" | "admin">("student");
+  const [userFormInitial, setUserFormInitial] = useState<ManagedUser | null>(null);
+  const [resetUser, setResetUser] = useState<ResetUser | null>(null);
+  const [resetTotpUser, setResetTotpUser] = useState<ResetUser | null>(null);
+  const [bulkCreateOpen, setBulkCreateOpen] = useState(false);
 
   // ─── Students list extra filters ─────────────────────────────────
   const [listSemesterId, setListSemesterId] = useState<string>("all");
@@ -92,7 +102,7 @@ export default function UsersAdmin() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, full_name, university_id, email, gender, department_id, phone, academic_year, created_at")
+        .select("id, full_name, university_id, email, gender, department_id, phone, academic_year, study_year, created_at")
         .order("full_name");
       if (error) throw error;
       return data;
@@ -113,7 +123,7 @@ export default function UsersAdmin() {
   const { data: departments = [] } = useQuery({
     queryKey: ["mu-departments"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("departments").select("id, name").order("name");
+      const { data, error } = await supabase.from("departments").select("id, name, code").order("name");
       if (error) throw error;
       return data;
     },
@@ -198,6 +208,10 @@ export default function UsersAdmin() {
     () => profiles.filter((p) => roleMap[p.id] === "lecturer"),
     [profiles, roleMap]
   );
+  const admins = useMemo(
+    () => profiles.filter((p) => roleMap[p.id] === "admin"),
+    [profiles, roleMap]
+  );
 
   const lecturerCoursesMap: Record<string, string[]> = useMemo(() => {
     const m: Record<string, string[]> = {};
@@ -258,64 +272,60 @@ export default function UsersAdmin() {
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
 
-  const deleteStudentMutation = useMutation({
-    mutationFn: async (studentId: string) => {
-      await supabase.from("attendance_records").delete().eq("user_id", studentId);
-      await supabase.from("course_enrollments").delete().eq("user_id", studentId);
-      await supabase.from("user_roles").delete().eq("user_id", studentId);
-      const { error } = await supabase.from("profiles").delete().eq("id", studentId);
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const { data, error } = await supabase.functions.invoke("admin-manage-users", {
+        body: { action: "delete", user_id: userId },
+      });
       if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mu-profiles"] });
       queryClient.invalidateQueries({ queryKey: ["mu-roles"] });
       queryClient.invalidateQueries({ queryKey: ["mu-enrollments"] });
-      toast({ title: t("common.success"), description: t("admin.studentDeleted") });
-      setDeleteStudentId(null);
-    },
-    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
-  });
-
-  // ─── Staff mutations ─────────────────────────────────────────────
-  const updateStaffMutation = useMutation({
-    mutationFn: async () => {
-      if (!editStaffId) return;
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          full_name: editForm.full_name,
-          university_id: editForm.university_id,
-          email: editForm.email || null,
-          phone: editForm.phone || null,
-          gender: editForm.gender || null,
-        })
-        .eq("id", editStaffId);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["mu-profiles"] });
-      toast({ title: t("common.success"), description: t("admin.staffUpdated") });
-      setEditStaffId(null);
-    },
-    onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
-  });
-
-  const deleteStaffMutation = useMutation({
-    mutationFn: async (staffId: string) => {
-      await supabase.from("course_lecturers").delete().eq("lecturer_id", staffId);
-      await supabase.from("user_roles").delete().eq("user_id", staffId);
-      const { error } = await supabase.from("profiles").delete().eq("id", staffId);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["mu-profiles"] });
-      queryClient.invalidateQueries({ queryKey: ["mu-roles"] });
       queryClient.invalidateQueries({ queryKey: ["mu-course-lecturers"] });
-      toast({ title: t("common.success"), description: t("admin.staffDeleted") });
+      queryClient.invalidateQueries({ queryKey: ["mu-courses"] });
+      toast({ title: t("common.success"), description: t("admin.userDeleted") });
+      setDeleteStudentId(null);
       setDeleteStaffId(null);
     },
     onError: (e: any) => toast({ title: t("common.error"), description: e.message, variant: "destructive" }),
   });
+
+  const openCreateUser = (nextRole: "student" | "lecturer" | "admin") => {
+    setUserFormMode("create");
+    setUserFormRole(nextRole);
+    setUserFormInitial(null);
+    setUserFormOpen(true);
+  };
+
+  const openEditUser = (profile: any) => {
+    const nextRole = (roleMap[profile.id] ?? "student") as "student" | "lecturer" | "admin";
+    setUserFormMode("edit");
+    setUserFormRole(nextRole);
+    setUserFormInitial({
+      id: profile.id,
+      full_name: profile.full_name ?? "",
+      university_id: profile.university_id ?? "",
+      email: profile.email ?? null,
+      phone: profile.phone ?? null,
+      gender: profile.gender ?? null,
+      department_id: profile.department_id ?? null,
+      academic_year: profile.academic_year ?? null,
+      study_year: profile.study_year ?? null,
+      role: nextRole,
+    });
+    setUserFormOpen(true);
+  };
+
+  const invalidateUserQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ["mu-profiles"] });
+    queryClient.invalidateQueries({ queryKey: ["mu-roles"] });
+    queryClient.invalidateQueries({ queryKey: ["mu-enrollments"] });
+    queryClient.invalidateQueries({ queryKey: ["mu-course-lecturers"] });
+    queryClient.invalidateQueries({ queryKey: ["mu-courses"] });
+  };
 
   // ─── Bulk CSV import — parse + validate + show preview ───────────
   const parseCsv = (text: string): { headers: string[]; rows: Record<string, string>[] } => {
@@ -339,7 +349,7 @@ export default function UsersAdmin() {
       const text = await file.text();
       const { headers, rows } = parseCsv(text);
       if (rows.length === 0) {
-        toast({ title: t("common.error"), description: "Empty file", variant: "destructive" });
+        toast({ title: t("common.error"), description: t("common.emptyFile"), variant: "destructive" });
         if (fileInputRef.current) fileInputRef.current.value = "";
         return;
       }
@@ -614,7 +624,7 @@ export default function UsersAdmin() {
 
       {/* Top toggle: Staff vs Students */}
       <Tabs value={section} onValueChange={(v) => setSection(v as any)}>
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsList className="grid w-full max-w-2xl grid-cols-3">
           <TabsTrigger value="students" className="gap-2">
             <Users className="h-4 w-4" />
             {t("admin.manageStudents")}
@@ -622,6 +632,10 @@ export default function UsersAdmin() {
           <TabsTrigger value="staff" className="gap-2">
             <GraduationCap className="h-4 w-4" />
             {t("admin.manageStaff")}
+          </TabsTrigger>
+          <TabsTrigger value="admins" className="gap-2">
+            <Shield className="h-4 w-4" />
+            {t("admin.manageAdmins")}
           </TabsTrigger>
         </TabsList>
 
@@ -643,11 +657,25 @@ export default function UsersAdmin() {
             <TabsContent value="list" className="space-y-4 mt-4">
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    {t("admin.studentsList")}
-                  </CardTitle>
-                  <CardDescription>{t("enroll.level")} → {t("enroll.module")}</CardDescription>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        {t("admin.studentsList")}
+                      </CardTitle>
+                      <CardDescription>{t("enroll.level")} → {t("enroll.module")}</CardDescription>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setBulkCreateOpen(true)}>
+                        <FileSpreadsheet className="h-4 w-4 mr-1.5" />
+                        {t("admin.bulkCreateStudents")}
+                      </Button>
+                      <Button size="sm" onClick={() => openCreateUser("student")}>
+                        <UserPlus className="h-4 w-4 mr-1.5" />
+                        {t("admin.addStudent")}
+                      </Button>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {/* Search bar + clear */}
@@ -734,7 +762,7 @@ export default function UsersAdmin() {
                           <TableHead>{t("reports.universityId")}</TableHead>
                           <TableHead className="hidden md:table-cell">{t("auth.email")}</TableHead>
                           <TableHead>{t("auth.gender")}</TableHead>
-                          <TableHead className="w-16 text-right">{t("common.actions")}</TableHead>
+                          <TableHead className="w-28 text-right">{t("common.actions")}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -757,14 +785,28 @@ export default function UsersAdmin() {
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-right">
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                  onClick={() => setDeleteStudentId(s.id)}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
+                                <div className="inline-flex items-center gap-1">
+                                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title={t("admin.editStudent")}
+                                    onClick={() => openEditUser(s)}>
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title={t("admin.resetPassword")}
+                                    onClick={() => setResetUser({ id: s.id, full_name: s.full_name, email: s.email })}>
+                                    <KeyRound className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title={t("admin.resetTotp")}
+                                    onClick={() => setResetTotpUser({ id: s.id, full_name: s.full_name, email: s.email })}>
+                                    <ShieldOff className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    onClick={() => setDeleteStudentId(s.id)}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
                               </TableCell>
                             </TableRow>
                           ))
@@ -971,7 +1013,10 @@ export default function UsersAdmin() {
                     {t("admin.lecturerLevel")} · {t("admin.lecturerModules")}
                   </CardDescription>
                 </div>
-                <AddLecturerDialog departments={departments} levels={levels} />
+                <Button size="sm" className="gap-1.5" onClick={() => openCreateUser("lecturer")}>
+                  <UserPlus className="h-4 w-4" />
+                  {t("admin.addStaff")}
+                </Button>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1082,17 +1127,16 @@ export default function UsersAdmin() {
                                   <Eye className="h-3.5 w-3.5" />
                                 </Button>
                                 <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title={t("admin.editStaff")}
-                                  onClick={() => {
-                                    setEditStaffId(lec.id);
-                                    setEditForm({
-                                      full_name: lec.full_name || "",
-                                      university_id: lec.university_id || "",
-                                      email: lec.email || "",
-                                      phone: lec.phone || "",
-                                      gender: lec.gender || "",
-                                    });
-                                  }}>
+                                  onClick={() => openEditUser(lec)}>
                                   <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title={t("admin.resetPassword")}
+                                  onClick={() => setResetUser({ id: lec.id, full_name: lec.full_name, email: lec.email })}>
+                                  <KeyRound className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title={t("admin.resetTotp")}
+                                  onClick={() => setResetTotpUser({ id: lec.id, full_name: lec.full_name, email: lec.email })}>
+                                  <ShieldOff className="h-3.5 w-3.5" />
                                 </Button>
                                 <Button size="sm" variant="ghost"
                                   className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
@@ -1140,6 +1184,87 @@ export default function UsersAdmin() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* ══════════════ MANAGE ADMINS ══════════════ */}
+        <TabsContent value="admins" className="space-y-5 mt-5">
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Shield className="h-4 w-4" />
+                    {t("admin.adminsList")}
+                  </CardTitle>
+                  <CardDescription>{t("admin.adminsDesc")}</CardDescription>
+                </div>
+                <Button size="sm" className="gap-1.5" onClick={() => openCreateUser("admin")}>
+                  <UserPlus className="h-4 w-4" />
+                  {t("admin.addAdmin")}
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-lg border overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">#</TableHead>
+                      <TableHead>{t("admin.staffSortName")}</TableHead>
+                      <TableHead>{t("admin.staffSortId")}</TableHead>
+                      <TableHead>{t("auth.email")}</TableHead>
+                      <TableHead>{t("admin.staffDepartment")}</TableHead>
+                      <TableHead className="text-right w-[160px]">{t("common.actions")}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {admins.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                          {t("reports.noData")}
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      admins.map((adminUser: any, i) => {
+                        const dept = departments.find((d) => d.id === adminUser.department_id);
+                        return (
+                          <TableRow key={adminUser.id} className="hover:bg-muted/40">
+                            <TableCell className="text-muted-foreground text-xs">{i + 1}</TableCell>
+                            <TableCell className="font-medium">{adminUser.full_name}</TableCell>
+                            <TableCell className="font-mono text-xs">{adminUser.university_id}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{adminUser.email || "—"}</TableCell>
+                            <TableCell className="text-xs">{dept?.name || "—"}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="inline-flex items-center gap-1">
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title={t("admin.editStaff")}
+                                  onClick={() => openEditUser(adminUser)}>
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title={t("admin.resetPassword")}
+                                  onClick={() => setResetUser({ id: adminUser.id, full_name: adminUser.full_name, email: adminUser.email })}>
+                                  <KeyRound className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title={t("admin.resetTotp")}
+                                  onClick={() => setResetTotpUser({ id: adminUser.id, full_name: adminUser.full_name, email: adminUser.email })}>
+                                  <ShieldOff className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button size="sm" variant="ghost"
+                                  className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  title={t("admin.deleteUser")}
+                                  onClick={() => setDeleteStaffId(adminUser.id)}>
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       {/* Delete confirmation */}
@@ -1153,7 +1278,7 @@ export default function UsersAdmin() {
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => deleteStudentId && deleteStudentMutation.mutate(deleteStudentId)}
+              onClick={() => deleteStudentId && deleteUserMutation.mutate(deleteStudentId)}
             >
               {t("common.delete")}
             </AlertDialogAction>
@@ -1283,7 +1408,7 @@ export default function UsersAdmin() {
             const lecLevelIds = [...new Set(lecCourses.map((c) => c.level_id).filter(Boolean))];
             const lecLevels = levels.filter((l) => lecLevelIds.includes(l.id));
             const dept = departments.find((d) => d.id === lec.department_id);
-            const joined = lec.created_at ? new Date(lec.created_at).toLocaleDateString() : "—";
+            const joined = lec.created_at ? new Date(lec.created_at).toLocaleDateString(dateLocale.code) : "—";
             return (
               <>
                 <DialogHeader>
@@ -1367,14 +1492,7 @@ export default function UsersAdmin() {
                   <Button variant="outline" onClick={() => setViewStaffId(null)}>{t("common.cancel")}</Button>
                   <Button
                     onClick={() => {
-                      setEditStaffId(lec.id);
-                      setEditForm({
-                        full_name: lec.full_name || "",
-                        university_id: lec.university_id || "",
-                        email: lec.email || "",
-                        phone: lec.phone || "",
-                        gender: lec.gender || "",
-                      });
+                      openEditUser(lec);
                       setViewStaffId(null);
                     }}
                   >
@@ -1387,79 +1505,58 @@ export default function UsersAdmin() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Staff: Edit dialog ── */}
-      <Dialog open={!!editStaffId} onOpenChange={(o) => { if (!o) setEditStaffId(null); }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Pencil className="h-4 w-4 text-primary" />
-              {t("admin.editStaff")}
-            </DialogTitle>
-            <DialogDescription>{t("admin.staffPersonalInfo")}</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">{t("admin.staffSortName")}</Label>
-              <Input value={editForm.full_name}
-                onChange={(e) => setEditForm((f) => ({ ...f, full_name: e.target.value }))} />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">{t("admin.staffSortId")}</Label>
-              <Input value={editForm.university_id}
-                onChange={(e) => setEditForm((f) => ({ ...f, university_id: e.target.value }))} />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">{t("auth.email")}</Label>
-              <Input type="email" value={editForm.email}
-                onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))} />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">{t("admin.staffPhone")}</Label>
-              <Input value={editForm.phone}
-                onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))} />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">{t("auth.gender")}</Label>
-              <Select value={editForm.gender || "unset"} onValueChange={(v) => setEditForm((f) => ({ ...f, gender: v === "unset" ? "" : v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="unset">—</SelectItem>
-                  <SelectItem value="M">{t("auth.male")}</SelectItem>
-                  <SelectItem value="F">{t("auth.female")}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditStaffId(null)} disabled={updateStaffMutation.isPending}>
-              {t("common.cancel")}
-            </Button>
-            <Button onClick={() => updateStaffMutation.mutate()}
-              disabled={updateStaffMutation.isPending || !editForm.full_name || !editForm.university_id}>
-              {updateStaffMutation.isPending ? "…" : t("common.save")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Staff: Delete confirmation ── */}
+      {/* ── Staff/Admin: Delete confirmation ── */}
       <AlertDialog open={!!deleteStaffId} onOpenChange={(o) => { if (!o) setDeleteStaffId(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("admin.deleteStaff")}</AlertDialogTitle>
-            <AlertDialogDescription>{t("admin.confirmDeleteStaff")}</AlertDialogDescription>
+            <AlertDialogTitle>{t("admin.deleteUser")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("admin.confirmDeleteUser")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => deleteStaffId && deleteStaffMutation.mutate(deleteStaffId)}
+              onClick={() => deleteStaffId && deleteUserMutation.mutate(deleteStaffId)}
             >
               {t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <UserFormDialog
+        open={userFormOpen}
+        onOpenChange={setUserFormOpen}
+        mode={userFormMode}
+        defaultRole={userFormRole}
+        initialUser={userFormInitial}
+        currentUserId={user?.id}
+        departments={departments}
+        levels={levels}
+        courses={courses}
+        onSaved={invalidateUserQueries}
+      />
+
+      <ResetPasswordDialog
+        open={!!resetUser}
+        onOpenChange={(open) => { if (!open) setResetUser(null); }}
+        user={resetUser}
+      />
+
+      <ResetTotpDialog
+        open={!!resetTotpUser}
+        onOpenChange={(open) => { if (!open) setResetTotpUser(null); }}
+        user={resetTotpUser}
+      />
+
+      <BulkCreateStudentsDialog
+        open={bulkCreateOpen}
+        onOpenChange={setBulkCreateOpen}
+        departments={departments}
+        levels={levels}
+        courses={courses}
+        onDone={invalidateUserQueries}
+      />
     </div>
   );
 }

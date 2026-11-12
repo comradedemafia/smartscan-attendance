@@ -1,9 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { corsHeadersFor } from "../_shared/cors.ts";
 
 // Thresholds (in minutes) for sending reminders before the optional selection deadline closes.
 const THRESHOLDS: { key: string; minutes: number; label: string }[] = [
@@ -13,7 +9,23 @@ const THRESHOLDS: { key: string; minutes: number; label: string }[] = [
 ];
 
 Deno.serve(async (req) => {
+  const corsHeaders = corsHeadersFor(req);
+
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  // This function is a scheduled job. Require a shared secret so it cannot be
+  // triggered by arbitrary clients to spam notifications or burn resources.
+  const cronSecret = Deno.env.get("CRON_SECRET");
+  const providedSecret =
+    req.headers.get("x-cron-secret") ||
+    req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
+
+  if (!cronSecret || providedSecret !== cronSecret) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -58,7 +70,7 @@ Deno.serve(async (req) => {
       .eq("department_id", course.department_id)
       .eq("user_roles.role", "student");
 
-    const studentIds = (deptStudents ?? []).map((s: any) => s.id);
+    const studentIds = (deptStudents ?? []).map((s) => s.id);
     if (studentIds.length === 0) continue;
 
     const { data: alreadyEnrolled } = await supabase
@@ -66,7 +78,7 @@ Deno.serve(async (req) => {
       .select("user_id")
       .eq("course_id", course.id)
       .in("user_id", studentIds);
-    const enrolledSet = new Set((alreadyEnrolled ?? []).map((e: any) => e.user_id));
+    const enrolledSet = new Set((alreadyEnrolled ?? []).map((e) => e.user_id));
 
     // Notify both: students who haven't selected yet AND those who are enrolled (in case they want to reconsider).
     // Reason: selection window closes — they need to know either way.

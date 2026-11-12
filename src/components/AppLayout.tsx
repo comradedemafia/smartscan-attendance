@@ -27,6 +27,7 @@ import {
   GraduationCap,
   Bell,
   FileText,
+  FileSpreadsheet,
   ShieldCheck,
   History,
 } from "lucide-react";
@@ -37,6 +38,7 @@ export default function AppLayout() {
   const { user, role, profile, signOut } = useAuth();
   const { t, language, setLanguage } = useI18n();
   const { theme, setTheme } = useTheme();
+  const roleLabel = role === "admin" ? t("common.admin") : role === "lecturer" ? t("auth.lecturer") : role === "student" ? t("auth.student") : "";
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -72,10 +74,11 @@ export default function AppLayout() {
     { to: "/attendance", icon: ClipboardList, label: t("nav.attendance"), roles: ["admin", "lecturer", "student"] },
     { to: "/reports", icon: BarChart3, label: t("nav.reports"), roles: ["admin", "lecturer", "student"] },
     { to: "/users", icon: Users, label: t("nav.users"), roles: ["admin"] },
+    { to: "/student-registry", icon: FileSpreadsheet, label: t("registry.title"), roles: ["admin"] },
     { to: "/excuses", icon: FileText, label: t("excuse.title"), roles: ["admin", "lecturer", "student"] },
     { to: "/notifications", icon: Bell, label: t("notify.history"), roles: ["admin", "lecturer", "student"] },
     { to: "/otp-audit", icon: ShieldCheck, label: t("otpAudit.title"), roles: ["admin"] },
-    { to: "/audit-log", icon: History, label: "Audit Log", roles: ["admin"] },
+    { to: "/audit-log", icon: History, label: t("nav.auditLog"), roles: ["admin"] },
     { to: "/settings", icon: Settings, label: t("nav.settings"), roles: ["admin", "lecturer", "student"] },
   ];
 
@@ -135,7 +138,7 @@ export default function AppLayout() {
 
         <div className="p-4 border-t border-sidebar-border space-y-3">
           <div className="flex items-center justify-between">
-            <Label className="text-xs text-sidebar-foreground">EN / SW</Label>
+            <Label className="text-xs text-sidebar-foreground">{t("settings.language")}</Label>
             <Switch
               checked={language === "sw"}
               onCheckedChange={(checked) => setLanguage(checked ? "sw" : "en")}
@@ -153,7 +156,7 @@ export default function AppLayout() {
             </Button>
           </div>
           <div className="text-xs text-sidebar-foreground truncate">
-            {profile?.full_name} • {role}
+            {profile?.full_name} • {roleLabel}
           </div>
           <Button
             variant="ghost"

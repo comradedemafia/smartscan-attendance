@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import LanguageToggle from "@/components/LanguageToggle";
 import { QrCode, GraduationCap, ArrowLeft } from "lucide-react";
 import { z } from "zod";
 
@@ -36,7 +37,7 @@ export default function ResetPassword() {
     setErrors({});
 
     const schema = z.object({
-      password: z.string().min(6, "Password must be at least 6 characters"),
+      password: z.string().min(6, t("common.passwordMin6")),
       confirmPassword: z.string(),
     }).refine((d) => d.password === d.confirmPassword, {
       message: t("auth.passwordMismatch"),
@@ -68,7 +69,8 @@ export default function ResetPassword() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="relative min-h-screen flex items-center justify-center bg-background p-4">
+      <LanguageToggle className="absolute top-4 right-4" />
       <div className="w-full max-w-md space-y-8">
         <div className="flex flex-col items-center gap-3">
           <div className="flex items-center gap-2 text-primary">
@@ -85,8 +87,8 @@ export default function ResetPassword() {
             <CardTitle>{t("auth.updatePassword")}</CardTitle>
             <CardDescription>
               {ready
-                ? "Enter your new password below"
-                : "Waiting for verification..."}
+                ? t("common.enterNewPassword")
+                : t("common.waitingVerification")}
             </CardDescription>
           </CardHeader>
           <CardContent>

@@ -5,7 +5,6 @@ import "./index.css";
 // Suppress removeChild errors caused by browser extensions (password managers, etc.)
 // modifying DOM nodes that React is trying to unmount
 const originalRemoveChild = Node.prototype.removeChild;
-// @ts-ignore
 Node.prototype.removeChild = function <T extends Node>(child: T): T {
   if (child.parentNode !== this) {
     if (console && console.warn) {

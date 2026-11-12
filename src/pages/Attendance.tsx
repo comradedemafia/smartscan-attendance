@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label";
 type Level = { id: string; name: string; code: string; department_id: string; sort_order: number };
 
 export default function Attendance() {
-  const { t } = useI18n();
+  const { t, dateLocale } = useI18n();
   const { user, role } = useAuth();
   const isAdmin = role === "admin";
   const [selectedDeptId, setSelectedDeptId] = useState<string>("all");
@@ -319,7 +319,7 @@ export default function Attendance() {
               <BookOpen className="h-4 w-4 text-primary" />
               <span>{course.code} — {course.name}</span>
             </div>
-            <Badge variant="secondary" className="text-xs">{sessionHistory.length} sessions</Badge>
+            <Badge variant="secondary" className="text-xs">{sessionHistory.length} {t("courses.sessions")}</Badge>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -445,7 +445,7 @@ export default function Attendance() {
                                 <div>
                                   <p className="font-medium text-sm">{s.title}</p>
                                   <p className="text-xs text-muted-foreground">
-                                    {format(new Date(s.session_date), "dd MMM yyyy")}
+                                    {format(new Date(s.session_date), "dd MMM yyyy", { locale: dateLocale })}
                                     {s.venue_name && ` · 📍 ${s.venue_name}`}
                                   </p>
                                 </div>
@@ -523,7 +523,7 @@ export default function Attendance() {
                     <p className="text-2xl font-bold text-destructive">{overallSummary.totalAbsent}</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-xs text-muted-foreground">Sessions</p>
+                    <p className="text-xs text-muted-foreground">{t("sessions.title")}</p>
                     <p className="text-2xl font-bold">{overallSummary.sessionCount}</p>
                   </div>
                   <div className="text-center">
@@ -578,6 +578,7 @@ function SessionHistoryItem({ sessionData, studentProfiles, t }: {
   t: (key: string) => string;
 }) {
   const [open, setOpen] = useState(false);
+  const { dateLocale } = useI18n();
   const { session, presentStudents, absentStudents, totalEnrolled } = sessionData;
   const pct = totalEnrolled > 0 ? Math.round((presentStudents.length / totalEnrolled) * 100) : 0;
 
@@ -590,7 +591,7 @@ function SessionHistoryItem({ sessionData, studentProfiles, t }: {
             <div>
               <p className="text-sm font-medium">{session.title}</p>
               <p className="text-xs text-muted-foreground">
-                {format(new Date(session.session_date), "dd MMM yyyy")}
+                {format(new Date(session.session_date), "dd MMM yyyy", { locale: dateLocale })}
                 {session.venue_name && ` · 📍 ${session.venue_name}`}
               </p>
             </div>

@@ -22,3 +22,18 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Supabase CLI
+supabase/.temp/
+
+# Cloudflare / Wrangler
+.wrangler/
+.dev.vars
+
+# Generated face verification models
+public/models/

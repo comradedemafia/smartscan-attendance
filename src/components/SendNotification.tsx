@@ -95,7 +95,7 @@ export default function SendNotification() {
               <SelectContent>
                 <SelectItem value="student">{t("auth.student")}</SelectItem>
                 <SelectItem value="lecturer">{t("auth.lecturer")}</SelectItem>
-                {role === "admin" && <SelectItem value="admin">Admin</SelectItem>}
+                {role === "admin" && <SelectItem value="admin">{t("common.admin")}</SelectItem>}
                 <SelectItem value="all">{t("notify.allUsers")}</SelectItem>
               </SelectContent>
             </Select>
@@ -108,10 +108,10 @@ export default function SendNotification() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="info">ℹ️ Info</SelectItem>
-                <SelectItem value="session">📅 Session</SelectItem>
-                <SelectItem value="qr">📱 QR</SelectItem>
-                <SelectItem value="alert">⚠️ Alert</SelectItem>
+                <SelectItem value="info">{t("notify.typeInfo")}</SelectItem>
+                <SelectItem value="session">{t("notify.typeSession")}</SelectItem>
+                <SelectItem value="qr">{t("notify.typeQr")}</SelectItem>
+                <SelectItem value="alert">{t("notify.typeAlert")}</SelectItem>
               </SelectContent>
             </Select>
           </div>

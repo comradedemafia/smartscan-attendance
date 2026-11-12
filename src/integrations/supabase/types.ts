@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.1"
-  }
   public: {
     Tables: {
       attendance_otp: {
@@ -57,28 +52,43 @@ export type Database = {
       }
       attendance_records: {
         Row: {
+          face_gender: string | null
+          face_match_distance: number | null
+          face_verified: boolean
+          gender_match: boolean | null
           id: string
           latitude: number | null
           longitude: number | null
           scanned_at: string
+          selfie_path: string | null
           session_id: string
           status: string
           user_id: string
         }
         Insert: {
+          face_gender?: string | null
+          face_match_distance?: number | null
+          face_verified?: boolean
+          gender_match?: boolean | null
           id?: string
           latitude?: number | null
           longitude?: number | null
           scanned_at?: string
+          selfie_path?: string | null
           session_id: string
           status?: string
           user_id: string
         }
         Update: {
+          face_gender?: string | null
+          face_match_distance?: number | null
+          face_verified?: boolean
+          gender_match?: boolean | null
           id?: string
           latitude?: number | null
           longitude?: number | null
           scanned_at?: string
+          selfie_path?: string | null
           session_id?: string
           status?: string
           user_id?: string
@@ -290,6 +300,7 @@ export type Database = {
       }
       departments: {
         Row: {
+          code: string
           created_at: string
           description: string | null
           id: string
@@ -297,6 +308,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          code: string
           created_at?: string
           description?: string | null
           id?: string
@@ -304,6 +316,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          code?: string
           created_at?: string
           description?: string | null
           id?: string
@@ -531,9 +544,52 @@ export type Database = {
         }
         Relationships: []
       }
+      course_code_aliases: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          course_id: string
+          external_code: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          course_id: string
+          external_code: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          course_id?: string
+          external_code?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_code_aliases_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_code_aliases_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           academic_year: string | null
+          admission_number: string | null
           avatar_url: string | null
           created_at: string
           department_id: string | null
@@ -543,13 +599,14 @@ export type Database = {
           id: string
           must_change_password: boolean
           phone: string | null
+          programme: string | null
           study_year: number | null
-          totp_secret: string | null
           university_id: string
           updated_at: string
         }
         Insert: {
           academic_year?: string | null
+          admission_number?: string | null
           avatar_url?: string | null
           created_at?: string
           department_id?: string | null
@@ -559,13 +616,14 @@ export type Database = {
           id: string
           must_change_password?: boolean
           phone?: string | null
+          programme?: string | null
           study_year?: number | null
-          totp_secret?: string | null
           university_id: string
           updated_at?: string
         }
         Update: {
           academic_year?: string | null
+          admission_number?: string | null
           avatar_url?: string | null
           created_at?: string
           department_id?: string | null
@@ -575,8 +633,8 @@ export type Database = {
           id?: string
           must_change_password?: boolean
           phone?: string | null
+          programme?: string | null
           study_year?: number | null
-          totp_secret?: string | null
           university_id?: string
           updated_at?: string
         }
@@ -586,6 +644,144 @@ export type Database = {
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_registry: {
+        Row: {
+          academic_year: string | null
+          admission_number: string | null
+          created_at: string
+          department_id: string | null
+          department_raw: string | null
+          email: string | null
+          email_is_synthetic: boolean
+          full_name: string
+          gender: string | null
+          id: string
+          last_synced_at: string | null
+          phone: string | null
+          profile_id: string | null
+          programme: string | null
+          provisioned_at: string | null
+          semester: string | null
+          source: string
+          status: string
+          study_year: number | null
+          university_id: string
+          updated_at: string
+        }
+        Insert: {
+          academic_year?: string | null
+          admission_number?: string | null
+          created_at?: string
+          department_id?: string | null
+          department_raw?: string | null
+          email?: string | null
+          email_is_synthetic?: boolean
+          full_name: string
+          gender?: string | null
+          id?: string
+          last_synced_at?: string | null
+          phone?: string | null
+          profile_id?: string | null
+          programme?: string | null
+          provisioned_at?: string | null
+          semester?: string | null
+          source?: string
+          status?: string
+          study_year?: number | null
+          university_id: string
+          updated_at?: string
+        }
+        Update: {
+          academic_year?: string | null
+          admission_number?: string | null
+          created_at?: string
+          department_id?: string | null
+          department_raw?: string | null
+          email?: string | null
+          email_is_synthetic?: boolean
+          full_name?: string
+          gender?: string | null
+          id?: string
+          last_synced_at?: string | null
+          phone?: string | null
+          profile_id?: string | null
+          programme?: string | null
+          provisioned_at?: string | null
+          semester?: string | null
+          source?: string
+          status?: string
+          study_year?: number | null
+          university_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_registry_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_registry_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_registry_enrollments: {
+        Row: {
+          academic_year: string | null
+          course_id: string | null
+          created_at: string
+          external_code: string
+          id: string
+          mapping_status: string
+          registry_id: string
+          semester: string | null
+          updated_at: string
+        }
+        Insert: {
+          academic_year?: string | null
+          course_id?: string | null
+          created_at?: string
+          external_code: string
+          id?: string
+          mapping_status?: string
+          registry_id: string
+          semester?: string | null
+          updated_at?: string
+        }
+        Update: {
+          academic_year?: string | null
+          course_id?: string | null
+          created_at?: string
+          external_code?: string
+          id?: string
+          mapping_status?: string
+          registry_id?: string
+          semester?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_registry_enrollments_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_registry_enrollments_registry_id_fkey"
+            columns: ["registry_id"]
+            isOneToOne: false
+            referencedRelation: "student_registry"
             referencedColumns: ["id"]
           },
         ]
@@ -714,11 +910,70 @@ export type Database = {
         }
         Relationships: []
       }
+      user_totp_secrets: {
+        Row: {
+          created_at: string
+          pending_secret: string | null
+          secret: string | null
+          updated_at: string
+          user_id: string
+          verified: boolean
+        }
+        Insert: {
+          created_at?: string
+          pending_secret?: string | null
+          secret?: string | null
+          updated_at?: string
+          user_id: string
+          verified?: boolean
+        }
+        Update: {
+          created_at?: string
+          pending_secret?: string | null
+          secret?: string | null
+          updated_at?: string
+          user_id?: string
+          verified?: boolean
+        }
+        Relationships: []
+      }
     }
     Views: {
-      [_ in never]: never
+      v_profiles_missing_registry: {
+        Row: {
+          created_at: string
+          department_id: string | null
+          email: string | null
+          full_name: string
+          gender: string | null
+          id: string
+          programme: string | null
+          university_id: string
+        }
+        Relationships: []
+      }
+      v_student_registry_reconciliation: {
+        Row: {
+          admission_number: string | null
+          profile_department_id: string | null
+          profile_gender: string | null
+          profile_id: string | null
+          profile_name: string | null
+          profile_programme: string | null
+          provisioned_at: string | null
+          registry_department_id: string | null
+          registry_gender: string | null
+          registry_id: string
+          registry_name: string
+          registry_programme: string | null
+          status: string
+          university_id: string
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      apply_course_code_aliases: { Args: never; Returns: number }
       email_for_login_id: { Args: { _login_id: string }; Returns: string }
       get_2fa_stats: {
         Args: never

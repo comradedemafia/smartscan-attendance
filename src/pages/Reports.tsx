@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { Locale } from "date-fns";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,7 +18,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 
 export default function Reports() {
-  const { t } = useI18n();
+  const { t, dateLocale } = useI18n();
   const { user, role } = useAuth();
   const [selectedCourse, setSelectedCourse] = useState<string>("");
   const [selectedStudent, setSelectedStudent] = useState<string>("");
@@ -225,7 +226,7 @@ export default function Reports() {
         const excused = sessions.filter((s) => excuseSet.has(`${uid}_${s.id}`)).length;
         const profile = profileMap[uid];
         return {
-          userId: uid, name: profile?.full_name || "Unknown",
+          userId: uid, name: profile?.full_name || t("common.unknown"),
           universityId: profile?.university_id || "—", gender: profile?.gender || "—",
           attended, excused, total: sessions.length,
           percentage: sessions.length > 0 ? Math.round((attended / sessions.length) * 100) : 0,
@@ -339,13 +340,23 @@ export default function Reports() {
   });
 
   if (role === "student") {
-    return <StudentReportView t={t} userId={user!.id} />;
+    return <StudentReportView t={t} dateLocale={dateLocale} userId={user!.id} />;
   }
 
   const chartConfig = { attendance: { label: t("attendance.attended"), color: "hsl(var(--primary))" } };
 
   const handleExport = (format: "pdf" | "excel") => {
-    const fn = format === "pdf" ? exportToPDF : exportToExcel;
+    const run = format === "pdf" ? exportToPDF : exportToExcel;
+    const fn = (data: Parameters<typeof run>[0]) => run({
+      ...data,
+      locale: dateLocale.code,
+      labels: {
+        filters: t("reports.filters"),
+        generated: t("reports.generated"),
+        period: t("reports.period"),
+        sheet: t("reports.report"),
+      },
+    });
     const dateRange = (dateFrom || dateTo) ? { from: dateFrom, to: dateTo } : undefined;
     const courseFilters: string[] = [];
     if (activeTab === "course") {
@@ -1030,7 +1041,7 @@ export default function Reports() {
 // ============================================================================
 // Student Report View — per-module + general summary + daily sessions
 // ============================================================================
-function StudentReportView({ t, userId }: { t: (k: string) => string; userId: string }) {
+function StudentReportView({ t, dateLocale, userId }: { t: (k: string) => string; dateLocale: Locale; userId: string }) {
   const [tab, setTab] = useState<string>("modules");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
@@ -1146,7 +1157,17 @@ function StudentReportView({ t, userId }: { t: (k: string) => string; userId: st
   });
 
   const handleExport = (fmt: "pdf" | "excel") => {
-    const fn = fmt === "pdf" ? exportToPDF : exportToExcel;
+    const run = fmt === "pdf" ? exportToPDF : exportToExcel;
+    const fn = (data: Parameters<typeof run>[0]) => run({
+      ...data,
+      locale: dateLocale.code,
+      labels: {
+        filters: t("reports.filters"),
+        generated: t("reports.generated"),
+        period: t("reports.period"),
+        sheet: t("reports.report"),
+      },
+    });
     if (tab === "modules") {
       fn({
         title: t("reports.byModule"),
@@ -1169,12 +1190,12 @@ function StudentReportView({ t, userId }: { t: (k: string) => string; userId: st
         columns: [
           { header: t("reports.studentName"), key: "name" },
           { header: t("reports.universityId"), key: "uid" },
-          { header: "Module", key: "module" },
+          { header: t("attendance.course"), key: "module" },
           { header: t("reports.totalSessions"), key: "total" },
           { header: t("reports.attendedSessions"), key: "attended" },
           { header: t("reports.missedSessions"), key: "missed" },
           { header: t("reports.missedWithExcuse"), key: "excused" },
-          { header: "Excuse / Permission", key: "excuseReasons" },
+          { header: t("reports.excusePermission"), key: "excuseReasons" },
         ],
         rows: perModule.map((m) => {
           const reasons = sessions
@@ -1196,14 +1217,18 @@ function StudentReportView({ t, userId }: { t: (k: string) => string; userId: st
         subtitle: profile ? `${profile.full_name} (${profile.university_id})` : undefined,
         dateRange: (dateFrom || dateTo) ? { from: dateFrom, to: dateTo } : undefined,
         columns: [
-          { header: "Date", key: "date" },
-          { header: "Module", key: "module" },
-          { header: "Session", key: "title" },
+          { header: t("attendance.date"), key: "date" },
+          { header: t("attendance.course"), key: "module" },
+          { header: t("attendance.session"), key: "title" },
           { header: t("sessions.venue"), key: "venue" },
           { header: t("sessions.status"), key: "status" },
-          { header: "Excuse / Permission", key: "excuseReason" },
+          { header: t("reports.excusePermission"), key: "excuseReason" },
         ],
-        rows: daily.map((d) => ({ ...d, excuseReason: d.excuseReason || "—" })),
+        rows: daily.map((d) => ({
+          ...d,
+          status: d.status === "present" ? t("attendance.present") : d.status === "excused" ? t("reports.missedWithExcuse") : t("attendance.absent"),
+          excuseReason: d.excuseReason || "—",
+        })),
       });
     }
   };
@@ -1327,11 +1352,11 @@ function StudentReportView({ t, userId }: { t: (k: string) => string; userId: st
                   <TableHeader><TableRow>
                     <TableHead>{t("reports.studentName")}</TableHead>
                     <TableHead>{t("reports.universityId")}</TableHead>
-                    <TableHead>Module</TableHead>
-                    <TableHead className="text-center">Total</TableHead>
-                    <TableHead className="text-center">Attended</TableHead>
-                    <TableHead className="text-center">Missed</TableHead>
-                    <TableHead className="text-center">Excused</TableHead>
+                    <TableHead>{t("attendance.course")}</TableHead>
+                    <TableHead className="text-center">{t("common.total")}</TableHead>
+                    <TableHead className="text-center">{t("attendance.attended")}</TableHead>
+                    <TableHead className="text-center">{t("reports.missed")}</TableHead>
+                    <TableHead className="text-center">{t("reports.excused")}</TableHead>
                   </TableRow></TableHeader>
                   <TableBody>
                     {perModule.map((m) => (
@@ -1362,9 +1387,9 @@ function StudentReportView({ t, userId }: { t: (k: string) => string; userId: st
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader><TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Module</TableHead>
-                      <TableHead>Session</TableHead>
+                      <TableHead>{t("attendance.date")}</TableHead>
+                      <TableHead>{t("attendance.course")}</TableHead>
+                      <TableHead>{t("attendance.session")}</TableHead>
                       <TableHead>{t("sessions.venue")}</TableHead>
                       <TableHead>{t("sessions.status")}</TableHead>
                     </TableRow></TableHeader>

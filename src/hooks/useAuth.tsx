@@ -10,29 +10,17 @@ interface AuthContextType {
   role: AppRole | null;
   profile: {
     university_id: string;
+    admission_number?: string | null;
     full_name: string;
     email: string;
     avatar_url?: string | null;
+    gender?: string | null;
+    programme?: string | null;
     must_change_password?: boolean;
   } | null;
   loading: boolean;
   refreshProfile: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (
-    email: string,
-    password: string,
-    metadata: {
-      university_id: string;
-      full_name: string;
-      role: string;
-      gender?: string;
-      department_id?: string;
-      programme?: string;
-      phone?: string;
-      academic_year?: string;
-      study_year?: number;
-    }
-  ) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -51,7 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
         supabase
           .from("profiles")
-          .select("university_id, full_name, email, avatar_url, must_change_password")
+          .select("university_id, admission_number, full_name, email, avatar_url, gender, programme, must_change_password")
           .eq("id", userId)
           .maybeSingle(),
       ]);
@@ -96,32 +84,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: error as Error | null };
   };
 
-  const signUp = async (
-    email: string,
-    password: string,
-    metadata: {
-      university_id: string;
-      full_name: string;
-      role: string;
-      gender?: string;
-      department_id?: string;
-      programme?: string;
-      phone?: string;
-      academic_year?: string;
-      study_year?: number;
-    }
-  ) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/`,
-        data: metadata,
-      },
-    });
-    return { error: error as Error | null };
-  };
-
   const signOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
@@ -142,7 +104,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (user) await fetchUserData(user.id);
         },
         signIn,
-        signUp,
         signOut,
       }}
     >

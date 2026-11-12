@@ -228,14 +228,14 @@ export default function StudentDepartment() {
   const toggleLevel = (id: string) => {
     setExpandedLevels((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
   };
   const toggleSemester = (id: string) => {
     setExpandedSemesters((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
   };
@@ -300,17 +300,17 @@ export default function StudentDepartment() {
               {isCore ? (
                 <Badge variant="default" className="text-[10px] gap-1">
                   <Star className="h-3 w-3" />
-                  {t("courses.core") || "Core"}
+                  {t("courses.core")}
                 </Badge>
               ) : (
                 <Badge variant="secondary" className="text-[10px]">
-                  {t("courses.optional") || "Optional"}
+                  {t("courses.optional")}
                 </Badge>
               )}
               {lockedOptional && (
                 <Badge variant="outline" className="text-[10px] gap-1 text-destructive border-destructive/40">
                   <Lock className="h-3 w-3" />
-                  {t("courses.selectionClosed") || "Selection closed"}
+                  {t("courses.selectionClosed")}
                 </Badge>
               )}
               {isEnrolled && <CheckCircle2 className="h-4 w-4 text-primary" />}
@@ -323,7 +323,7 @@ export default function StudentDepartment() {
           {countdown && (
             <div className={`flex items-center gap-1.5 text-[11px] font-medium border rounded-md px-2 py-1 ${urgencyClass}`}>
               <Clock className="h-3.5 w-3.5" />
-              <span>{t("courses.timeLeft") || "Time left"}: <span className="font-mono">{countdown}</span></span>
+              <span>{t("courses.timeLeft")}: <span className="font-mono">{countdown}</span></span>
             </div>
           )}
           <div className="flex items-center gap-1 text-xs text-muted-foreground">

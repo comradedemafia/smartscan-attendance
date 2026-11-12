@@ -26,14 +26,6 @@ export default function CourseEnrollments() {
   const [searchQuery, setSearchQuery] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  if (role !== "admin") {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">Access denied</p>
-      </div>
-    );
-  }
-
   // Fetch departments
   const { data: departments = [] } = useQuery({
     queryKey: ["enroll-departments"],
@@ -217,6 +209,14 @@ export default function CourseEnrollments() {
     setSelectedLevelId(val);
     setSelectedCourseId("");
   };
+
+  if (role !== "admin") {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-muted-foreground">{t("common.accessDenied")}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

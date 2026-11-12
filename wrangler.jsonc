@@ -1,4 +1,5 @@
 {
+  "$schema": "node_modules/wrangler/config-schema.json",
   "name": "smartscan-attendance",
   "compatibility_date": "2026-11-09",
   "assets": {

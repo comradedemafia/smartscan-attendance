@@ -107,12 +107,12 @@ Deno.test({
     let totpSecret: string | null = null;
     if (SERVICE_ROLE) {
       const admin = createClient(SUPABASE_URL!, SERVICE_ROLE);
-      const { data: profile } = await admin
-        .from("profiles")
-        .select("totp_secret")
-        .eq("id", userId)
-        .single();
-      totpSecret = profile?.totp_secret ?? null;
+      const { data: totpRow } = await admin
+        .from("user_totp_secrets")
+        .select("secret, verified")
+        .eq("user_id", userId)
+        .maybeSingle();
+      totpSecret = totpRow?.verified ? totpRow?.secret ?? null : null;
 
       // Best-effort cleanup so the test can re-run.
       await admin

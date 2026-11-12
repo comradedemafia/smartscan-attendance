@@ -12,7 +12,7 @@ import { formatDistanceToNow, format } from "date-fns";
 
 export default function Notifications() {
   const { user } = useAuth();
-  const { t } = useI18n();
+  const { t, dateLocale } = useI18n();
   const queryClient = useQueryClient();
   const [confirmClearAll, setConfirmClearAll] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -78,10 +78,10 @@ export default function Notifications() {
 
   const typeBadge = (type: string) => {
     switch (type) {
-      case "session": return <Badge variant="secondary" className="text-[10px]">Session</Badge>;
-      case "qr": return <Badge variant="secondary" className="text-[10px]">QR</Badge>;
-      case "alert": return <Badge variant="destructive" className="text-[10px]">Alert</Badge>;
-      default: return <Badge variant="outline" className="text-[10px]">Info</Badge>;
+      case "session": return <Badge variant="secondary" className="text-[10px]">{t("notifications.session")}</Badge>;
+      case "qr": return <Badge variant="secondary" className="text-[10px]">{t("notifications.qr")}</Badge>;
+      case "alert": return <Badge variant="destructive" className="text-[10px]">{t("notifications.alert")}</Badge>;
+      default: return <Badge variant="outline" className="text-[10px]">{t("notifications.info")}</Badge>;
     }
   };
 
@@ -152,8 +152,8 @@ export default function Notifications() {
                   </div>
                   <p className="text-sm text-muted-foreground">{n.message}</p>
                   <p className="text-xs text-muted-foreground/60">
-                    {format(new Date(n.created_at), "PPp")} •{" "}
-                    {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
+                    {format(new Date(n.created_at), "PPp", { locale: dateLocale })} •{" "}
+                    {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: dateLocale })}
                   </p>
                 </div>
                 <Button
