@@ -30,6 +30,7 @@ import Excuses from "@/pages/Excuses";
 import AdminOtpAuditLog from "@/pages/AdminOtpAuditLog";
 import AdminAuditLog from "@/pages/AdminAuditLog";
 import MustChangePassword from "@/pages/MustChangePassword";
+import SessionGuard from "@/components/SessionGuard";
 
 const queryClient = new QueryClient();
 
@@ -75,6 +76,7 @@ const App = () => (
             <Toaster />
             <Sonner />
             <BrowserRouter>
+              <SessionGuard />
               <Routes>
                 <Route path="/auth" element={<AuthRoute />} />
                 <Route path="/reset-password" element={<ResetPassword />} />

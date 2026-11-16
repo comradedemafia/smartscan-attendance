@@ -49,6 +49,7 @@ npx supabase functions deploy admin-manage-users
 npx supabase functions deploy admin-create-lecturer
 npx supabase functions deploy import-student-registry
 npx supabase functions deploy provision-student-accounts
+npx supabase functions deploy complete-password-change
 npx supabase functions deploy optional-deadline-reminders
 ```
 
@@ -205,6 +206,12 @@ deno test --allow-net --allow-env supabase/functions/
 - TOTP reset is admin-only and clears the service-role-only secret row.
 - `must_change_password` is cleared by a database trigger only after the
   password actually changes; users cannot edit it directly.
+- The forced first-login password change uses the `complete-password-change`
+  edge function, so users with a temporary password do not need to re-enter it.
+  The function only works while `must_change_password` is true.
+- Auth sessions are stored per browser tab in `sessionStorage`; copying the app
+  URL to another tab or device requires a fresh login. Inactive sessions are
+  signed out after 10 minutes.
 - Scheduled edge functions require a shared secret / privileged role.
 
 ## Project structure

@@ -43,10 +43,29 @@ export default function MustChangePassword() {
     }
     setSubmitting(true);
     try {
-      const { error: upErr } = await supabase.auth.updateUser({ password: pwd });
-      if (upErr) throw upErr;
-      // The `on_auth_user_password_changed` trigger clears the
-      // must_change_password flag server-side once the password is updated.
+      const { error: fnError } = await supabase.functions.invoke(
+        "complete-password-change",
+        { body: { password: pwd } },
+      );
+
+      if (fnError) {
+        let code = "";
+        const context = (fnError as { context?: Response }).context;
+        if (context) {
+          try {
+            const body = await context.json();
+            if (typeof body?.error === "string") code = body.error;
+          } catch {
+            // Ignore non-JSON error bodies.
+          }
+        }
+
+        if (code === "password_policy") throw new Error(t("auth.passwordPolicyHint"));
+        if (code === "not_required") throw new Error(t("auth.passwordChangeNotRequired"));
+        if (code === "unauthorized") throw new Error(t("sessions.endedExpired"));
+        throw new Error(t("auth.passwordChangeFailed"));
+      }
+
       await refreshProfile();
       toast({ title: t("common.success"), description: t("auth.passwordUpdated") });
       navigate("/", { replace: true });

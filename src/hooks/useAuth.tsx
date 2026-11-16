@@ -79,18 +79,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, [fetchUserData]);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error: error as Error | null };
-  };
+  }, []);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
     setRole(null);
     setProfile(null);
-  };
+  }, []);
+
+  const refreshProfile = useCallback(async () => {
+    if (user) await fetchUserData(user.id);
+  }, [user, fetchUserData]);
 
   return (
     <AuthContext.Provider
@@ -100,9 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role,
         profile,
         loading,
-        refreshProfile: async () => {
-          if (user) await fetchUserData(user.id);
-        },
+        refreshProfile,
         signIn,
         signOut,
       }}
