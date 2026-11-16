@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import TotpSetup from "@/components/TotpSetup";
 import { useI18n } from "@/lib/i18n";
@@ -15,10 +16,11 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
 export default function SettingsPage() {
-  const { user, profile, role } = useAuth();
+  const { user, profile, role, signOut } = useAuth();
   const { t, language, setLanguage } = useI18n();
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const roleLabel = role === "admin" ? t("common.admin") : role === "lecturer" ? t("auth.lecturer") : role === "student" ? t("auth.student") : "—";
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -116,6 +118,8 @@ export default function SettingsPage() {
       toast({ title: t("common.success"), description: t("settings.passwordChanged") });
       setNewPassword("");
       setConfirmPassword("");
+      await signOut();
+      navigate("/auth", { replace: true });
     } catch (err: any) {
       toast({ title: t("common.error"), description: err.message, variant: "destructive" });
     } finally {

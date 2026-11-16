@@ -21,7 +21,7 @@ const POLICY = {
 };
 
 export default function MustChangePassword() {
-  const { refreshProfile } = useAuth();
+  const { signOut } = useAuth();
   const { t } = useI18n();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -66,9 +66,9 @@ export default function MustChangePassword() {
         throw new Error(t("auth.passwordChangeFailed"));
       }
 
-      await refreshProfile();
       toast({ title: t("common.success"), description: t("auth.passwordUpdated") });
-      navigate("/", { replace: true });
+      await signOut();
+      navigate("/auth", { replace: true });
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
