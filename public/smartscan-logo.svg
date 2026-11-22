@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">SmartScan Attendance</title>
+  <desc id="desc">QR code and graduation cap logo for the SmartScan Attendance system.</desc>
+  <rect width="64" height="64" rx="14" fill="#0F9F78"/>
+  <g fill="#FFFFFF">
+    <rect x="12" y="12" width="11" height="11" rx="2"/>
+    <rect x="15" y="15" width="5" height="5" rx="1" fill="#0F9F78"/>
+    <rect x="41" y="12" width="11" height="11" rx="2"/>
+    <rect x="44" y="15" width="5" height="5" rx="1" fill="#0F9F78"/>
+    <rect x="12" y="41" width="11" height="11" rx="2"/>
+    <rect x="15" y="44" width="5" height="5" rx="1" fill="#0F9F78"/>
+    <rect x="27" y="27" width="5" height="5" rx="1"/>
+    <rect x="34" y="27" width="5" height="5" rx="1"/>
+    <rect x="27" y="34" width="5" height="5" rx="1"/>
+    <rect x="41" y="34" width="5" height="5" rx="1"/>
+    <rect x="48" y="34" width="5" height="5" rx="1"/>
+    <rect x="34" y="41" width="5" height="5" rx="1"/>
+    <rect x="48" y="41" width="5" height="5" rx="1"/>
+    <rect x="27" y="48" width="5" height="5" rx="1"/>
+    <rect x="41" y="48" width="5" height="5" rx="1"/>
+  </g>
+  <path d="M8 26 32 16l24 10-24 10L8 26Z" fill="#FFFFFF"/>
+  <path d="M20 31v9c0 4 5.4 7 12 7s12-3 12-7v-9" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/>
+  <path d="M56 26v11" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/>
+</svg>

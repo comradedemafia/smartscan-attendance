@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import LanguageToggle from "@/components/LanguageToggle";
-import { QrCode, GraduationCap, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import AppLogo from "@/components/AppLogo";
 import { z } from "zod";
 
 export default function ResetPassword() {
@@ -73,10 +74,7 @@ export default function ResetPassword() {
       <LanguageToggle className="absolute top-4 right-4" />
       <div className="w-full max-w-md space-y-8">
         <div className="flex flex-col items-center gap-3">
-          <div className="flex items-center gap-2 text-primary">
-            <QrCode className="h-10 w-10" />
-            <GraduationCap className="h-10 w-10" />
-          </div>
+          <AppLogo />
           <h1 className="text-3xl font-bold tracking-tight font-['Space_Grotesk']">
             {t("auth.resetPassword")}
           </h1>

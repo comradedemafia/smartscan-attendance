@@ -1,4 +1,5 @@
 import NotificationBell from "@/components/NotificationBell";
+import AppLogo from "@/components/AppLogo";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useI18n } from "@/lib/i18n";
@@ -99,7 +100,7 @@ export default function AppLayout() {
         )}
       >
         <div className="flex items-center gap-2 px-6 py-5 border-b border-sidebar-border">
-          <QrCode className="h-7 w-7 text-sidebar-primary" />
+          <AppLogo className="h-7 w-7" />
           <span className="font-bold text-lg font-['Space_Grotesk'] text-sidebar-primary-foreground">
             AAS
           </span>
