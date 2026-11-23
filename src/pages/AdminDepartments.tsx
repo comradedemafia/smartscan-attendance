@@ -195,12 +195,22 @@ export default function AdminDepartments() {
   const { data: allLecturers = [] } = useQuery({
     queryKey: ["all-lecturers"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: roleRows, error: roleError } = await supabase
         .from("user_roles")
-        .select("user_id, profiles(id, full_name, university_id, department_id, phone, gender)")
+        .select("user_id")
         .eq("role", "lecturer");
-      if (error) throw error;
-      return (data || []).map((r: any) => r.profiles).filter(Boolean);
+      if (roleError) throw roleError;
+
+      const lecturerIds = (roleRows || []).map((r: any) => r.user_id);
+      if (lecturerIds.length === 0) return [];
+
+      const { data: profiles, error: profileError } = await supabase
+        .from("profiles")
+        .select("id, full_name, university_id, department_id, phone, gender")
+        .in("id", lecturerIds)
+        .order("full_name");
+      if (profileError) throw profileError;
+      return profiles || [];
     },
   });
 

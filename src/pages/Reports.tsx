@@ -105,13 +105,24 @@ export default function Reports() {
 
       // Get lecturers via course_lecturers
       const { data: clData } = await supabase.from("course_lecturers")
-        .select("lecturer_id, course_id, profiles(full_name, university_id)")
+        .select("lecturer_id, course_id")
         .in("course_id", courseIds);
+
+      const lecturerIds = Array.from(new Set((clData || []).map((cl: any) => cl.lecturer_id)));
+      const lecturerProfiles: any[] = [];
+      if (lecturerIds.length > 0) {
+        const { data } = await supabase.from("profiles")
+          .select("id, full_name, university_id")
+          .in("id", lecturerIds);
+        lecturerProfiles.push(...(data || []));
+      }
+      const lecturerProfileMap = new Map(lecturerProfiles.map((p: any) => [p.id, p]));
 
       const lecturerMap = new Map<string, { name: string; uid: string; courses: string[] }>();
       (clData || []).forEach((cl: any) => {
+        const profile = lecturerProfileMap.get(cl.lecturer_id);
         if (!lecturerMap.has(cl.lecturer_id)) {
-          lecturerMap.set(cl.lecturer_id, { name: cl.profiles?.full_name || "", uid: cl.profiles?.university_id || "", courses: [] });
+          lecturerMap.set(cl.lecturer_id, { name: profile?.full_name || "", uid: profile?.university_id || "", courses: [] });
         }
         const course = deptCourses.find(c => c.id === cl.course_id);
         if (course) lecturerMap.get(cl.lecturer_id)!.courses.push(course.code);
