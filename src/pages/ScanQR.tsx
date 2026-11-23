@@ -124,12 +124,7 @@ export default function ScanQR() {
   // After QR scan — validate
   const initiateMutation = useMutation({
     mutationFn: async (parsed: { session_id: string; secret: string; registration_number: string; latitude?: number; longitude?: number }) => {
-      const { data, error } = await supabase.functions.invoke("attendance-otp", {
-        body: { action: "initiate", ...parsed },
-      });
-      if (error) throw new Error(error.message || t("common.networkError"));
-      if (data?.error) throw new Error(data.error);
-      return data;
+      return callOtp({ action: "initiate", ...parsed });
     },
     onSuccess: (data) => {
       if (data.needs_totp) {
@@ -175,23 +170,18 @@ export default function ScanQR() {
       if (!selfiePayload) {
         throw new Error("SELFIE_REQUIRED");
       }
-      const { data, error } = await supabase.functions.invoke("attendance-otp", {
-        body: {
-          action: "verify-scan-totp",
-          session_id: pendingSessionId,
-          code: otpCode,
-          registration_number: registrationNumber.trim(),
-          latitude: pendingLocation.latitude,
-          longitude: pendingLocation.longitude,
-          selfie: selfiePayload.dataUrl,
-          face_match_distance: selfiePayload.faceMatchDistance,
-          gender: selfiePayload.gender,
-          gender_match: selfiePayload.genderMatch,
-        },
+      return callOtp({
+        action: "verify-scan-totp",
+        session_id: pendingSessionId,
+        code: otpCode,
+        registration_number: registrationNumber.trim(),
+        latitude: pendingLocation.latitude,
+        longitude: pendingLocation.longitude,
+        selfie: selfiePayload.dataUrl,
+        face_match_distance: selfiePayload.faceMatchDistance,
+        gender: selfiePayload.gender,
+        gender_match: selfiePayload.genderMatch,
       });
-      if (error) throw new Error(error.message || t("common.networkError"));
-      if (data?.error) throw new Error(data.error);
-      return data;
     },
     onSuccess: () => {
       setScanStep("verified");
